@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -167,6 +167,31 @@ export default function Saida() {
   const custosAutomaticos = tipoSelecionado?.cobra_custos ? custoTotalAcumulado : 0;
   const custosTotaisCobrados = custoPerda + formData.custos_adicionais + custosAutomaticos;
   const valorFinal = valorBruto - custosTotaisCobrados;
+
+  // Mapeamento de tipo de entrada para tipo de saída sugerido
+  const tipoEntradaToSaidaMap: Record<string, string> = {
+    'Remessa Industrialização': 'Retorno Industrialização',
+    'Compra': 'Venda',
+    'Consignação': 'Retirada pelo Dono',
+    'Transferência': 'Venda',
+  };
+
+  // Detectar tipo de entrada predominante dos lotes selecionados
+  const tipoEntradaPredominante = selectedLotes.length > 0
+    ? selectedLotes[0]?.entrada?.tipo_entrada?.nome || null
+    : null;
+
+  // Sugerir tipo de saída baseado no tipo de entrada
+  const sugerirTipoSaida = () => {
+    if (!tipoEntradaPredominante) return;
+    const nomeSaidaSugerida = tipoEntradaToSaidaMap[tipoEntradaPredominante];
+    if (nomeSaidaSugerida) {
+      const tipoSaidaSugerido = tiposSaida.find((t: any) => t.nome === nomeSaidaSugerida);
+      if (tipoSaidaSugerido && formData.tipo_saida_id !== tipoSaidaSugerido.id) {
+        setFormData(prev => ({ ...prev, tipo_saida_id: tipoSaidaSugerido.id }));
+      }
+    }
+  };
 
   // Filtro de sublotes
   const sublotesFiltrados = sublotesDisponiveis.filter(
@@ -430,13 +455,24 @@ export default function Saida() {
                     </Card>
                   )}
 
-                  <Button className="w-full" onClick={() => setActiveTab("cliente")} disabled={selectedLotes.length === 0}>
+                  <Button className="w-full" onClick={() => { sugerirTipoSaida(); setActiveTab("cliente"); }} disabled={selectedLotes.length === 0}>
                     Próximo: Cliente
                   </Button>
                 </TabsContent>
 
                 {/* Tab 2: Cliente */}
                 <TabsContent value="cliente" className="space-y-4 pt-4">
+                  {tipoEntradaPredominante && (
+                    <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
+                      <p className="text-sm text-amber-700 dark:text-amber-300">
+                        <strong>Tipo de entrada detectado:</strong> {tipoEntradaPredominante}
+                        {tipoEntradaToSaidaMap[tipoEntradaPredominante] && (
+                          <span> → Sugestão: <strong>{tipoEntradaToSaidaMap[tipoEntradaPredominante]}</strong></span>
+                        )}
+                      </p>
+                    </div>
+                  )}
+
                   <div className="space-y-2">
                     <Label>Tipo de Saída</Label>
                     <Select value={formData.tipo_saida_id} onValueChange={(v) => setFormData({ ...formData, tipo_saida_id: v })}>
