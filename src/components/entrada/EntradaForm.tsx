@@ -17,6 +17,7 @@ interface Volume {
   id: string;
   codigo: string;
   peso_kg: string;
+  tipo_produto_id: string;
 }
 
 interface EntradaFormProps {
@@ -39,12 +40,11 @@ export function EntradaForm({ onClose }: EntradaFormProps) {
     placa_veiculo: "",
     transportadora_id: "",
     peso_nf_kg: "",
-    tipo_produto_id: "",
     observacoes: "",
   });
 
   const [volumes, setVolumes] = useState<Volume[]>([]);
-  const [newVolume, setNewVolume] = useState({ codigo: "", peso_kg: "" });
+  const [newVolume, setNewVolume] = useState({ codigo: "", peso_kg: "", tipo_produto_id: "" });
 
   // Queries
   const { data: tiposEntrada } = useQuery({
@@ -97,9 +97,13 @@ export function EntradaForm({ onClose }: EntradaFormProps) {
       toast({ title: "Informe o peso do volume", variant: "destructive" });
       return;
     }
+    if (!newVolume.tipo_produto_id) {
+      toast({ title: "Selecione o tipo de produto", variant: "destructive" });
+      return;
+    }
     const codigo = newVolume.codigo || generateVolumeCode();
-    setVolumes([...volumes, { id: crypto.randomUUID(), codigo, peso_kg: newVolume.peso_kg }]);
-    setNewVolume({ codigo: "", peso_kg: "" });
+    setVolumes([...volumes, { id: crypto.randomUUID(), codigo, peso_kg: newVolume.peso_kg, tipo_produto_id: newVolume.tipo_produto_id }]);
+    setNewVolume({ codigo: "", peso_kg: "", tipo_produto_id: newVolume.tipo_produto_id }); // Keep tipo_produto_id for convenience
   };
 
   const removeVolume = (id: string) => {
@@ -112,13 +116,15 @@ export function EntradaForm({ onClose }: EntradaFormProps) {
     mutationFn: async () => {
       // Gerar código da entrada (lote mãe)
       const codigo = `ENT-${format(new Date(), "yyyyMMdd")}-${String(Math.floor(Math.random() * 9999)).padStart(4, "0")}`;
+      const firstTipoProduto = volumes[0]?.tipo_produto_id || null;
+      const tipoMaterial = tiposProduto?.find((t) => t.id === firstTipoProduto)?.nome || "Material";
       
       // Criar entrada
       const { data: entrada, error: entradaError } = await supabase
         .from("entradas")
         .insert({
           codigo,
-          tipo_material: tiposProduto?.find((t) => t.id === formData.tipo_produto_id)?.nome || "Material",
+          tipo_material: tipoMaterial,
           peso_bruto_kg: totalPeso,
           peso_liquido_kg: totalPeso,
           peso_nf_kg: parseFloat(formData.peso_nf_kg) || null,
@@ -126,7 +132,7 @@ export function EntradaForm({ onClose }: EntradaFormProps) {
           parceiro_id: formData.parceiro_id || null,
           dono_id: formData.dono_id || null,
           tipo_entrada_id: formData.tipo_entrada_id || null,
-          tipo_produto_id: formData.tipo_produto_id || null,
+          tipo_produto_id: firstTipoProduto,
           nota_fiscal: formData.nota_fiscal || null,
           data_entrada: formData.data_entrada,
           motorista: formData.motorista || null,
@@ -149,7 +155,7 @@ export function EntradaForm({ onClose }: EntradaFormProps) {
           entrada_id: entrada.id,
           peso_kg: totalPeso,
           dono_id: formData.dono_id || null,
-          tipo_produto_id: formData.tipo_produto_id || null,
+          tipo_produto_id: firstTipoProduto,
           status: "disponivel",
           numero_volume: 0, // 0 indica lote mãe
         })
@@ -167,7 +173,7 @@ export function EntradaForm({ onClose }: EntradaFormProps) {
           lote_pai_id: loteMae.id,
           peso_kg: parseFloat(volume.peso_kg),
           dono_id: formData.dono_id || null,
-          tipo_produto_id: formData.tipo_produto_id || null,
+          tipo_produto_id: volume.tipo_produto_id || null,
           status: "disponivel",
           numero_volume: i + 1,
         });
@@ -338,20 +344,12 @@ export function EntradaForm({ onClose }: EntradaFormProps) {
           </div>
 
           <div className="space-y-2">
-            <Label>Tipo de Produto</Label>
-            <Select
-              value={formData.tipo_produto_id}
-              onValueChange={(v) => setFormData({ ...formData, tipo_produto_id: v })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o produto..." />
-              </SelectTrigger>
-              <SelectContent>
-                {tiposProduto?.map((t) => (
-                  <SelectItem key={t.id} value={t.id}>{t.nome}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label>Observações</Label>
+            <Input
+              value={formData.observacoes}
+              onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
+              placeholder="Observações gerais..."
+            />
           </div>
 
           <Button className="w-full" onClick={() => setActiveTab("volumes")}>
@@ -362,8 +360,24 @@ export function EntradaForm({ onClose }: EntradaFormProps) {
         <TabsContent value="volumes" className="space-y-4 pt-4">
           <div className="p-4 rounded-lg border bg-muted/30 space-y-4">
             <Label className="text-base font-medium">Adicionar Volume/Ticket</Label>
-            <div className="flex gap-2 items-end">
-              <div className="flex-1 space-y-2">
+            <div className="grid grid-cols-3 gap-2 items-end">
+              <div className="space-y-2">
+                <Label className="text-sm">Tipo Produto *</Label>
+                <Select
+                  value={newVolume.tipo_produto_id}
+                  onValueChange={(v) => setNewVolume({ ...newVolume, tipo_produto_id: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {tiposProduto?.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>{t.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
                 <Label className="text-sm">Código TKT</Label>
                 <Input
                   value={newVolume.codigo}
@@ -371,18 +385,20 @@ export function EntradaForm({ onClose }: EntradaFormProps) {
                   placeholder="Auto (opcional)"
                 />
               </div>
-              <div className="flex-1 space-y-2">
+              <div className="space-y-2">
                 <Label className="text-sm">Peso (kg) *</Label>
-                <Input
-                  type="number"
-                  value={newVolume.peso_kg}
-                  onChange={(e) => setNewVolume({ ...newVolume, peso_kg: e.target.value })}
-                  placeholder="0"
-                />
+                <div className="flex gap-2">
+                  <Input
+                    type="number"
+                    value={newVolume.peso_kg}
+                    onChange={(e) => setNewVolume({ ...newVolume, peso_kg: e.target.value })}
+                    placeholder="0"
+                  />
+                  <Button onClick={addVolume} className="bg-primary">
+                    <Plus className="h-4 w-4 mr-1" /> Add
+                  </Button>
+                </div>
               </div>
-              <Button onClick={addVolume} className="bg-primary">
-                <Plus className="h-4 w-4 mr-1" /> Add
-              </Button>
             </div>
           </div>
 
@@ -392,6 +408,7 @@ export function EntradaForm({ onClose }: EntradaFormProps) {
                 <TableHeader>
                   <TableRow className="bg-muted/50">
                     <TableHead>Código</TableHead>
+                    <TableHead>Tipo Produto</TableHead>
                     <TableHead className="text-right">Peso (kg)</TableHead>
                     <TableHead className="w-12"></TableHead>
                   </TableRow>
@@ -400,6 +417,7 @@ export function EntradaForm({ onClose }: EntradaFormProps) {
                   {volumes.map((volume) => (
                     <TableRow key={volume.id}>
                       <TableCell className="font-mono text-primary">{volume.codigo}</TableCell>
+                      <TableCell>{tiposProduto?.find(t => t.id === volume.tipo_produto_id)?.nome || "—"}</TableCell>
                       <TableCell className="text-right font-medium">{parseFloat(volume.peso_kg).toLocaleString("pt-BR")} kg</TableCell>
                       <TableCell>
                         <Button variant="ghost" size="icon" onClick={() => removeVolume(volume.id)}>
@@ -409,7 +427,7 @@ export function EntradaForm({ onClose }: EntradaFormProps) {
                     </TableRow>
                   ))}
                   <TableRow className="bg-muted/30 font-bold">
-                    <TableCell>TOTAL ({volumes.length} volumes)</TableCell>
+                    <TableCell colSpan={2}>TOTAL ({volumes.length} volumes)</TableCell>
                     <TableCell className="text-right">{totalPeso.toLocaleString("pt-BR")} kg</TableCell>
                     <TableCell></TableCell>
                   </TableRow>
