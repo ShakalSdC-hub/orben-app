@@ -266,12 +266,12 @@ export default function Relatorios() {
               </div>
               <div className="space-y-2">
                 <Label>Dono do Material</Label>
-                <Select value={donoFiltro} onValueChange={setDonoFiltro}>
+                <Select value={donoFiltro || "all"} onValueChange={(v) => setDonoFiltro(v === "all" ? "" : v)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Todos" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todos</SelectItem>
+                    <SelectItem value="all">Todos</SelectItem>
                     {donos?.map((d) => (
                       <SelectItem key={d.id} value={d.id}>
                         {d.nome}
@@ -282,12 +282,12 @@ export default function Relatorios() {
               </div>
               <div className="space-y-2">
                 <Label>Tipo de Produto</Label>
-                <Select value={tipoFiltro} onValueChange={setTipoFiltro}>
+                <Select value={tipoFiltro || "all"} onValueChange={(v) => setTipoFiltro(v === "all" ? "" : v)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Todos" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todos</SelectItem>
+                    <SelectItem value="all">Todos</SelectItem>
                     {tiposProduto?.map((t) => (
                       <SelectItem key={t.id} value={t.id}>
                         {t.nome}

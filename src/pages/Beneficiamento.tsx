@@ -10,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Cog, DollarSign, Scale, AlertTriangle, Truck, Package, Loader2, Search, Trash2, Printer, ChevronRight, ChevronDown } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Plus, Cog, DollarSign, Scale, AlertTriangle, Truck, Package, Loader2, Search, Trash2, Printer, ChevronRight, ChevronDown, Info } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -107,27 +108,20 @@ export default function Beneficiamento() {
   });
 
   // Função para verificar se um sublote é relacionado (pai/filho) a algum já selecionado
+  // Permite múltiplos filhos do mesmo pai, mas não permite pai+filho ao mesmo tempo
   const isRelatedToSelected = (sublote: any): { isRelated: boolean; relatedCode: string | null } => {
     for (const selected of selectedLotes) {
-      // Verifica se o sublote selecionado é pai do atual
+      // Verifica se o sublote selecionado é pai do atual (não permite selecionar filho se pai está selecionado)
       if (sublote.lote_pai_id === selected.id) {
         return { isRelated: true, relatedCode: selected.codigo };
       }
-      // Verifica se o sublote atual é pai do selecionado
+      // Verifica se o sublote atual é pai do selecionado (não permite selecionar pai se filho está selecionado)
       const selectedFull = sublotesDisponiveis.find((s: any) => s.id === selected.id);
       if (selectedFull?.lote_pai_id === sublote.id) {
         return { isRelated: true, relatedCode: selected.codigo };
       }
-      // Verifica se compartilham o mesmo entrada_id e um é pai do outro (mesma entrada)
-      if (sublote.entrada_id && selectedFull?.entrada_id === sublote.entrada_id) {
-        if (sublote.lote_pai_id || selectedFull?.lote_pai_id) {
-          // Se um deles tem lote_pai_id, são relacionados (lote mãe e sublote)
-          if (sublote.lote_pai_id === selected.id || selectedFull?.lote_pai_id === sublote.id) {
-            return { isRelated: true, relatedCode: selected.codigo };
-          }
-        }
-      }
     }
+    // Permite múltiplos filhos do mesmo pai (irmãos)
     return { isRelated: false, relatedCode: null };
   };
 
@@ -412,10 +406,26 @@ export default function Beneficiamento() {
                                       className="font-mono text-primary cursor-pointer"
                                       onClick={() => toggleExpand(parent.id)}
                                     >
-                                      {parent.codigo}
-                                      <Badge variant="secondary" className="ml-2 text-xs">
-                                        {childrenCount} sublote{childrenCount > 1 ? 's' : ''}
-                                      </Badge>
+                                      <TooltipProvider>
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <span className="inline-flex items-center gap-2">
+                                              {parent.codigo}
+                                              <Badge variant="secondary" className="text-xs">
+                                                {childrenCount} sublote{childrenCount > 1 ? 's' : ''}
+                                              </Badge>
+                                              <Info className="h-3 w-3 text-muted-foreground" />
+                                            </span>
+                                          </TooltipTrigger>
+                                          <TooltipContent side="top" className="max-w-xs">
+                                            <p className="text-sm">
+                                              <strong>Lote mãe com {childrenCount} sublote{childrenCount > 1 ? 's' : ''}.</strong><br />
+                                              Clique na seta para expandir e selecionar sublotes individualmente, 
+                                              ou selecione o lote mãe para incluir todo o material.
+                                            </p>
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      </TooltipProvider>
                                     </TableCell>
                                     <TableCell>{parent.tipo_produto?.nome || "-"}</TableCell>
                                     <TableCell>{parent.dono?.nome || "-"}</TableCell>
