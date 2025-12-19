@@ -100,7 +100,8 @@ export default function Saida() {
         .from("saidas")
         .select(`
           *,
-          tipos_saida(nome, cobra_custos)
+          tipos_saida(nome, cobra_custos),
+          cliente:parceiros!saidas_cliente_id_fkey(razao_social, nome_fantasia)
         `)
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -611,6 +612,7 @@ export default function Saida() {
                 <TableRow>
                   <TableHead>Código</TableHead>
                   <TableHead>Tipo</TableHead>
+                  <TableHead>Cliente/Parceiro</TableHead>
                   <TableHead>Data</TableHead>
                   <TableHead className="text-right">Peso</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
@@ -621,9 +623,9 @@ export default function Saida() {
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow><TableCell colSpan={8} className="text-center">Carregando...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={9} className="text-center">Carregando...</TableCell></TableRow>
                 ) : filteredSaidas.length === 0 ? (
-                  <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">Nenhuma saída encontrada</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">Nenhuma saída encontrada</TableCell></TableRow>
                 ) : (
                   filteredSaidas.map((s: any) => (
                     <TableRow key={s.id}>
@@ -633,6 +635,7 @@ export default function Saida() {
                           {s.tipos_saida?.nome || s.tipo_saida}
                         </Badge>
                       </TableCell>
+                      <TableCell>{s.cliente?.razao_social || s.cliente?.nome_fantasia || "-"}</TableCell>
                       <TableCell>{format(new Date(s.data_saida), "dd/MM/yyyy", { locale: ptBR })}</TableCell>
                       <TableCell className="text-right">{formatWeight(s.peso_total_kg)}</TableCell>
                       <TableCell className="text-right">{formatCurrency(s.valor_total || 0)}</TableCell>

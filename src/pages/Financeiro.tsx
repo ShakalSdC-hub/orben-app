@@ -6,12 +6,13 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { 
   DollarSign, TrendingUp, TrendingDown, Users, AlertTriangle, CheckCircle, 
   Clock, Calculator, ArrowUpRight, ArrowDownRight, Wallet, PiggyBank,
-  BarChart3, Loader2
+  BarChart3, Loader2, Check
 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, subDays, startOfMonth, endOfMonth, eachDayOfInterval, parseISO, isWithinInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -19,6 +20,8 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, PieChart, Pie, Cell, Legend, LineChart, Line, ComposedChart
 } from "recharts";
+import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
@@ -44,8 +47,13 @@ const statusConfig: Record<string, { label: string; variant: "default" | "second
 };
 
 export default function Financeiro() {
+  const queryClient = useQueryClient();
+  const { role } = useAuth();
+  const canConciliar = role === "admin" || role === "financeiro";
   const [periodoFluxo, setPeriodoFluxo] = useState("30");
-
+  const [selectedEntradas, setSelectedEntradas] = useState<string[]>([]);
+  const [selectedSaidas, setSelectedSaidas] = useState<string[]>([]);
+  const [selectedAcertos, setSelectedAcertos] = useState<string[]>([]);
   // Acertos financeiros
   const { data: acertos = [], isLoading: loadingAcertos } = useQuery({
     queryKey: ["acertos_financeiros"],
@@ -209,6 +217,73 @@ export default function Financeiro() {
   const margemMedia = margensPorOperacao.length > 0 
     ? margensPorOperacao.reduce((acc, m) => acc + m.margemPct, 0) / margensPorOperacao.length 
     : 0;
+
+  // Mutations para conciliação
+  const conciliarEntradasMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      for (const id of ids) {
+        const { error } = await supabase
+          .from("entradas")
+          .update({ status: "finalizado" })
+          .eq("id", id);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["entradas_financeiro"] });
+      toast({ title: "Entradas conciliadas com sucesso!" });
+      setSelectedEntradas([]);
+    },
+    onError: (error) => toast({ title: "Erro ao conciliar", description: error.message, variant: "destructive" }),
+  });
+
+  const conciliarSaidasMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      for (const id of ids) {
+        const { error } = await supabase
+          .from("saidas")
+          .update({ status: "finalizada" })
+          .eq("id", id);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["saidas_financeiro"] });
+      toast({ title: "Saídas conciliadas com sucesso!" });
+      setSelectedSaidas([]);
+    },
+    onError: (error) => toast({ title: "Erro ao conciliar", description: error.message, variant: "destructive" }),
+  });
+
+  const conciliarAcertosMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      for (const id of ids) {
+        const { error } = await supabase
+          .from("acertos_financeiros")
+          .update({ status: "pago", data_pagamento: new Date().toISOString().split("T")[0] })
+          .eq("id", id);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["acertos_financeiros"] });
+      toast({ title: "Acertos conciliados com sucesso!" });
+      setSelectedAcertos([]);
+    },
+    onError: (error) => toast({ title: "Erro ao conciliar", description: error.message, variant: "destructive" }),
+  });
+
+  const toggleEntrada = (id: string) => {
+    setSelectedEntradas(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const toggleSaida = (id: string) => {
+    setSelectedSaidas(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const toggleAcerto = (id: string) => {
+    setSelectedAcertos(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
 
   return (
     <MainLayout>
@@ -391,17 +466,30 @@ export default function Financeiro() {
             <div className="grid gap-6 lg:grid-cols-2">
               {/* A Receber */}
               <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-success">
-                    <ArrowUpRight className="h-5 w-5" />
-                    Contas a Receber
-                  </CardTitle>
-                  <CardDescription>Saídas pendentes de recebimento</CardDescription>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2 text-success">
+                      <ArrowUpRight className="h-5 w-5" />
+                      Contas a Receber
+                    </CardTitle>
+                    <CardDescription>Saídas pendentes de recebimento</CardDescription>
+                  </div>
+                  {canConciliar && selectedSaidas.length > 0 && (
+                    <Button 
+                      size="sm" 
+                      onClick={() => conciliarSaidasMutation.mutate(selectedSaidas)}
+                      disabled={conciliarSaidasMutation.isPending}
+                    >
+                      {conciliarSaidasMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Check className="h-4 w-4 mr-2" />}
+                      Conciliar ({selectedSaidas.length})
+                    </Button>
+                  )}
                 </CardHeader>
                 <CardContent>
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        {canConciliar && <TableHead className="w-10"></TableHead>}
                         <TableHead>Código</TableHead>
                         <TableHead>Cliente</TableHead>
                         <TableHead>Data</TableHead>
@@ -411,16 +499,24 @@ export default function Financeiro() {
                     <TableBody>
                       {saidas.filter((s: any) => s.status === "pendente" || s.status === "em_transito").length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={4} className="text-center text-muted-foreground">
+                          <TableCell colSpan={canConciliar ? 5 : 4} className="text-center text-muted-foreground">
                             Nenhuma conta a receber
                           </TableCell>
                         </TableRow>
                       ) : (
                         saidas
                           .filter((s: any) => s.status === "pendente" || s.status === "em_transito")
-                          .slice(0, 10)
+                          .slice(0, 15)
                           .map((s: any) => (
-                            <TableRow key={s.id}>
+                            <TableRow key={s.id} className={selectedSaidas.includes(s.id) ? "bg-success/10" : ""}>
+                              {canConciliar && (
+                                <TableCell>
+                                  <Checkbox 
+                                    checked={selectedSaidas.includes(s.id)} 
+                                    onCheckedChange={() => toggleSaida(s.id)} 
+                                  />
+                                </TableCell>
+                              )}
                               <TableCell className="font-mono">{s.codigo}</TableCell>
                               <TableCell>{s.cliente?.razao_social || "-"}</TableCell>
                               <TableCell>{format(new Date(s.data_saida), "dd/MM/yyyy", { locale: ptBR })}</TableCell>
@@ -437,17 +533,30 @@ export default function Financeiro() {
 
               {/* A Pagar */}
               <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-destructive">
-                    <ArrowDownRight className="h-5 w-5" />
-                    Contas a Pagar
-                  </CardTitle>
-                  <CardDescription>Entradas pendentes de pagamento</CardDescription>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2 text-destructive">
+                      <ArrowDownRight className="h-5 w-5" />
+                      Contas a Pagar
+                    </CardTitle>
+                    <CardDescription>Entradas pendentes de pagamento</CardDescription>
+                  </div>
+                  {canConciliar && selectedEntradas.length > 0 && (
+                    <Button 
+                      size="sm" 
+                      onClick={() => conciliarEntradasMutation.mutate(selectedEntradas)}
+                      disabled={conciliarEntradasMutation.isPending}
+                    >
+                      {conciliarEntradasMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Check className="h-4 w-4 mr-2" />}
+                      Conciliar ({selectedEntradas.length})
+                    </Button>
+                  )}
                 </CardHeader>
                 <CardContent>
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        {canConciliar && <TableHead className="w-10"></TableHead>}
                         <TableHead>Código</TableHead>
                         <TableHead>Fornecedor</TableHead>
                         <TableHead>Data</TableHead>
@@ -457,16 +566,24 @@ export default function Financeiro() {
                     <TableBody>
                       {entradas.filter((e: any) => e.status === "pendente" && e.valor_total).length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={4} className="text-center text-muted-foreground">
+                          <TableCell colSpan={canConciliar ? 5 : 4} className="text-center text-muted-foreground">
                             Nenhuma conta a pagar
                           </TableCell>
                         </TableRow>
                       ) : (
                         entradas
                           .filter((e: any) => e.status === "pendente" && e.valor_total)
-                          .slice(0, 10)
+                          .slice(0, 15)
                           .map((e: any) => (
-                            <TableRow key={e.id}>
+                            <TableRow key={e.id} className={selectedEntradas.includes(e.id) ? "bg-destructive/10" : ""}>
+                              {canConciliar && (
+                                <TableCell>
+                                  <Checkbox 
+                                    checked={selectedEntradas.includes(e.id)} 
+                                    onCheckedChange={() => toggleEntrada(e.id)} 
+                                  />
+                                </TableCell>
+                              )}
                               <TableCell className="font-mono">{e.codigo}</TableCell>
                               <TableCell>{e.fornecedor?.razao_social || e.dono?.nome || "-"}</TableCell>
                               <TableCell>{format(new Date(e.data_entrada), "dd/MM/yyyy", { locale: ptBR })}</TableCell>
@@ -484,17 +601,30 @@ export default function Financeiro() {
 
             {/* Acertos Financeiros */}
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  Acertos por Dono do Material
-                </CardTitle>
-                <CardDescription>Controle de cobranças e repasses por proprietário</CardDescription>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Users className="h-5 w-5" />
+                    Acertos por Dono do Material
+                  </CardTitle>
+                  <CardDescription>Controle de cobranças e repasses por proprietário</CardDescription>
+                </div>
+                {canConciliar && selectedAcertos.length > 0 && (
+                  <Button 
+                    size="sm" 
+                    onClick={() => conciliarAcertosMutation.mutate(selectedAcertos)}
+                    disabled={conciliarAcertosMutation.isPending}
+                  >
+                    {conciliarAcertosMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Check className="h-4 w-4 mr-2" />}
+                    Conciliar ({selectedAcertos.length})
+                  </Button>
+                )}
               </CardHeader>
               <CardContent>
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      {canConciliar && <TableHead className="w-10"></TableHead>}
                       <TableHead>Dono</TableHead>
                       <TableHead>Tipo</TableHead>
                       <TableHead>Data Acerto</TableHead>
@@ -505,13 +635,22 @@ export default function Financeiro() {
                   <TableBody>
                     {acertos.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={5} className="text-center text-muted-foreground">
+                        <TableCell colSpan={canConciliar ? 6 : 5} className="text-center text-muted-foreground">
                           Nenhum acerto financeiro registrado
                         </TableCell>
                       </TableRow>
                     ) : (
-                      acertos.slice(0, 10).map((a: any) => (
-                        <TableRow key={a.id}>
+                      acertos.slice(0, 15).map((a: any) => (
+                        <TableRow key={a.id} className={selectedAcertos.includes(a.id) ? "bg-primary/10" : ""}>
+                          {canConciliar && a.status === "pendente" && (
+                            <TableCell>
+                              <Checkbox 
+                                checked={selectedAcertos.includes(a.id)} 
+                                onCheckedChange={() => toggleAcerto(a.id)} 
+                              />
+                            </TableCell>
+                          )}
+                          {canConciliar && a.status !== "pendente" && <TableCell></TableCell>}
                           <TableCell className="font-medium">{a.donos_material?.nome || "-"}</TableCell>
                           <TableCell>
                             <Badge variant="outline" className="capitalize">{a.tipo}</Badge>

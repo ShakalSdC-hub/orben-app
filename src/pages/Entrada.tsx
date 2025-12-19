@@ -250,7 +250,7 @@ export default function Entrada() {
                 <TableRow className="bg-muted/50">
                   <TableHead className="w-10"></TableHead>
                   <TableHead className="font-semibold">Código (Lote)</TableHead>
-                  <TableHead className="font-semibold">Fornecedor</TableHead>
+                  <TableHead className="font-semibold">Parceiro</TableHead>
                   <TableHead className="font-semibold">Data</TableHead>
                   <TableHead className="font-semibold">NF</TableHead>
                   <TableHead className="font-semibold text-right">Peso Total</TableHead>

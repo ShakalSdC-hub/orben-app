@@ -1012,11 +1012,15 @@ export default function Beneficiamento() {
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow><TableCell colSpan={7} className="text-center">Carregando...</TableCell></TableRow>
-                ) : beneficiamentos.length === 0 ? (
-                  <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Nenhum beneficiamento cadastrado</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={8} className="text-center">Carregando...</TableCell></TableRow>
+                ) : beneficiamentos.filter((b: any) => 
+                  b.codigo?.toLowerCase().includes(searchBeneficiamento.toLowerCase())
+                ).length === 0 ? (
+                  <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">Nenhum beneficiamento cadastrado</TableCell></TableRow>
                 ) : (
-                  beneficiamentos.map((b: any) => (
+                  beneficiamentos.filter((b: any) => 
+                    b.codigo?.toLowerCase().includes(searchBeneficiamento.toLowerCase())
+                  ).map((b: any) => (
                     <TableRow key={b.id}>
                       <TableCell className="font-mono font-medium">{b.codigo}</TableCell>
                       <TableCell>{b.processos?.nome || "-"}</TableCell>

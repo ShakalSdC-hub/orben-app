@@ -19,13 +19,13 @@ export function GlobalFilters({
   onParceiroChange,
   onDonoChange,
 }: GlobalFiltersProps) {
-  // Fetch parceiros
+  // Fetch parceiros (inclui fornecedores, clientes e transportadoras)
   const { data: parceiros } = useQuery({
     queryKey: ["parceiros-filtro"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("parceiros")
-        .select("id, razao_social, nome_fantasia, is_fornecedor")
+        .select("id, razao_social, nome_fantasia, is_fornecedor, is_cliente, is_transportadora")
         .eq("ativo", true)
         .order("razao_social");
       if (error) throw error;
@@ -64,6 +64,8 @@ export function GlobalFilters({
             {parceiros?.map((p) => (
               <SelectItem key={p.id} value={p.id}>
                 {p.nome_fantasia || p.razao_social}
+                {p.is_fornecedor && " (F)"}
+                {p.is_cliente && " (C)"}
               </SelectItem>
             ))}
           </SelectContent>
