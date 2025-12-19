@@ -41,7 +41,7 @@ export default function Index() {
             trendValue="+12%"
           />
           <KPICard
-            title="ROMs Hoje"
+            title="Movimentações Hoje"
             value="8"
             subtitle="4 entradas · 4 saídas"
             icon={<FileInput className="h-5 w-5" />}
