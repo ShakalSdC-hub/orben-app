@@ -62,7 +62,11 @@ interface SubloteSelecionado {
   custo_unitario_total: number;
   tipo_produto?: { nome: string } | null;
   dono?: { nome: string } | null;
-  entrada?: { codigo: string; tipo_entrada: { id: string; nome: string } | null } | null;
+  entrada?: { 
+    codigo: string; 
+    valor_unitario: number | null;
+    tipo_entrada: { id: string; nome: string; gera_custo: boolean } | null 
+  } | null;
 }
 
 export default function Saida() {
@@ -123,7 +127,7 @@ export default function Saida() {
           *,
           tipo_produto:tipos_produto(nome),
           dono:donos_material(nome),
-          entrada:entradas(codigo, tipo_entrada:tipos_entrada(id, nome))
+          entrada:entradas(codigo, valor_unitario, tipo_entrada:tipos_entrada(id, nome, gera_custo))
         `)
         .eq("status", "disponivel")
         .gt("peso_kg", 0)
@@ -156,15 +160,32 @@ export default function Saida() {
 
   // Cálculos base
   const pesoTotal = selectedLotes.reduce((acc, l) => acc + l.peso_kg, 0);
-  const custoTotalAcumulado = selectedLotes.reduce((acc, l) => acc + (l.custo_unitario_total || 0) * l.peso_kg, 0);
+  
+  // Calcular custos de beneficiamento: 
+  // - Para entradas que NÃO geram custo (Remessa Industrialização): cobrar apenas a diferença de custo (beneficiamento adicionado)
+  // - Para entradas que geram custo (Compra, Consignação): usar custo total
+  const custoMOBeneficiamento = selectedLotes.reduce((acc, l) => {
+    const geraCusto = l.entrada?.tipo_entrada?.gera_custo ?? true;
+    const custoUnitarioAtual = l.custo_unitario_total || 0;
+    
+    if (!geraCusto) {
+      // Para Remessa Industrialização: cobrar apenas o custo de beneficiamento (custo atual - custo original da entrada)
+      // O custo original seria 0 pois não gera custo
+      return acc + custoUnitarioAtual * l.peso_kg;
+    } else {
+      // Para Compra/Consignação: usar custo total acumulado
+      return acc + custoUnitarioAtual * l.peso_kg;
+    }
+  }, 0);
+  
   const valorBruto = pesoTotal * formData.valor_unitario;
   const perdaPeso = pesoTotal * (formData.perda_cobrada_pct / 100);
   const custoPerda = perdaPeso * formData.valor_unitario;
 
   const tipoSelecionado = tiposSaida.find((t: any) => t.id === formData.tipo_saida_id);
   
-  // Para tipos que cobram custos (Retorno Industrialização, etc): usar custo acumulado automaticamente
-  const custosAutomaticos = tipoSelecionado?.cobra_custos ? custoTotalAcumulado : 0;
+  // Para tipos que cobram custos (Retorno Industrialização, etc): usar custo de MO/Beneficiamento
+  const custosAutomaticos = tipoSelecionado?.cobra_custos ? custoMOBeneficiamento : 0;
   const custosTotaisCobrados = custoPerda + formData.custos_adicionais + custosAutomaticos;
   const valorFinal = valorBruto - custosTotaisCobrados;
 
@@ -445,7 +466,7 @@ export default function Saida() {
                           <div>
                             <p className="font-medium">{selectedLotes.length} lote(s) selecionado(s)</p>
                             <p className="text-2xl font-bold text-primary">{formatWeight(pesoTotal)}</p>
-                            <p className="text-sm text-muted-foreground">Custo acumulado: {formatCurrency(custoTotalAcumulado)}</p>
+                            <p className="text-sm text-muted-foreground">Custo MO/Benef: {formatCurrency(custoMOBeneficiamento)}</p>
                           </div>
                           <Button variant="outline" size="sm" onClick={() => setSelectedLotes([])}>
                             <Trash2 className="h-4 w-4 mr-2" />Limpar
