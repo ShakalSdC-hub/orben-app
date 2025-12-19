@@ -455,7 +455,7 @@ export default function Beneficiamento() {
         // Gerar código para novo sublote
         const codigoSaida = `TKT-${format(new Date(), "yyMMdd")}-${String(Math.floor(Math.random() * 999)).padStart(3, "0")}`;
 
-        // Criar sublote de saída (produto transformado)
+        // Criar sublote de saída (produto transformado - sem vínculo pai/filho para não duplicar)
         const { data: novoSublote, error: subloteError } = await supabase
           .from("sublotes")
           .insert({
@@ -464,9 +464,11 @@ export default function Beneficiamento() {
             tipo_produto_id: tipoProdutoSaidaId,
             dono_id: donoId,
             local_estoque_id: localDestinoId,
-            lote_pai_id: item.sublote_id,
+            // Não definir lote_pai_id para evitar duplicação no estoque
+            // O rastreamento é feito via beneficiamento_itens_saida
             custo_unitario_total: novoCustoUnitario,
             status: "disponivel",
+            observacoes: `Origem: Beneficiamento de ${item.sublote_id}`,
           })
           .select()
           .single();
@@ -488,6 +490,12 @@ export default function Beneficiamento() {
           .from("sublotes")
           .update({ status: "consumido", peso_kg: 0 })
           .eq("id", item.sublote_id);
+
+        // Também marcar sublotes filhos como consumidos (se o pai foi consumido, filhos também)
+        await supabase
+          .from("sublotes")
+          .update({ status: "consumido", peso_kg: 0 })
+          .eq("lote_pai_id", item.sublote_id);
       }
 
       // Atualizar beneficiamento para finalizado
