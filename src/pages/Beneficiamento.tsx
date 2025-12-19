@@ -1016,7 +1016,8 @@ export default function Beneficiamento() {
             <CardTitle>Beneficiamentos</CardTitle>
             <CardDescription>Lista de todos os beneficiamentos cadastrados</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-0 md:p-6">
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -1130,6 +1131,7 @@ export default function Beneficiamento() {
                 )}
               </TableBody>
             </Table>
+            </div>
           </CardContent>
         </Card>
 
