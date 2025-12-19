@@ -93,18 +93,30 @@ export default function Indicadores() {
   // Calcular variações
   const hoje = historico[0];
   const ontem = historico[1];
-  const semanaPassada = historico.find((h: any) => {
-    const diff = new Date().getTime() - new Date(h.data).getTime();
-    return diff >= 7 * 24 * 60 * 60 * 1000;
-  }) || historico[historico.length - 1];
+  
+  // Calcular média da semana (últimos 7 registros disponíveis)
+  const registrosSemana = historico.slice(0, 7);
+  const cobreMediaSemana = registrosSemana.length > 0 
+    ? registrosSemana.reduce((acc: number, h: any) => acc + (h.cobre_brl_kg || 0), 0) / registrosSemana.filter((h: any) => h.cobre_brl_kg).length
+    : 0;
+  const aluminioMediaSemana = registrosSemana.length > 0 
+    ? registrosSemana.reduce((acc: number, h: any) => acc + (h.aluminio_brl_kg || 0), 0) / registrosSemana.filter((h: any) => h.aluminio_brl_kg).length
+    : 0;
+
+  // Média da semana anterior para comparação
+  const registrosSemanaAnterior = historico.slice(7, 14);
+  const cobreMediaSemanaAnterior = registrosSemanaAnterior.length > 0 
+    ? registrosSemanaAnterior.reduce((acc: number, h: any) => acc + (h.cobre_brl_kg || 0), 0) / registrosSemanaAnterior.filter((h: any) => h.cobre_brl_kg).length || cobreMediaSemana
+    : cobreMediaSemana;
+  const aluminioMediaSemanaAnterior = registrosSemanaAnterior.length > 0 
+    ? registrosSemanaAnterior.reduce((acc: number, h: any) => acc + (h.aluminio_brl_kg || 0), 0) / registrosSemanaAnterior.filter((h: any) => h.aluminio_brl_kg).length || aluminioMediaSemana
+    : aluminioMediaSemana;
 
   const cobreHoje = hoje?.cobre_brl_kg || 0;
   const cobreOntem = ontem?.cobre_brl_kg || cobreHoje;
-  const cobreSemana = semanaPassada?.cobre_brl_kg || cobreHoje;
 
   const aluminioHoje = hoje?.aluminio_brl_kg || 0;
   const aluminioOntem = ontem?.aluminio_brl_kg || aluminioHoje;
-  const aluminioSemana = semanaPassada?.aluminio_brl_kg || aluminioHoje;
 
   // Dados para o gráfico
   const chartData = [...historico].reverse().map((h: any) => ({
@@ -181,9 +193,9 @@ export default function Indicadores() {
         {/* Cards de Variação - Apenas Cobre e Alumínio */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <VariationCard title="Cobre - Hoje" current={cobreHoje} previous={cobreOntem} />
-          <VariationCard title="Cobre - Semana" current={cobreHoje} previous={cobreSemana} />
+          <VariationCard title="Cobre - Média Semana" current={cobreMediaSemana} previous={cobreMediaSemanaAnterior} />
           <VariationCard title="Alumínio - Hoje" current={aluminioHoje} previous={aluminioOntem} />
-          <VariationCard title="Alumínio - Semana" current={aluminioHoje} previous={aluminioSemana} />
+          <VariationCard title="Alumínio - Média Semana" current={aluminioMediaSemana} previous={aluminioMediaSemanaAnterior} />
         </div>
 
         {/* Gráfico de Evolução */}
