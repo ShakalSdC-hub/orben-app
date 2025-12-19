@@ -26,6 +26,7 @@ import {
   History,
   UserRoundCog,
 } from "lucide-react";
+import { FileSpreadsheet, FileText, Printer } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -35,6 +36,13 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import { TransferenciaDono } from "@/components/estoque/TransferenciaDono";
+import { useExportReport } from "@/hooks/useExportReport";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const statusConfig = {
   disponivel: { label: "Disponível", className: "bg-success/10 text-success border-success/20" },
@@ -64,6 +72,7 @@ export default function Estoque() {
   const [transferData, setTransferData] = useState({ local_destino_id: "", motivo: "" });
   const [isTransferDonoOpen, setIsTransferDonoOpen] = useState(false);
   const [selectedLoteDono, setSelectedLoteDono] = useState<any | null>(null);
+  const { exportToExcel, formatEstoqueReport, printReport } = useExportReport();
 
   // Fetch sublotes com relacionamentos
   const { data: sublotes, isLoading } = useQuery({
@@ -274,6 +283,21 @@ export default function Estoque() {
             </p>
           </div>
           <div className="flex gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <FileText className="mr-2 h-4 w-4" />Exportar
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={() => exportToExcel(formatEstoqueReport(filteredSublotes || []), { filename: "relatorio_estoque", sheetName: "Estoque" })}>
+                  <FileSpreadsheet className="mr-2 h-4 w-4" />Excel
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => printReport("Relatório de Estoque", formatEstoqueReport(filteredSublotes || []), ["Código", "Entrada", "Tipo Produto", "Dono", "Local", "Peso (kg)", "Custo Unitário", "Valor Total", "Status"])}>
+                  <Printer className="mr-2 h-4 w-4" />Imprimir PDF
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button variant="outline" size="sm">
               <BarChart3 className="mr-2 h-4 w-4" />
               Relatório
