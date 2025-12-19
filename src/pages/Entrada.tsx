@@ -126,6 +126,41 @@ export default function Entrada() {
     },
   });
 
+  // Fetch beneficiamento_itens_entrada para verificar sublotes processados
+  const { data: beneficiamentoItens } = useQuery({
+    queryKey: ["beneficiamento_itens_entrada"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("beneficiamento_itens_entrada")
+        .select("sublote_id");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Fetch saida_itens para verificar sublotes vendidos
+  const { data: saidaItens } = useQuery({
+    queryKey: ["saida_itens"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("saida_itens")
+        .select("sublote_id");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Verifica se uma entrada foi processada (sublotes usados em beneficiamento ou saída)
+  const isEntradaProcessada = (entradaId: string): boolean => {
+    const sublotesEntrada = sublotes?.filter(s => s.entrada_id === entradaId) || [];
+    const subloteIds = new Set(sublotesEntrada.map(s => s.id));
+    
+    const usadoEmBeneficiamento = beneficiamentoItens?.some(bi => subloteIds.has(bi.sublote_id)) || false;
+    const usadoEmSaida = saidaItens?.some(si => subloteIds.has(si.sublote_id)) || false;
+    
+    return usadoEmBeneficiamento || usadoEmSaida;
+  };
+
   const formatWeight = (kg: number) => {
     if (kg >= 1000) return `${(kg / 1000).toFixed(2)}t`;
     return `${kg.toLocaleString("pt-BR")}kg`;
@@ -353,14 +388,20 @@ export default function Entrada() {
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                  <DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => setEditEntrada({ ...entrada, readOnly: true })}>
                                     <Eye className="mr-2 h-4 w-4" />
                                     Visualizar
                                   </DropdownMenuItem>
-                                  {canEdit && (
+                                  {canEdit && !isEntradaProcessada(entrada.id) && (
                                     <DropdownMenuItem onClick={() => setEditEntrada(entrada)}>
                                       <Edit className="mr-2 h-4 w-4" />
                                       Editar
+                                    </DropdownMenuItem>
+                                  )}
+                                  {canEdit && isEntradaProcessada(entrada.id) && (
+                                    <DropdownMenuItem disabled className="text-muted-foreground">
+                                      <Edit className="mr-2 h-4 w-4" />
+                                      Editar (Processado)
                                     </DropdownMenuItem>
                                   )}
                                   <DropdownMenuItem onClick={() => setRomaneioEntrada({
@@ -373,7 +414,7 @@ export default function Entrada() {
                                     <Printer className="mr-2 h-4 w-4" />
                                     Imprimir Romaneio
                                   </DropdownMenuItem>
-                                  {isAdmin && (
+                                  {isAdmin && !isEntradaProcessada(entrada.id) && (
                                     <>
                                       <DropdownMenuSeparator />
                                       <DropdownMenuItem 
@@ -382,6 +423,15 @@ export default function Entrada() {
                                       >
                                         <Trash2 className="mr-2 h-4 w-4" />
                                         Excluir
+                                      </DropdownMenuItem>
+                                    </>
+                                  )}
+                                  {isAdmin && isEntradaProcessada(entrada.id) && (
+                                    <>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem disabled className="text-muted-foreground">
+                                        <Trash2 className="mr-2 h-4 w-4" />
+                                        Excluir (Processado)
                                       </DropdownMenuItem>
                                     </>
                                   )}
@@ -467,6 +517,27 @@ export default function Entrada() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Dialog para edição/visualização */}
+        {editEntrada && (
+          <Dialog open={!!editEntrada} onOpenChange={() => setEditEntrada(null)}>
+            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>
+                  {editEntrada.readOnly ? "Visualizar" : "Editar"} Entrada {editEntrada.codigo}
+                </DialogTitle>
+                <DialogDescription>
+                  {editEntrada.readOnly ? "Detalhes da entrada" : "Alterar dados da entrada"}
+                </DialogDescription>
+              </DialogHeader>
+              <EntradaEditForm 
+                entrada={editEntrada} 
+                onClose={() => setEditEntrada(null)} 
+                readOnly={editEntrada.readOnly || isEntradaProcessada(editEntrada.id)}
+              />
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
     </MainLayout>
   );
