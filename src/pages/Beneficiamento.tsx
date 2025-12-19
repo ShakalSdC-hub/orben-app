@@ -28,7 +28,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, Cog, DollarSign, Scale, AlertTriangle, Truck, Package, Loader2, Search, Trash2, Printer, ChevronRight, ChevronDown, Info, MoreHorizontal, Eye, Edit, CheckCircle2 } from "lucide-react";
+import { Plus, Cog, DollarSign, Scale, AlertTriangle, Truck, Package, Loader2, Search, Trash2, Printer, ChevronRight, ChevronDown, Info, MoreHorizontal, Eye, Edit, CheckCircle2, FileSpreadsheet, FileText } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -37,6 +37,8 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { BeneficiamentoRomaneioPrint } from "@/components/romaneio/BeneficiamentoRomaneioPrint";
 import { GlobalFilters } from "@/components/filters/GlobalFilters";
+import { BeneficiamentoEditForm } from "@/components/beneficiamento/BeneficiamentoEditForm";
+import { useExportReport } from "@/hooks/useExportReport";
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   em_andamento: { label: "Em Andamento", variant: "default" },
@@ -76,7 +78,9 @@ export default function Beneficiamento() {
   const [selectedDono, setSelectedDono] = useState<string | null>(null);
   const [deleteBeneficiamento, setDeleteBeneficiamento] = useState<any | null>(null);
   const [finalizeBeneficiamento, setFinalizeBeneficiamento] = useState<any | null>(null);
+  const [editBeneficiamento, setEditBeneficiamento] = useState<any | null>(null);
   const [finalizeData, setFinalizeData] = useState({ peso_saida_real: 0, local_destino_id: "", tipo_produto_saida_id: "" });
+  const { exportToExcel, formatBeneficiamentoReport, printReport } = useExportReport();
 
   const [formData, setFormData] = useState({
     processo_id: "",
@@ -518,10 +522,24 @@ export default function Beneficiamento() {
             <h1 className="text-3xl font-bold text-foreground">Beneficiamento</h1>
             <p className="text-muted-foreground">Gerencie os processos de beneficiamento de materiais</p>
           </div>
-          <Dialog open={isOpen} onOpenChange={(v) => v ? setIsOpen(true) : handleClose()}>
-            <DialogTrigger asChild>
-              <Button className="bg-gradient-copper"><Plus className="h-4 w-4 mr-2" />Novo Beneficiamento</Button>
-            </DialogTrigger>
+          <div className="flex gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline"><FileText className="h-4 w-4 mr-2" />Exportar</Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={() => exportToExcel(formatBeneficiamentoReport(beneficiamentos), { filename: "relatorio_beneficiamentos", sheetName: "Beneficiamentos" })}>
+                  <FileSpreadsheet className="mr-2 h-4 w-4" />Excel
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => printReport("Relatório de Beneficiamentos", formatBeneficiamentoReport(beneficiamentos), ["Código", "Data Início", "Processo", "Tipo", "Peso Entrada (kg)", "Peso Saída (kg)", "Perda Real (%)", "Perda Cobrada (%)", "Custo Frete Ida", "Custo Frete Volta", "Custo MO Terceiro", "Custo MO IBRAC", "Status"])}>
+                  <Printer className="mr-2 h-4 w-4" />Imprimir PDF
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Dialog open={isOpen} onOpenChange={(v) => v ? setIsOpen(true) : handleClose()}>
+              <DialogTrigger asChild>
+                <Button className="bg-gradient-copper"><Plus className="h-4 w-4 mr-2" />Novo Beneficiamento</Button>
+              </DialogTrigger>
             <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Novo Beneficiamento</DialogTitle>
@@ -968,6 +986,7 @@ export default function Beneficiamento() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
 
         {/* Filtros */}
@@ -1045,13 +1064,13 @@ export default function Beneficiamento() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setEditBeneficiamento(b)}>
                               <Eye className="mr-2 h-4 w-4" />
                               Visualizar
                             </DropdownMenuItem>
                             {canEdit && b.status === "em_andamento" && (
                               <>
-                                <DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setEditBeneficiamento(b)}>
                                   <Edit className="mr-2 h-4 w-4" />
                                   Editar
                                 </DropdownMenuItem>
@@ -1097,6 +1116,16 @@ export default function Beneficiamento() {
             </Table>
           </CardContent>
         </Card>
+
+        {/* Edit Dialog */}
+        <Dialog open={!!editBeneficiamento} onOpenChange={() => setEditBeneficiamento(null)}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Editar Beneficiamento - {editBeneficiamento?.codigo}</DialogTitle>
+            </DialogHeader>
+            {editBeneficiamento && <BeneficiamentoEditForm beneficiamento={editBeneficiamento} onClose={() => setEditBeneficiamento(null)} />}
+          </DialogContent>
+        </Dialog>
 
         {/* Romaneio Print Dialog */}
         {romaneioBeneficiamento && (

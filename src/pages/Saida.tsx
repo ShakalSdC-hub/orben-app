@@ -28,7 +28,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, FileOutput, Search, Truck, DollarSign, Loader2, Trash2, Printer, MoreHorizontal, Eye, Edit } from "lucide-react";
+import { Plus, FileOutput, Search, Truck, DollarSign, Loader2, Trash2, Printer, MoreHorizontal, Eye, Edit, FileSpreadsheet, FileText } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -37,6 +37,8 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { RomaneioPrint } from "@/components/romaneio/RomaneioPrint";
 import { GlobalFilters } from "@/components/filters/GlobalFilters";
+import { SaidaEditForm } from "@/components/saida/SaidaEditForm";
+import { useExportReport } from "@/hooks/useExportReport";
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   pendente: { label: "Pendente", variant: "outline" },
@@ -76,6 +78,8 @@ export default function Saida() {
   const [romaneioSaida, setRomaneioSaida] = useState<any | null>(null);
   const [selectedDono, setSelectedDono] = useState<string | null>(null);
   const [deleteSaida, setDeleteSaida] = useState<any | null>(null);
+  const [editSaida, setEditSaida] = useState<any | null>(null);
+  const { exportToExcel, formatSaidaReport, printReport } = useExportReport();
 
   const [formData, setFormData] = useState({
     tipo_saida_id: "",
@@ -309,6 +313,19 @@ export default function Saida() {
             <h1 className="text-3xl font-bold text-foreground">Saída</h1>
             <p className="text-muted-foreground">Registre as saídas de material do estoque</p>
           </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline"><FileText className="h-4 w-4 mr-2" />Exportar</Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={() => exportToExcel(formatSaidaReport(saidas), { filename: "relatorio_saidas", sheetName: "Saídas" })}>
+                <FileSpreadsheet className="mr-2 h-4 w-4" />Excel
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => printReport("Relatório de Saídas", formatSaidaReport(saidas), ["Código", "Data", "Tipo", "Cliente", "Nota Fiscal", "Peso Total (kg)", "Valor Unitário", "Valor Total", "Custos Cobrados", "Repasse Dono", "Status"])}>
+                <Printer className="mr-2 h-4 w-4" />Imprimir PDF
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Dialog open={isOpen} onOpenChange={(v) => v ? setIsOpen(true) : handleClose()}>
             <DialogTrigger asChild>
               <Button className="bg-gradient-copper"><Plus className="h-4 w-4 mr-2" />Nova Saída</Button>
@@ -657,12 +674,12 @@ export default function Saida() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setEditSaida(s)}>
                               <Eye className="mr-2 h-4 w-4" />
                               Visualizar
                             </DropdownMenuItem>
                             {canEdit && (
-                              <DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setEditSaida(s)}>
                                 <Edit className="mr-2 h-4 w-4" />
                                 Editar
                               </DropdownMenuItem>
@@ -693,6 +710,16 @@ export default function Saida() {
             </Table>
           </CardContent>
         </Card>
+
+        {/* Edit Dialog */}
+        <Dialog open={!!editSaida} onOpenChange={() => setEditSaida(null)}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Editar Saída - {editSaida?.codigo}</DialogTitle>
+            </DialogHeader>
+            {editSaida && <SaidaEditForm saida={editSaida} onClose={() => setEditSaida(null)} />}
+          </DialogContent>
+        </Dialog>
 
         {/* Romaneio Print Dialog */}
         {romaneioSaida && (

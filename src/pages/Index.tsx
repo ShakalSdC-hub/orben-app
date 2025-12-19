@@ -22,6 +22,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { GlobalFilters } from "@/components/filters/GlobalFilters";
+import { LMECharts } from "@/components/dashboard/LMECharts";
 
 export default function Index() {
   const [selectedDono, setSelectedDono] = useState<string | null>(null);
@@ -46,7 +47,7 @@ export default function Index() {
         .from("historico_lme")
         .select("*")
         .order("data", { ascending: false })
-        .limit(7);
+        .limit(30);
       if (error) throw error;
       return data;
     },
@@ -263,77 +264,37 @@ export default function Index() {
           </Card>
         )}
 
-        <div className="grid gap-6 lg:grid-cols-2">
-          {/* Gráfico LME */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Evolução Cobre LME (R$/kg)</CardTitle>
-              <CardDescription>Últimos 7 dias</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {chartData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={200}>
-                  <AreaChart data={chartData}>
-                    <defs>
-                      <linearGradient id="colorCobre" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(var(--copper))" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="hsl(var(--copper))" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
-                    <XAxis dataKey="data" axisLine={false} tickLine={false} className="text-xs" />
-                    <YAxis hide domain={["auto", "auto"]} />
-                    <Tooltip
-                      formatter={(value: number) => [formatCurrency(value), "Cobre"]}
-                      contentStyle={{
-                        backgroundColor: "hsl(var(--card))",
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "8px",
-                      }}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="cobre"
-                      stroke="hsl(var(--copper))"
-                      strokeWidth={2}
-                      fill="url(#colorCobre)"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
+        {/* Gráficos LME */}
+        {ultimaLme && ultimaLme.length > 0 && (
+          <LMECharts lmeData={ultimaLme} />
+        )}
+
+        {/* Estoque por Dono */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Estoque por Dono</CardTitle>
+            <CardDescription>Distribuição do material em estoque</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {estoquePorDono.length > 0 ? (
+                estoquePorDono.map((dono) => (
+                  <div key={dono.id} className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="h-3 w-3 rounded-full bg-copper" />
+                      <span className="text-sm font-medium">{dono.nome}</span>
+                    </div>
+                    <span className="font-semibold">{formatWeight(dono.peso)}</span>
+                  </div>
+                ))
               ) : (
-                <div className="flex items-center justify-center h-[200px] text-muted-foreground">
-                  Sem dados de cotação
+                <div className="text-center py-4 text-muted-foreground">
+                  Nenhum material de terceiros em estoque
                 </div>
               )}
-            </CardContent>
-          </Card>
-
-          {/* Estoque por Dono */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Estoque por Dono</CardTitle>
-              <CardDescription>Distribuição do material em estoque</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {estoquePorDono.length > 0 ? (
-                  estoquePorDono.map((dono) => (
-                    <div key={dono.id} className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="h-3 w-3 rounded-full bg-copper" />
-                        <span className="text-sm font-medium">{dono.nome}</span>
-                      </div>
-                      <span className="font-semibold">{formatWeight(dono.peso)}</span>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-center py-4 text-muted-foreground">
-                    Nenhum material de terceiros em estoque
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Entradas Recentes */}
         <Card>
