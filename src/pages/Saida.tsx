@@ -414,6 +414,7 @@ export default function Saida() {
                           <TableHead className="w-10"></TableHead>
                           <TableHead>Código</TableHead>
                           <TableHead>Tipo Entrada</TableHead>
+                          <TableHead>Gera Custo</TableHead>
                           <TableHead>Produto</TableHead>
                           <TableHead>Dono</TableHead>
                           <TableHead className="text-right">Peso</TableHead>
@@ -423,7 +424,7 @@ export default function Saida() {
                       <TableBody>
                         {sublotesFiltrados.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                            <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                               Nenhum lote disponível
                             </TableCell>
                           </TableRow>
@@ -444,6 +445,13 @@ export default function Saida() {
                                   <Badge variant="outline" className="text-xs">
                                     {sublote.entrada?.tipo_entrada?.nome || "N/A"}
                                   </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  {sublote.entrada?.tipo_entrada?.gera_custo === false ? (
+                                    <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-800">Não</Badge>
+                                  ) : (
+                                    <Badge variant="default" className="text-xs">Sim</Badge>
+                                  )}
                                 </TableCell>
                                 <TableCell>{sublote.tipo_produto?.nome || "-"}</TableCell>
                                 <TableCell>{sublote.dono?.nome || "-"}</TableCell>
