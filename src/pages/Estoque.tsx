@@ -36,6 +36,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import { TransferenciaDono } from "@/components/estoque/TransferenciaDono";
+import { LoteHistorico } from "@/components/estoque/LoteHistorico";
 import { useExportReport } from "@/hooks/useExportReport";
 import {
   DropdownMenu,
@@ -567,6 +568,11 @@ export default function Estoque() {
                         </p>
                       </div>
                     )}
+
+                    {/* Histórico de Transferências */}
+                    <div className="mt-3 pt-3 border-t">
+                      <LoteHistorico loteId={lote.id} loteCodigo={lote.codigo} />
+                    </div>
 
                     {lote.status === "disponivel" && (
                       <div className="mt-3 pt-3 border-t flex gap-2">
