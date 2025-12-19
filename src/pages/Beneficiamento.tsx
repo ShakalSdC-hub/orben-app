@@ -11,7 +11,24 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Plus, Cog, DollarSign, Scale, AlertTriangle, Truck, Package, Loader2, Search, Trash2, Printer, ChevronRight, ChevronDown, Info } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Plus, Cog, DollarSign, Scale, AlertTriangle, Truck, Package, Loader2, Search, Trash2, Printer, ChevronRight, ChevronDown, Info, MoreHorizontal, Eye, Edit } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -45,7 +62,10 @@ interface SublotesSelecionados {
 
 export default function Beneficiamento() {
   const queryClient = useQueryClient();
-  const { user, profile } = useAuth();
+  const { user, profile, role } = useAuth();
+  const isAdmin = role === "admin";
+  const canEdit = role === "admin" || role === "operacao";
+  
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("lotes");
   const [searchLotes, setSearchLotes] = useState("");
@@ -54,6 +74,7 @@ export default function Beneficiamento() {
   const [romaneioBeneficiamento, setRomaneioBeneficiamento] = useState<any | null>(null);
   const [searchBeneficiamento, setSearchBeneficiamento] = useState("");
   const [selectedDono, setSelectedDono] = useState<string | null>(null);
+  const [deleteBeneficiamento, setDeleteBeneficiamento] = useState<any | null>(null);
 
   const [formData, setFormData] = useState({
     processo_id: "",
@@ -319,6 +340,57 @@ export default function Beneficiamento() {
     setSelectedLotes([]);
     setActiveTab("lotes");
   };
+
+  // Mutation para deletar beneficiamento
+  const deleteMutation = useMutation({
+    mutationFn: async (beneficiamentoId: string) => {
+      // Buscar itens de entrada para restaurar status dos sublotes
+      const { data: itensEntrada } = await supabase
+        .from("beneficiamento_itens_entrada")
+        .select("sublote_id")
+        .eq("beneficiamento_id", beneficiamentoId);
+
+      // Restaurar status dos sublotes
+      if (itensEntrada) {
+        for (const item of itensEntrada) {
+          if (item.sublote_id) {
+            await supabase
+              .from("sublotes")
+              .update({ status: "disponivel" })
+              .eq("id", item.sublote_id);
+          }
+        }
+      }
+
+      // Deletar itens de entrada
+      await supabase
+        .from("beneficiamento_itens_entrada")
+        .delete()
+        .eq("beneficiamento_id", beneficiamentoId);
+
+      // Deletar itens de saída
+      await supabase
+        .from("beneficiamento_itens_saida")
+        .delete()
+        .eq("beneficiamento_id", beneficiamentoId);
+
+      // Deletar beneficiamento
+      const { error } = await supabase
+        .from("beneficiamentos")
+        .delete()
+        .eq("id", beneficiamentoId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["beneficiamentos"] });
+      queryClient.invalidateQueries({ queryKey: ["sublotes_disponiveis"] });
+      toast({ title: "Beneficiamento excluído com sucesso!" });
+      setDeleteBeneficiamento(null);
+    },
+    onError: (error) => {
+      toast({ title: "Erro ao excluir", description: error.message, variant: "destructive" });
+    },
+  });
 
   return (
     <MainLayout>
@@ -844,9 +916,41 @@ export default function Beneficiamento() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="icon" onClick={() => setRomaneioBeneficiamento(b)}>
-                          <Printer className="h-4 w-4" />
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem>
+                              <Eye className="mr-2 h-4 w-4" />
+                              Visualizar
+                            </DropdownMenuItem>
+                            {canEdit && (
+                              <DropdownMenuItem>
+                                <Edit className="mr-2 h-4 w-4" />
+                                Editar
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem onClick={() => setRomaneioBeneficiamento(b)}>
+                              <Printer className="mr-2 h-4 w-4" />
+                              Imprimir Romaneio
+                            </DropdownMenuItem>
+                            {isAdmin && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem 
+                                  onClick={() => setDeleteBeneficiamento(b)}
+                                  className="text-destructive focus:text-destructive"
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Excluir
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))
@@ -864,6 +968,30 @@ export default function Beneficiamento() {
             onClose={() => setRomaneioBeneficiamento(null)}
           />
         )}
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={!!deleteBeneficiamento} onOpenChange={() => setDeleteBeneficiamento(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tem certeza que deseja excluir o beneficiamento <strong>{deleteBeneficiamento?.codigo}</strong>?
+                <br />
+                Esta ação não pode ser desfeita. Os sublotes serão restaurados para disponíveis.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => deleteMutation.mutate(deleteBeneficiamento?.id)}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </MainLayout>
   );

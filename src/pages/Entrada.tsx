@@ -20,6 +20,16 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Plus,
   Search,
   Download,
@@ -31,11 +41,13 @@ import {
   Loader2,
   ChevronDown,
   ChevronRight,
+  Trash2,
 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -44,12 +56,14 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { EntradaForm } from "@/components/entrada/EntradaForm";
 import { EntradaRomaneioPrint } from "@/components/romaneio/EntradaRomaneioPrint";
 import { GlobalFilters } from "@/components/filters/GlobalFilters";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "@/hooks/use-toast";
 
 const statusConfig: Record<string, { label: string; className: string }> = {
   pendente: { label: "Pendente", className: "bg-warning/10 text-warning border-warning/20" },
@@ -59,12 +73,18 @@ const statusConfig: Record<string, { label: string; className: string }> = {
 };
 
 export default function Entrada() {
+  const queryClient = useQueryClient();
+  const { role } = useAuth();
+  const isAdmin = role === "admin";
+  const canEdit = role === "admin" || role === "operacao";
+  
   const [searchTerm, setSearchTerm] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [romaneioEntrada, setRomaneioEntrada] = useState<any | null>(null);
   const [selectedParceiro, setSelectedParceiro] = useState<string | null>(null);
   const [selectedDono, setSelectedDono] = useState<string | null>(null);
+  const [deleteEntrada, setDeleteEntrada] = useState<any | null>(null);
 
   // Fetch entradas with sublotes
   const { data: entradas, isLoading } = useQuery({
@@ -134,6 +154,34 @@ export default function Entrada() {
   const getSublotesForEntrada = (entradaId: string) => {
     return sublotes?.filter((s) => s.entrada_id === entradaId && s.numero_volume > 0) || [];
   };
+
+  // Mutation para deletar entrada
+  const deleteMutation = useMutation({
+    mutationFn: async (entradaId: string) => {
+      // Primeiro deletar sublotes relacionados
+      const { error: sublotesError } = await supabase
+        .from("sublotes")
+        .delete()
+        .eq("entrada_id", entradaId);
+      if (sublotesError) throw sublotesError;
+
+      // Depois deletar a entrada
+      const { error } = await supabase
+        .from("entradas")
+        .delete()
+        .eq("id", entradaId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["entradas"] });
+      queryClient.invalidateQueries({ queryKey: ["sublotes"] });
+      toast({ title: "Entrada excluída com sucesso!" });
+      setDeleteEntrada(null);
+    },
+    onError: (error) => {
+      toast({ title: "Erro ao excluir", description: error.message, variant: "destructive" });
+    },
+  });
 
   return (
     <MainLayout>
@@ -280,10 +328,12 @@ export default function Entrada() {
                                     <Eye className="mr-2 h-4 w-4" />
                                     Visualizar
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem>
-                                    <Edit className="mr-2 h-4 w-4" />
-                                    Editar
-                                  </DropdownMenuItem>
+                                  {canEdit && (
+                                    <DropdownMenuItem>
+                                      <Edit className="mr-2 h-4 w-4" />
+                                      Editar
+                                    </DropdownMenuItem>
+                                  )}
                                   <DropdownMenuItem onClick={() => setRomaneioEntrada({
                                     ...entrada,
                                     parceiros: entrada.fornecedor ? { razao_social: (entrada.fornecedor as any).razao_social } : null,
@@ -294,6 +344,18 @@ export default function Entrada() {
                                     <Printer className="mr-2 h-4 w-4" />
                                     Imprimir Romaneio
                                   </DropdownMenuItem>
+                                  {isAdmin && (
+                                    <>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem 
+                                        onClick={() => setDeleteEntrada(entrada)}
+                                        className="text-destructive focus:text-destructive"
+                                      >
+                                        <Trash2 className="mr-2 h-4 w-4" />
+                                        Excluir
+                                      </DropdownMenuItem>
+                                    </>
+                                  )}
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             </TableCell>
@@ -352,6 +414,30 @@ export default function Entrada() {
             onClose={() => setRomaneioEntrada(null)}
           />
         )}
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={!!deleteEntrada} onOpenChange={() => setDeleteEntrada(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tem certeza que deseja excluir a entrada <strong>{deleteEntrada?.codigo}</strong>?
+                <br />
+                Esta ação não pode ser desfeita e irá excluir todos os sublotes associados.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => deleteMutation.mutate(deleteEntrada?.id)}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </MainLayout>
   );
