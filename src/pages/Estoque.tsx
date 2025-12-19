@@ -133,6 +133,25 @@ export default function Estoque() {
     },
   });
 
+  // Fetch transferências de dono
+  const { data: transferenciasDono } = useQuery({
+    queryKey: ["transferencias-dono"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("transferencias_dono")
+        .select(`
+          *,
+          sublote:sublotes(codigo, peso_kg),
+          dono_origem:donos_material!transferencias_dono_dono_origem_id_fkey(nome),
+          dono_destino:donos_material!transferencias_dono_dono_destino_id_fkey(nome)
+        `)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return data;
+    },
+  });
+
   // Transferência mutation
   const transferMutation = useMutation({
     mutationFn: async () => {
@@ -554,52 +573,117 @@ export default function Estoque() {
           </TabsContent>
 
           <TabsContent value="movimentacoes">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <History className="h-5 w-5" />
-                  Histórico de Movimentações
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Data</TableHead>
-                      <TableHead>Sublote</TableHead>
-                      <TableHead>Tipo</TableHead>
-                      <TableHead>Origem</TableHead>
-                      <TableHead>Destino</TableHead>
-                      <TableHead className="text-right">Peso</TableHead>
-                      <TableHead>Motivo</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {!movimentacoes || movimentacoes.length === 0 ? (
+            <div className="space-y-6">
+              {/* Transferências de Local */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <ArrowRightLeft className="h-5 w-5" />
+                    Transferências de Local
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center text-muted-foreground">
-                          Nenhuma movimentação registrada
-                        </TableCell>
+                        <TableHead>Data</TableHead>
+                        <TableHead>Sublote</TableHead>
+                        <TableHead>Tipo</TableHead>
+                        <TableHead>Origem</TableHead>
+                        <TableHead>Destino</TableHead>
+                        <TableHead className="text-right">Peso</TableHead>
+                        <TableHead>Motivo</TableHead>
                       </TableRow>
-                    ) : (
-                      movimentacoes.map((mov: any) => (
-                        <TableRow key={mov.id}>
-                          <TableCell>{format(new Date(mov.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}</TableCell>
-                          <TableCell className="font-mono">{mov.sublote?.codigo || "-"}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="capitalize">{mov.tipo}</Badge>
+                    </TableHeader>
+                    <TableBody>
+                      {!movimentacoes || movimentacoes.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center text-muted-foreground">
+                            Nenhuma movimentação registrada
                           </TableCell>
-                          <TableCell>{mov.local_origem?.nome || "-"}</TableCell>
-                          <TableCell>{mov.local_destino?.nome || "-"}</TableCell>
-                          <TableCell className="text-right">{formatWeight(mov.peso_kg)}</TableCell>
-                          <TableCell className="max-w-[200px] truncate">{mov.motivo || "-"}</TableCell>
                         </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+                      ) : (
+                        movimentacoes.map((mov: any) => (
+                          <TableRow key={mov.id}>
+                            <TableCell>{format(new Date(mov.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}</TableCell>
+                            <TableCell className="font-mono">{mov.sublote?.codigo || "-"}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="capitalize">{mov.tipo}</Badge>
+                            </TableCell>
+                            <TableCell>{mov.local_origem?.nome || "-"}</TableCell>
+                            <TableCell>{mov.local_destino?.nome || "-"}</TableCell>
+                            <TableCell className="text-right">{formatWeight(mov.peso_kg)}</TableCell>
+                            <TableCell className="max-w-[200px] truncate">{mov.motivo || "-"}</TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+
+              {/* Transferências de Dono */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <UserRoundCog className="h-5 w-5" />
+                    Transferências de Dono do Material
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Data</TableHead>
+                        <TableHead>Sublote</TableHead>
+                        <TableHead>Dono Origem</TableHead>
+                        <TableHead>Dono Destino</TableHead>
+                        <TableHead className="text-right">Peso</TableHead>
+                        <TableHead className="text-right">Acréscimo</TableHead>
+                        <TableHead>Observações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {!transferenciasDono || transferenciasDono.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center text-muted-foreground">
+                            Nenhuma transferência de dono registrada
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        transferenciasDono.map((trans: any) => (
+                          <TableRow key={trans.id}>
+                            <TableCell>{format(new Date(trans.data_transferencia || trans.created_at), "dd/MM/yyyy", { locale: ptBR })}</TableCell>
+                            <TableCell className="font-mono">{trans.sublote?.codigo || "-"}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="bg-muted">
+                                {trans.dono_origem?.nome || "IBRAC"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="bg-copper/10 text-copper border-copper/20">
+                                {trans.dono_destino?.nome || "IBRAC"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">{formatWeight(trans.peso_kg)}</TableCell>
+                            <TableCell className="text-right">
+                              {trans.valor_acrescimo && trans.valor_acrescimo > 0 ? (
+                                <span className="text-success font-medium">
+                                  +{formatCurrency(trans.valor_acrescimo)}
+                                </span>
+                              ) : (
+                                "-"
+                              )}
+                            </TableCell>
+                            <TableCell className="max-w-[200px] truncate">{trans.observacoes || "-"}</TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
 
