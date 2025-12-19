@@ -3,6 +3,7 @@ import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import { AIInsightsChat } from "@/components/ai/AIInsightsChat";
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -21,6 +22,7 @@ export function MainLayout({ children }: MainLayoutProps) {
         <Header />
         <main className={cn("p-4", !isMobile && "p-6")}>{children}</main>
       </div>
+      <AIInsightsChat />
     </div>
   );
 }
