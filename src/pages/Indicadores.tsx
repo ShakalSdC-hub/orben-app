@@ -11,7 +11,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { format, subDays, startOfMonth, endOfMonth } from "date-fns";
+import { format, startOfWeek, endOfWeek, subWeeks, startOfMonth, endOfMonth, subMonths, isWithinInterval, parseISO } from "date-fns";
 import { ExcelImport } from "@/components/lme/ExcelImport";
 import { ptBR } from "date-fns/locale";
 
@@ -94,23 +94,63 @@ export default function Indicadores() {
   const hoje = historico[0];
   const ontem = historico[1];
   
-  // Calcular média da semana (últimos 7 registros disponíveis)
-  const registrosSemana = historico.slice(0, 7);
-  const cobreMediaSemana = registrosSemana.length > 0 
-    ? registrosSemana.reduce((acc: number, h: any) => acc + (h.cobre_brl_kg || 0), 0) / registrosSemana.filter((h: any) => h.cobre_brl_kg).length
-    : 0;
-  const aluminioMediaSemana = registrosSemana.length > 0 
-    ? registrosSemana.reduce((acc: number, h: any) => acc + (h.aluminio_brl_kg || 0), 0) / registrosSemana.filter((h: any) => h.aluminio_brl_kg).length
-    : 0;
+  // Função auxiliar para calcular média de um intervalo
+  const calcularMedia = (registros: any[], campo: string) => {
+    const validos = registros.filter((h: any) => h[campo] != null && h[campo] > 0);
+    if (validos.length === 0) return 0;
+    return validos.reduce((acc: number, h: any) => acc + h[campo], 0) / validos.length;
+  };
 
-  // Média da semana anterior para comparação
-  const registrosSemanaAnterior = historico.slice(7, 14);
-  const cobreMediaSemanaAnterior = registrosSemanaAnterior.length > 0 
-    ? registrosSemanaAnterior.reduce((acc: number, h: any) => acc + (h.cobre_brl_kg || 0), 0) / registrosSemanaAnterior.filter((h: any) => h.cobre_brl_kg).length || cobreMediaSemana
-    : cobreMediaSemana;
-  const aluminioMediaSemanaAnterior = registrosSemanaAnterior.length > 0 
-    ? registrosSemanaAnterior.reduce((acc: number, h: any) => acc + (h.aluminio_brl_kg || 0), 0) / registrosSemanaAnterior.filter((h: any) => h.aluminio_brl_kg).length || aluminioMediaSemana
-    : aluminioMediaSemana;
+  // Calcular datas da última semana fechada (S-1) - segunda a sexta
+  const agora = new Date();
+  const inicioSemanaAtual = startOfWeek(agora, { weekStartsOn: 1 }); // Segunda-feira
+  const fimSemanaAnterior = endOfWeek(subWeeks(inicioSemanaAtual, 1), { weekStartsOn: 1 }); // Domingo S-1
+  const inicioSemanaAnterior = startOfWeek(subWeeks(inicioSemanaAtual, 1), { weekStartsOn: 1 }); // Segunda S-1
+  
+  // S-2 para comparação
+  const fimSemanaS2 = endOfWeek(subWeeks(inicioSemanaAtual, 2), { weekStartsOn: 1 });
+  const inicioSemanaS2 = startOfWeek(subWeeks(inicioSemanaAtual, 2), { weekStartsOn: 1 });
+
+  // Filtrar registros da semana S-1 (segunda a sexta)
+  const registrosSemanaS1 = historico.filter((h: any) => {
+    const dataRegistro = parseISO(h.data);
+    const diaSemana = dataRegistro.getDay();
+    return isWithinInterval(dataRegistro, { start: inicioSemanaAnterior, end: fimSemanaAnterior }) && diaSemana >= 1 && diaSemana <= 5;
+  });
+
+  // Filtrar registros da semana S-2 (segunda a sexta)
+  const registrosSemanaS2 = historico.filter((h: any) => {
+    const dataRegistro = parseISO(h.data);
+    const diaSemana = dataRegistro.getDay();
+    return isWithinInterval(dataRegistro, { start: inicioSemanaS2, end: fimSemanaS2 }) && diaSemana >= 1 && diaSemana <= 5;
+  });
+
+  // Médias semanais
+  const cobreMediaSemana = calcularMedia(registrosSemanaS1, 'cobre_brl_kg');
+  const aluminioMediaSemana = calcularMedia(registrosSemanaS1, 'aluminio_brl_kg');
+  const cobreMediaSemanaAnterior = calcularMedia(registrosSemanaS2, 'cobre_brl_kg') || cobreMediaSemana;
+  const aluminioMediaSemanaAnterior = calcularMedia(registrosSemanaS2, 'aluminio_brl_kg') || aluminioMediaSemana;
+
+  // Calcular médias mensais (mês anterior fechado)
+  const inicioMesAnterior = startOfMonth(subMonths(agora, 1));
+  const fimMesAnterior = endOfMonth(subMonths(agora, 1));
+  const inicioMesAnteAnterior = startOfMonth(subMonths(agora, 2));
+  const fimMesAnteAnterior = endOfMonth(subMonths(agora, 2));
+
+  const registrosMesAnterior = historico.filter((h: any) => {
+    const dataRegistro = parseISO(h.data);
+    return isWithinInterval(dataRegistro, { start: inicioMesAnterior, end: fimMesAnterior });
+  });
+
+  const registrosMesAnteAnterior = historico.filter((h: any) => {
+    const dataRegistro = parseISO(h.data);
+    return isWithinInterval(dataRegistro, { start: inicioMesAnteAnterior, end: fimMesAnteAnterior });
+  });
+
+  const cobreMediaMes = calcularMedia(registrosMesAnterior, 'cobre_brl_kg');
+  const aluminioMediaMes = calcularMedia(registrosMesAnterior, 'aluminio_brl_kg');
+  const cobreMediaMesAnterior = calcularMedia(registrosMesAnteAnterior, 'cobre_brl_kg') || cobreMediaMes;
+  const aluminioMediaMesAnterior = calcularMedia(registrosMesAnteAnterior, 'aluminio_brl_kg') || aluminioMediaMes;
 
   const cobreHoje = hoje?.cobre_brl_kg || 0;
   const cobreOntem = ontem?.cobre_brl_kg || cobreHoje;
@@ -190,12 +230,14 @@ export default function Indicadores() {
           </div>
         </div>
 
-        {/* Cards de Variação - Apenas Cobre e Alumínio */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {/* Cards de Variação - Cobre e Alumínio */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <VariationCard title="Cobre - Hoje" current={cobreHoje} previous={cobreOntem} />
-          <VariationCard title="Cobre - Média Semana" current={cobreMediaSemana} previous={cobreMediaSemanaAnterior} />
+          <VariationCard title="Cobre - Média S-1" current={cobreMediaSemana} previous={cobreMediaSemanaAnterior} />
+          <VariationCard title="Cobre - Média Mês" current={cobreMediaMes} previous={cobreMediaMesAnterior} />
           <VariationCard title="Alumínio - Hoje" current={aluminioHoje} previous={aluminioOntem} />
-          <VariationCard title="Alumínio - Média Semana" current={aluminioMediaSemana} previous={aluminioMediaSemanaAnterior} />
+          <VariationCard title="Alumínio - Média S-1" current={aluminioMediaSemana} previous={aluminioMediaSemanaAnterior} />
+          <VariationCard title="Alumínio - Média Mês" current={aluminioMediaMes} previous={aluminioMediaMesAnterior} />
         </div>
 
         {/* Gráfico de Evolução */}
