@@ -370,12 +370,12 @@ export default function Estoque() {
                   className="pl-10"
                 />
               </div>
-              <Select value={selectedTipo || ""} onValueChange={(v) => setSelectedTipo(v || null)}>
+              <Select value={selectedTipo || "all"} onValueChange={(v) => setSelectedTipo(v === "all" ? null : v)}>
                 <SelectTrigger className="w-40">
                   <SelectValue placeholder="Tipo Produto" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
                   {tiposProduto?.map((t) => (
                     <SelectItem key={t.id} value={t.id}>{t.nome}</SelectItem>
                   ))}
