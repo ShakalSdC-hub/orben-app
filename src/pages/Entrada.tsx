@@ -73,9 +73,11 @@ export default function Entrada() {
         .select(`
           *,
           fornecedor:fornecedores(razao_social),
+          parceiro:parceiros!entradas_parceiro_id_fkey(razao_social, nome_fantasia),
           dono:donos_material(nome),
           tipo_entrada:tipos_entrada(nome),
-          tipo_produto:tipos_produto(nome)
+          tipo_produto:tipos_produto(nome),
+          transportadora:parceiros!entradas_transportadora_id_fkey(razao_social)
         `)
         .order("data_entrada", { ascending: false });
       if (error) throw error;
@@ -234,7 +236,7 @@ export default function Entrada() {
                               {entrada.codigo}
                             </TableCell>
                             <TableCell>
-                              {entrada.fornecedor?.razao_social || "-"}
+                              {entrada.parceiro?.razao_social || entrada.parceiro?.nome_fantasia || entrada.fornecedor?.razao_social || "-"}
                             </TableCell>
                             <TableCell>
                               {format(new Date(entrada.data_entrada), "dd/MM/yyyy")}

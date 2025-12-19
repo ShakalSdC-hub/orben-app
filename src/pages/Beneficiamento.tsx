@@ -431,29 +431,86 @@ export default function Beneficiamento() {
                                     <TableCell>{parent.dono?.nome || "-"}</TableCell>
                                     <TableCell className="text-right font-medium">{formatWeight(parent.peso_kg)}</TableCell>
                                   </TableRow>
-                                  {/* Filhos expandidos */}
-                                  {isExpanded && children.map((child: any) => {
-                                    const isChildSelected = selectedLotes.some((l) => l.id === child.id);
-                                    const isDisabled = isParentSelected;
-                                    return (
-                                      <TableRow
-                                        key={child.id}
-                                        className={`${isChildSelected ? "bg-primary/10" : isDisabled ? "opacity-50" : "hover:bg-muted/30"} ${!isDisabled && "cursor-pointer"}`}
-                                        onClick={() => !isDisabled && toggleLote(child)}
-                                      >
-                                        <TableCell>
-                                          <Checkbox checked={isChildSelected} disabled={isDisabled} />
+                                  {/* Filhos expandidos com botão de seleção em massa */}
+                                  {isExpanded && (
+                                    <>
+                                      {/* Barra de ações para sublotes */}
+                                      <TableRow className="bg-muted/20">
+                                        <TableCell colSpan={6}>
+                                          <div className="flex items-center justify-between py-1">
+                                            <div className="flex items-center gap-4">
+                                              <Button
+                                                variant="outline"
+                                                size="sm"
+                                                disabled={isParentSelected}
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  const unselectedChildren = children.filter(
+                                                    (c: any) => !selectedLotes.some((l) => l.id === c.id)
+                                                  );
+                                                  setSelectedLotes([...selectedLotes, ...unselectedChildren]);
+                                                }}
+                                              >
+                                                <Plus className="h-3 w-3 mr-1" />
+                                                Selecionar todos ({children.length})
+                                              </Button>
+                                              {children.some((c: any) => selectedLotes.some((l) => l.id === c.id)) && (
+                                                <Button
+                                                  variant="ghost"
+                                                  size="sm"
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    const childIds = new Set(children.map((c: any) => c.id));
+                                                    setSelectedLotes(selectedLotes.filter((l) => !childIds.has(l.id)));
+                                                  }}
+                                                >
+                                                  <Trash2 className="h-3 w-3 mr-1" />
+                                                  Limpar seleção
+                                                </Button>
+                                              )}
+                                            </div>
+                                            {/* Resumo de peso selecionado */}
+                                            {(() => {
+                                              const selectedChildrenWeight = children
+                                                .filter((c: any) => selectedLotes.some((l) => l.id === c.id))
+                                                .reduce((acc: number, c: any) => acc + c.peso_kg, 0);
+                                              const selectedCount = children.filter((c: any) => 
+                                                selectedLotes.some((l) => l.id === c.id)
+                                              ).length;
+                                              return selectedCount > 0 ? (
+                                                <span className="text-sm text-muted-foreground">
+                                                  <strong className="text-foreground">{selectedCount}</strong> de {children.length} selecionado{selectedCount > 1 ? 's' : ''} = 
+                                                  <strong className="text-primary ml-1">{formatWeight(selectedChildrenWeight)}</strong>
+                                                </span>
+                                              ) : null;
+                                            })()}
+                                          </div>
                                         </TableCell>
-                                        <TableCell></TableCell>
-                                        <TableCell className="font-mono text-primary pl-6">
-                                          └ {child.codigo}
-                                        </TableCell>
-                                        <TableCell>{child.tipo_produto?.nome || "-"}</TableCell>
-                                        <TableCell>{child.dono?.nome || "-"}</TableCell>
-                                        <TableCell className="text-right font-medium">{formatWeight(child.peso_kg)}</TableCell>
                                       </TableRow>
-                                    );
-                                  })}
+                                      {children.map((child: any) => {
+                                        const isChildSelected = selectedLotes.some((l) => l.id === child.id);
+                                        const isDisabled = isParentSelected;
+                                        return (
+                                          <TableRow
+                                            key={child.id}
+                                            className={`${isChildSelected ? "bg-primary/10" : isDisabled ? "opacity-50" : "hover:bg-muted/30"} ${!isDisabled && "cursor-pointer"}`}
+                                            onClick={() => !isDisabled && toggleLote(child)}
+                                          >
+                                            <TableCell>
+                                              <Checkbox checked={isChildSelected} disabled={isDisabled} />
+                                            </TableCell>
+                                            <TableCell></TableCell>
+                                            <TableCell className="font-mono text-primary pl-6">
+                                              └ {child.codigo}
+                                            </TableCell>
+                                            <TableCell>{child.tipo_produto?.nome || "-"}</TableCell>
+                                            <TableCell>{child.dono?.nome || "-"}</TableCell>
+                                            <TableCell className="text-right font-medium">{formatWeight(child.peso_kg)}</TableCell>
+                                          </TableRow>
+                                        );
+                                      })}
+                                    </>
+                                  )}
                                 </>
                               );
                             })}
