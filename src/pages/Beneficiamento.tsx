@@ -19,6 +19,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { BeneficiamentoRomaneioPrint } from "@/components/romaneio/BeneficiamentoRomaneioPrint";
+import { GlobalFilters } from "@/components/filters/GlobalFilters";
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   em_andamento: { label: "Em Andamento", variant: "default" },
@@ -51,6 +52,8 @@ export default function Beneficiamento() {
   const [selectedLotes, setSelectedLotes] = useState<SublotesSelecionados[]>([]);
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
   const [romaneioBeneficiamento, setRomaneioBeneficiamento] = useState<any | null>(null);
+  const [searchBeneficiamento, setSearchBeneficiamento] = useState("");
+  const [selectedDono, setSelectedDono] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     processo_id: "",
@@ -775,6 +778,26 @@ export default function Beneficiamento() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+        </div>
+
+        {/* Filtros */}
+        <div className="flex flex-col gap-4 md:flex-row md:items-center">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input 
+              placeholder="Buscar por código..." 
+              value={searchBeneficiamento} 
+              onChange={(e) => setSearchBeneficiamento(e.target.value)} 
+              className="pl-10" 
+            />
+          </div>
+          <GlobalFilters
+            showParceiro={false}
+            selectedParceiro={null}
+            selectedDono={selectedDono}
+            onParceiroChange={() => {}}
+            onDonoChange={setSelectedDono}
+          />
         </div>
 
         {/* Lista de Beneficiamentos */}

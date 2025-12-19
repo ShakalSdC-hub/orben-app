@@ -19,6 +19,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { RomaneioPrint } from "@/components/romaneio/RomaneioPrint";
+import { GlobalFilters } from "@/components/filters/GlobalFilters";
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   pendente: { label: "Pendente", variant: "outline" },
@@ -53,6 +54,7 @@ export default function Saida() {
   const [activeTab, setActiveTab] = useState("lotes");
   const [selectedLotes, setSelectedLotes] = useState<SubloteSelecionado[]>([]);
   const [romaneioSaida, setRomaneioSaida] = useState<any | null>(null);
+  const [selectedDono, setSelectedDono] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     tipo_saida_id: "",
@@ -517,11 +519,18 @@ export default function Saida() {
         </div>
 
         {/* Filtros */}
-        <div className="flex gap-4">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input placeholder="Buscar por código..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10" />
           </div>
+          <GlobalFilters
+            showParceiro={false}
+            selectedParceiro={null}
+            selectedDono={selectedDono}
+            onParceiroChange={() => {}}
+            onDonoChange={setSelectedDono}
+          />
         </div>
 
         {/* Lista de Saídas */}

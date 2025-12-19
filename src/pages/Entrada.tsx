@@ -22,7 +22,6 @@ import {
 import {
   Plus,
   Search,
-  Filter,
   Download,
   Upload,
   MoreHorizontal,
@@ -50,6 +49,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { EntradaForm } from "@/components/entrada/EntradaForm";
 import { EntradaRomaneioPrint } from "@/components/romaneio/EntradaRomaneioPrint";
+import { GlobalFilters } from "@/components/filters/GlobalFilters";
 
 const statusConfig: Record<string, { label: string; className: string }> = {
   pendente: { label: "Pendente", className: "bg-warning/10 text-warning border-warning/20" },
@@ -63,6 +63,8 @@ export default function Entrada() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [romaneioEntrada, setRomaneioEntrada] = useState<any | null>(null);
+  const [selectedParceiro, setSelectedParceiro] = useState<string | null>(null);
+  const [selectedDono, setSelectedDono] = useState<string | null>(null);
 
   // Fetch entradas with sublotes
   const { data: entradas, isLoading } = useQuery({
@@ -104,11 +106,19 @@ export default function Entrada() {
   };
 
   const filteredEntradas = entradas?.filter(
-    (e) =>
-      e.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      e.fornecedor?.razao_social?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      e.dono?.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      e.nota_fiscal?.toLowerCase().includes(searchTerm.toLowerCase())
+    (e) => {
+      const matchesSearch = 
+        e.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        e.fornecedor?.razao_social?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        e.dono?.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        e.nota_fiscal?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesParceiro = !selectedParceiro || e.parceiro_id === selectedParceiro || e.fornecedor_id === selectedParceiro;
+      const matchesDono = !selectedDono || 
+        (selectedDono === "ibrac" ? !e.dono_id : e.dono_id === selectedDono);
+      
+      return matchesSearch && matchesParceiro && matchesDono;
+    }
   );
 
   const toggleRow = (id: string) => {
@@ -168,16 +178,16 @@ export default function Entrada() {
               className="pl-10"
             />
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm">
-              <Filter className="mr-2 h-4 w-4" />
-              Filtros
-            </Button>
-            <Button variant="outline" size="sm">
-              <Download className="mr-2 h-4 w-4" />
-              Exportar
-            </Button>
-          </div>
+          <GlobalFilters
+            selectedParceiro={selectedParceiro}
+            selectedDono={selectedDono}
+            onParceiroChange={setSelectedParceiro}
+            onDonoChange={setSelectedDono}
+          />
+          <Button variant="outline" size="sm">
+            <Download className="mr-2 h-4 w-4" />
+            Exportar
+          </Button>
         </div>
 
         {/* Table */}
