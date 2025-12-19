@@ -43,6 +43,18 @@ function DonosMaterialTab() {
     onError: () => toast({ title: "Erro ao cadastrar", variant: "destructive" }),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("donos_material").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["donos_material"] });
+      toast({ title: "Dono excluído com sucesso!" });
+    },
+    onError: () => toast({ title: "Erro ao excluir", variant: "destructive" }),
+  });
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -91,13 +103,14 @@ function DonosMaterialTab() {
             <TableHead>Telefone</TableHead>
             <TableHead>Taxa IBRAC</TableHead>
             <TableHead>Status</TableHead>
+            <TableHead className="w-[50px]"></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {isLoading ? (
-            <TableRow><TableCell colSpan={5} className="text-center">Carregando...</TableCell></TableRow>
+            <TableRow><TableCell colSpan={6} className="text-center">Carregando...</TableCell></TableRow>
           ) : donos.length === 0 ? (
-            <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">Nenhum dono cadastrado</TableCell></TableRow>
+            <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Nenhum dono cadastrado</TableCell></TableRow>
           ) : (
             donos.map((dono: any) => (
               <TableRow key={dono.id}>
@@ -106,6 +119,11 @@ function DonosMaterialTab() {
                 <TableCell>{dono.telefone || "-"}</TableCell>
                 <TableCell>{dono.taxa_operacao_pct}%</TableCell>
                 <TableCell><Badge variant={dono.ativo ? "default" : "secondary"}>{dono.ativo ? "Ativo" : "Inativo"}</Badge></TableCell>
+                <TableCell>
+                  <Button variant="ghost" size="icon" onClick={() => deleteMutation.mutate(dono.id)} disabled={deleteMutation.isPending}>
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </TableCell>
               </TableRow>
             ))
           )}
@@ -141,6 +159,18 @@ function TiposProdutoTab() {
       toast({ title: "Tipo de produto cadastrado com sucesso!" });
     },
     onError: () => toast({ title: "Erro ao cadastrar", variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("tipos_produto").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tipos_produto"] });
+      toast({ title: "Tipo excluído com sucesso!" });
+    },
+    onError: () => toast({ title: "Erro ao excluir", variant: "destructive" }),
   });
 
   return (
@@ -193,13 +223,14 @@ function TiposProdutoTab() {
             <TableHead>NCM</TableHead>
             <TableHead>ICMS</TableHead>
             <TableHead>PIS/COFINS</TableHead>
+            <TableHead className="w-[50px]"></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {isLoading ? (
-            <TableRow><TableCell colSpan={5} className="text-center">Carregando...</TableCell></TableRow>
+            <TableRow><TableCell colSpan={6} className="text-center">Carregando...</TableCell></TableRow>
           ) : tipos.length === 0 ? (
-            <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">Nenhum tipo cadastrado</TableCell></TableRow>
+            <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Nenhum tipo cadastrado</TableCell></TableRow>
           ) : (
             tipos.map((tipo: any) => (
               <TableRow key={tipo.id}>
@@ -208,6 +239,11 @@ function TiposProdutoTab() {
                 <TableCell>{tipo.ncm || "-"}</TableCell>
                 <TableCell>{tipo.icms_pct}%</TableCell>
                 <TableCell>{tipo.pis_cofins_pct}%</TableCell>
+                <TableCell>
+                  <Button variant="ghost" size="icon" onClick={() => deleteMutation.mutate(tipo.id)} disabled={deleteMutation.isPending}>
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </TableCell>
               </TableRow>
             ))
           )}
@@ -243,6 +279,18 @@ function ProcessosTab() {
       toast({ title: "Processo cadastrado com sucesso!" });
     },
     onError: () => toast({ title: "Erro ao cadastrar", variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("processos").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["processos"] });
+      toast({ title: "Processo excluído com sucesso!" });
+    },
+    onError: () => toast({ title: "Erro ao excluir", variant: "destructive" }),
   });
 
   return (
@@ -293,13 +341,14 @@ function ProcessosTab() {
             <TableHead>Frete Ida</TableHead>
             <TableHead>Frete Volta</TableHead>
             <TableHead>MO</TableHead>
+            <TableHead className="w-[50px]"></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {isLoading ? (
-            <TableRow><TableCell colSpan={5} className="text-center">Carregando...</TableCell></TableRow>
+            <TableRow><TableCell colSpan={6} className="text-center">Carregando...</TableCell></TableRow>
           ) : processos.length === 0 ? (
-            <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">Nenhum processo cadastrado</TableCell></TableRow>
+            <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Nenhum processo cadastrado</TableCell></TableRow>
           ) : (
             processos.map((p: any) => (
               <TableRow key={p.id}>
@@ -308,6 +357,11 @@ function ProcessosTab() {
                 <TableCell>{p.inclui_frete_ida ? <Badge variant="default">Sim</Badge> : <Badge variant="secondary">Não</Badge>}</TableCell>
                 <TableCell>{p.inclui_frete_volta ? <Badge variant="default">Sim</Badge> : <Badge variant="secondary">Não</Badge>}</TableCell>
                 <TableCell>{p.inclui_mo ? <Badge variant="default">Sim</Badge> : <Badge variant="secondary">Não</Badge>}</TableCell>
+                <TableCell>
+                  <Button variant="ghost" size="icon" onClick={() => deleteMutation.mutate(p.id)} disabled={deleteMutation.isPending}>
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </TableCell>
               </TableRow>
             ))
           )}
