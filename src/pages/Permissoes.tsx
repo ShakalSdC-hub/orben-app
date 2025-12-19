@@ -283,8 +283,11 @@ export default function Permissoes() {
                       type="password"
                       value={newUserData.password} 
                       onChange={(e) => setNewUserData({ ...newUserData, password: e.target.value })} 
-                      placeholder="Mínimo 6 caracteres"
+                      placeholder="Mínimo 12 caracteres"
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Mínimo 12 caracteres, com maiúscula, minúscula, número e caractere especial
+                    </p>
                   </div>
                   <div className="space-y-2">
                     <Label>Permissão</Label>
@@ -314,7 +317,16 @@ export default function Permissoes() {
                   </Button>
                   <Button
                     onClick={() => createUserMutation.mutate(newUserData)}
-                    disabled={!newUserData.email || !newUserData.password || newUserData.password.length < 6 || createUserMutation.isPending}
+                    disabled={
+                      !newUserData.email || 
+                      !newUserData.password || 
+                      newUserData.password.length < 12 ||
+                      !/[A-Z]/.test(newUserData.password) ||
+                      !/[a-z]/.test(newUserData.password) ||
+                      !/[0-9]/.test(newUserData.password) ||
+                      !/[^A-Za-z0-9]/.test(newUserData.password) ||
+                      createUserMutation.isPending
+                    }
                     className="bg-gradient-copper hover:opacity-90"
                   >
                     {createUserMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
