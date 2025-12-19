@@ -14,9 +14,12 @@ interface Message {
 }
 
 const QUICK_PROMPTS = [
-  { icon: TrendingUp, label: "Análise LME", prompt: "Qual a análise das cotações LME recentes? Dê insights sobre tendências." },
-  { icon: Package, label: "Estoque", prompt: "Quais insights você pode dar sobre gestão de estoque de metais?" },
-  { icon: DollarSign, label: "Custos", prompt: "Como posso otimizar os custos de beneficiamento?" },
+  { icon: TrendingUp, label: "Análise LME", prompt: "Qual a análise das cotações LME recentes? Dê insights sobre tendências de cobre e alumínio." },
+  { icon: Package, label: "Giro de Estoque", prompt: "Quais indicadores devo acompanhar para otimizar o giro de estoque de metais beneficiados?" },
+  { icon: DollarSign, label: "Otimizar Custos", prompt: "Como posso reduzir os custos de beneficiamento mantendo a qualidade? Considere fretes, mão de obra e perdas." },
+  { icon: TrendingUp, label: "Previsão de Preços", prompt: "Baseado nas tendências históricas da LME, qual sua análise para os próximos movimentos de preço do cobre?" },
+  { icon: Package, label: "Perdas no Processo", prompt: "Quais são as melhores práticas para reduzir perdas no processo de beneficiamento de cobre e alumínio?" },
+  { icon: DollarSign, label: "Margem de Lucro", prompt: "Como calcular e melhorar a margem de lucro nas operações de beneficiamento considerando custos fixos e variáveis?" },
 ];
 
 export function AIInsightsChat() {
