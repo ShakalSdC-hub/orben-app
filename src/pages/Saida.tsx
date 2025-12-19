@@ -18,6 +18,7 @@ import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { RomaneioPrint } from "@/components/romaneio/RomaneioPrint";
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   pendente: { label: "Pendente", variant: "outline" },
@@ -51,6 +52,7 @@ export default function Saida() {
   const [searchLotes, setSearchLotes] = useState("");
   const [activeTab, setActiveTab] = useState("lotes");
   const [selectedLotes, setSelectedLotes] = useState<SubloteSelecionado[]>([]);
+  const [romaneioSaida, setRomaneioSaida] = useState<any | null>(null);
 
   const [formData, setFormData] = useState({
     tipo_saida_id: "",
@@ -570,7 +572,7 @@ export default function Saida() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" onClick={() => setRomaneioSaida(s)}>
                           <Printer className="h-4 w-4" />
                         </Button>
                       </TableCell>
@@ -581,6 +583,15 @@ export default function Saida() {
             </Table>
           </CardContent>
         </Card>
+
+        {/* Romaneio Print Dialog */}
+        {romaneioSaida && (
+          <RomaneioPrint
+            saida={romaneioSaida}
+            isOpen={!!romaneioSaida}
+            onClose={() => setRomaneioSaida(null)}
+          />
+        )}
       </div>
     </MainLayout>
   );
