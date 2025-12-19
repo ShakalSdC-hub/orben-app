@@ -70,6 +70,42 @@ export type Database = {
           },
         ]
       }
+      audit_logs: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          ip_address: string | null
+          record_data: Json | null
+          record_id: string | null
+          table_name: string
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          record_data?: Json | null
+          record_id?: string | null
+          table_name: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          record_data?: Json | null
+          record_id?: string | null
+          table_name?: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       beneficiamento_itens_entrada: {
         Row: {
           beneficiamento_id: string | null
@@ -1371,6 +1407,15 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      log_data_access: {
+        Args: {
+          _action: string
+          _record_data?: Json
+          _record_id?: string
+          _table_name: string
+        }
+        Returns: undefined
       }
     }
     Enums: {
