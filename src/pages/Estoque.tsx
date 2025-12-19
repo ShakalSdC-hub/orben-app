@@ -318,21 +318,32 @@ export default function Estoque() {
     return { tipo: `Estoque ${donoNome}`, detalhe: "Material de Terceiro", cor: "bg-success/10 text-success" };
   };
 
-  // Identificar quais sublotes são pais (têm filhos)
+  // Identificar quais sublotes são pais (têm filhos disponíveis ou consumidos)
   const parentIdsSet = new Set(
     sublotes?.filter((s: any) => s.lote_pai_id).map((s: any) => s.lote_pai_id) || []
   );
 
-  // Filtrar sublotes - apenas mostrar "disponivel" por padrão, mas também "em_beneficiamento" quando filtrado
+  // Filtrar sublotes
   const filteredSublotes = sublotes?.filter((s) => {
-    // Só mostrar sublotes disponíveis ou em beneficiamento
+    // Não mostrar sublotes consumidos (já foram transformados/vendidos)
+    if (s.status === "consumido" || s.status === "vendido") return false;
+    
+    // Mostrar sublotes disponíveis ou em beneficiamento
     const statusValido = s.status === "disponivel" || s.status === "em_beneficiamento";
     if (!statusValido) return false;
     
-    // Filtro de tipo de lote (pai/filho)
+    // Filtro de tipo de lote (pai/filho/todos)
+    // Lote Mãe = sublote que TEM filhos (é referenciado por outros)
+    // Lote Filho = sublote que TEM pai (referencia outro lote)
     const isPai = parentIdsSet.has(s.id);
     const isFilho = !!s.lote_pai_id;
-    if (filterTipoLote === "pai" && !isPai) return false;
+    
+    if (filterTipoLote === "pai") {
+      // Mostrar apenas lotes que são pais OU que não têm pai e nem são filhos (lotes raiz)
+      if (!isPai && !isFilho) return true; // Lote raiz sem filhos
+      if (isPai) return true; // Lote que tem filhos
+      return false;
+    }
     if (filterTipoLote === "filho" && !isFilho) return false;
     
     const matchesSearch =
@@ -522,7 +533,11 @@ export default function Estoque() {
                         </div>
                         <div>
                           <p className="font-semibold">{lote.codigo}</p>
-                          <p className="text-xs text-muted-foreground">{lote.entrada?.codigo || "—"}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {lote.lote_pai_id 
+                              ? `Origem: ${sublotes?.find(s => s.id === lote.lote_pai_id)?.codigo || lote.lote_pai_id}`
+                              : lote.entrada?.codigo || "—"}
+                          </p>
                         </div>
                       </div>
                       <Badge
