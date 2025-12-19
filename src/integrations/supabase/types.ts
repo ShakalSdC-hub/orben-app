@@ -618,7 +618,9 @@ export type Database = {
           estanho_usd_t: number | null
           fonte: string | null
           id: string
+          is_media_semanal: boolean | null
           niquel_usd_t: number | null
+          semana_numero: number | null
           updated_at: string
           zinco_usd_t: number | null
         }
@@ -634,7 +636,9 @@ export type Database = {
           estanho_usd_t?: number | null
           fonte?: string | null
           id?: string
+          is_media_semanal?: boolean | null
           niquel_usd_t?: number | null
+          semana_numero?: number | null
           updated_at?: string
           zinco_usd_t?: number | null
         }
@@ -650,7 +654,9 @@ export type Database = {
           estanho_usd_t?: number | null
           fonte?: string | null
           id?: string
+          is_media_semanal?: boolean | null
           niquel_usd_t?: number | null
+          semana_numero?: number | null
           updated_at?: string
           zinco_usd_t?: number | null
         }

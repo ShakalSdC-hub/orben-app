@@ -7,8 +7,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
-import { format, parse } from "date-fns";
-import { ptBR, enUS } from "date-fns/locale";
+import { format, getWeek, getYear } from "date-fns";
 
 interface LMERow {
   data: string;
@@ -21,6 +20,8 @@ interface LMERow {
   dolar_brl: number | null;
   cobre_brl_kg: number | null;
   aluminio_brl_kg: number | null;
+  is_media_semanal: boolean;
+  semana_numero: number | null;
 }
 
 const monthMap: Record<string, number> = {
@@ -30,19 +31,21 @@ const monthMap: Record<string, number> = {
   feb: 1, apr: 3, may: 4, aug: 7, sep: 8, oct: 9, dec: 11,
 };
 
-function parseFlexibleDate(value: any): string | null {
-  if (!value) return null;
+function parseFlexibleDate(value: any): { date: string | null; isMedia: boolean } {
+  if (!value) return { date: null, isMedia: false };
 
   // Excel serial number
   if (typeof value === "number") {
     const excelDate = new Date((value - 25569) * 86400 * 1000);
-    return format(excelDate, "yyyy-MM-dd");
+    return { date: format(excelDate, "yyyy-MM-dd"), isMedia: false };
   }
 
   const str = String(value).trim().toLowerCase();
   
-  // Skip "média" rows
-  if (str.includes("média") || str.includes("media")) return null;
+  // Detect "média" rows - return flag instead of skipping
+  if (str.includes("média") || str.includes("media")) {
+    return { date: null, isMedia: true };
+  }
 
   // Format: "1-Dec", "01/dez", "1/12", etc.
   const match = str.match(/^(\d{1,2})[\-\/\.]?\s*([a-z]{3,})$/i);
@@ -52,7 +55,7 @@ function parseFlexibleDate(value: any): string | null {
     const month = monthMap[monthStr];
     if (month !== undefined) {
       const year = new Date().getFullYear();
-      return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+      return { date: `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`, isMedia: false };
     }
   }
 
@@ -61,17 +64,17 @@ function parseFlexibleDate(value: any): string | null {
   if (parts.length === 3) {
     const [d, m, y] = parts;
     const year = y.length === 2 ? `20${y}` : y;
-    return `${year}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+    return { date: `${year}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`, isMedia: false };
   }
 
   // Format: "dd/mm" (current year)
   if (parts.length === 2) {
     const [d, m] = parts;
     const year = new Date().getFullYear();
-    return `${year}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+    return { date: `${year}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`, isMedia: false };
   }
 
-  return null;
+  return { date: null, isMedia: false };
 }
 
 function parseNumber(value: any): number | null {
@@ -162,13 +165,53 @@ export function ExcelImport() {
         console.log("Header row:", headerRow);
 
         const rows: LMERow[] = [];
+        let lastValidDate: string | null = null;
+        let currentWeekNumber: number | null = null;
+        
         dataRows.forEach((row: any[]) => {
           if (!row || row.length === 0) return;
           
           const dataValue = row[colMap.data];
-          const dataStr = parseFlexibleDate(dataValue);
+          const { date: dataStr, isMedia } = parseFlexibleDate(dataValue);
           
-          if (!dataStr) return; // Skip if no valid date (also skips "Média" rows)
+          // If it's a média row, use the last valid date to determine the week
+          if (isMedia) {
+            const cobreBrl = parseNumber(row[colMap.cobre_brl_kg]);
+            const aluminioBrl = parseNumber(row[colMap.aluminio_brl_kg]);
+            
+            // Only add if we have average values
+            if (cobreBrl || aluminioBrl) {
+              // Use the last valid date to create a week identifier
+              const weekDate = lastValidDate ? new Date(lastValidDate) : new Date();
+              const weekNumber = getWeek(weekDate, { weekStartsOn: 1 });
+              const year = getYear(weekDate);
+              
+              // Create a synthetic date for the média (last Friday of that week)
+              const mediaDate = lastValidDate || format(new Date(), "yyyy-MM-dd");
+              
+              rows.push({
+                data: mediaDate,
+                cobre_usd_t: parseNumber(row[colMap.cobre_usd_t]),
+                aluminio_usd_t: parseNumber(row[colMap.aluminio_usd_t]),
+                zinco_usd_t: parseNumber(row[colMap.zinco_usd_t]),
+                chumbo_usd_t: parseNumber(row[colMap.chumbo_usd_t]),
+                estanho_usd_t: parseNumber(row[colMap.estanho_usd_t]),
+                niquel_usd_t: parseNumber(row[colMap.niquel_usd_t]),
+                dolar_brl: parseNumber(row[colMap.dolar_brl]),
+                cobre_brl_kg: cobreBrl,
+                aluminio_brl_kg: aluminioBrl,
+                is_media_semanal: true,
+                semana_numero: weekNumber,
+              });
+            }
+            return;
+          }
+          
+          if (!dataStr) return; // Skip if no valid date
+
+          // Track last valid date for média rows
+          lastValidDate = dataStr;
+          currentWeekNumber = getWeek(new Date(dataStr), { weekStartsOn: 1 });
 
           const cobreUsd = parseNumber(row[colMap.cobre_usd_t]);
           const aluminioUsd = parseNumber(row[colMap.aluminio_usd_t]);
@@ -196,6 +239,8 @@ export function ExcelImport() {
             dolar_brl: dolar,
             cobre_brl_kg: cobreBrl,
             aluminio_brl_kg: aluminioBrl,
+            is_media_semanal: false,
+            semana_numero: currentWeekNumber,
           });
         });
 
@@ -220,18 +265,37 @@ export function ExcelImport() {
   const importMutation = useMutation({
     mutationFn: async (rows: LMERow[]) => {
       for (const row of rows) {
-        // Check if record exists first
-        const { data: existing } = await supabase
-          .from("historico_lme")
-          .select("id")
-          .eq("data", row.data)
-          .maybeSingle();
-
-        if (existing) {
-          // Update existing record
-          const { error } = await supabase
+        // For média rows, check by semana_numero
+        if (row.is_media_semanal) {
+          const { data: existing } = await supabase
             .from("historico_lme")
-            .update({
+            .select("id")
+            .eq("semana_numero", row.semana_numero)
+            .eq("is_media_semanal", true)
+            .maybeSingle();
+
+          if (existing) {
+            // Update existing média record
+            const { error } = await supabase
+              .from("historico_lme")
+              .update({
+                cobre_usd_t: row.cobre_usd_t,
+                aluminio_usd_t: row.aluminio_usd_t,
+                zinco_usd_t: row.zinco_usd_t,
+                chumbo_usd_t: row.chumbo_usd_t,
+                estanho_usd_t: row.estanho_usd_t,
+                niquel_usd_t: row.niquel_usd_t,
+                dolar_brl: row.dolar_brl,
+                cobre_brl_kg: row.cobre_brl_kg,
+                aluminio_brl_kg: row.aluminio_brl_kg,
+                fonte: "excel",
+              })
+              .eq("id", existing.id);
+            if (error) throw error;
+          } else {
+            // Insert new média record
+            const { error } = await supabase.from("historico_lme").insert({
+              data: row.data,
               cobre_usd_t: row.cobre_usd_t,
               aluminio_usd_t: row.aluminio_usd_t,
               zinco_usd_t: row.zinco_usd_t,
@@ -239,30 +303,68 @@ export function ExcelImport() {
               estanho_usd_t: row.estanho_usd_t,
               niquel_usd_t: row.niquel_usd_t,
               dolar_brl: row.dolar_brl,
+              cobre_brl_kg: row.cobre_brl_kg,
+              aluminio_brl_kg: row.aluminio_brl_kg,
+              is_media_semanal: true,
+              semana_numero: row.semana_numero,
               fonte: "excel",
-            })
-            .eq("id", existing.id);
-          if (error) throw error;
+            });
+            if (error) throw error;
+          }
         } else {
-          // Insert new record
-          const { error } = await supabase.from("historico_lme").insert({
-            data: row.data,
-            cobre_usd_t: row.cobre_usd_t,
-            aluminio_usd_t: row.aluminio_usd_t,
-            zinco_usd_t: row.zinco_usd_t,
-            chumbo_usd_t: row.chumbo_usd_t,
-            estanho_usd_t: row.estanho_usd_t,
-            niquel_usd_t: row.niquel_usd_t,
-            dolar_brl: row.dolar_brl,
-            fonte: "excel",
-          });
-          if (error) throw error;
+          // Regular daily records - check by date
+          const { data: existing } = await supabase
+            .from("historico_lme")
+            .select("id")
+            .eq("data", row.data)
+            .eq("is_media_semanal", false)
+            .maybeSingle();
+
+          if (existing) {
+            // Update existing record
+            const { error } = await supabase
+              .from("historico_lme")
+              .update({
+                cobre_usd_t: row.cobre_usd_t,
+                aluminio_usd_t: row.aluminio_usd_t,
+                zinco_usd_t: row.zinco_usd_t,
+                chumbo_usd_t: row.chumbo_usd_t,
+                estanho_usd_t: row.estanho_usd_t,
+                niquel_usd_t: row.niquel_usd_t,
+                dolar_brl: row.dolar_brl,
+                cobre_brl_kg: row.cobre_brl_kg,
+                aluminio_brl_kg: row.aluminio_brl_kg,
+                semana_numero: row.semana_numero,
+                fonte: "excel",
+              })
+              .eq("id", existing.id);
+            if (error) throw error;
+          } else {
+            // Insert new record
+            const { error } = await supabase.from("historico_lme").insert({
+              data: row.data,
+              cobre_usd_t: row.cobre_usd_t,
+              aluminio_usd_t: row.aluminio_usd_t,
+              zinco_usd_t: row.zinco_usd_t,
+              chumbo_usd_t: row.chumbo_usd_t,
+              estanho_usd_t: row.estanho_usd_t,
+              niquel_usd_t: row.niquel_usd_t,
+              dolar_brl: row.dolar_brl,
+              cobre_brl_kg: row.cobre_brl_kg,
+              aluminio_brl_kg: row.aluminio_brl_kg,
+              is_media_semanal: false,
+              semana_numero: row.semana_numero,
+              fonte: "excel",
+            });
+            if (error) throw error;
+          }
         }
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["historico_lme"] });
       queryClient.invalidateQueries({ queryKey: ["ultima-lme"] });
+      queryClient.invalidateQueries({ queryKey: ["medias_semanais_lme"] });
       toast({ title: "Importação concluída!", description: `${parsedData.length} registros importados.` });
       setIsOpen(false);
       setParsedData([]);
@@ -277,6 +379,9 @@ export function ExcelImport() {
     if (value === null) return "-";
     return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
   };
+
+  const mediasCount = parsedData.filter(r => r.is_media_semanal).length;
+  const dailyCount = parsedData.filter(r => !r.is_media_semanal).length;
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -306,7 +411,7 @@ export function ExcelImport() {
             </Button>
             {fileName && (
               <span className="text-sm text-muted-foreground">
-                {fileName} ({parsedData.length} linhas)
+                {fileName} ({dailyCount} diários, {mediasCount} médias semanais)
               </span>
             )}
           </div>
@@ -318,6 +423,7 @@ export function ExcelImport() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Data</TableHead>
+                      <TableHead>Tipo</TableHead>
                       <TableHead className="text-right">Cobre (US$/t)</TableHead>
                       <TableHead className="text-right">Alumínio (US$/t)</TableHead>
                       <TableHead className="text-right">Dólar</TableHead>
@@ -326,9 +432,18 @@ export function ExcelImport() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {parsedData.slice(0, 20).map((row, idx) => (
-                      <TableRow key={idx}>
-                        <TableCell>{row.data}</TableCell>
+                    {parsedData.slice(0, 25).map((row, idx) => (
+                      <TableRow key={idx} className={row.is_media_semanal ? "bg-primary/10 font-semibold" : ""}>
+                        <TableCell>
+                          {row.is_media_semanal ? `Sem. ${row.semana_numero}` : row.data}
+                        </TableCell>
+                        <TableCell>
+                          {row.is_media_semanal ? (
+                            <span className="text-primary">Média</span>
+                          ) : (
+                            <span className="text-muted-foreground">Diário</span>
+                          )}
+                        </TableCell>
                         <TableCell className="text-right">{row.cobre_usd_t?.toLocaleString("pt-BR", { minimumFractionDigits: 2 }) || "-"}</TableCell>
                         <TableCell className="text-right">{row.aluminio_usd_t?.toLocaleString("pt-BR", { minimumFractionDigits: 2 }) || "-"}</TableCell>
                         <TableCell className="text-right">{row.dolar_brl?.toFixed(4) || "-"}</TableCell>
@@ -338,9 +453,9 @@ export function ExcelImport() {
                     ))}
                   </TableBody>
                 </Table>
-                {parsedData.length > 20 && (
+                {parsedData.length > 25 && (
                   <p className="text-center text-sm text-muted-foreground py-2">
-                    ... e mais {parsedData.length - 20} linhas
+                    ... e mais {parsedData.length - 25} linhas
                   </p>
                 )}
               </div>
@@ -372,6 +487,7 @@ export function ExcelImport() {
                 <FileSpreadsheet className="h-12 w-12 mx-auto mb-4 opacity-50" />
                 <p>Selecione um arquivo Excel com as cotações LME</p>
                 <p className="text-sm mt-2">O arquivo deve conter colunas: Data, Cobre (US$/t), Dólar, etc.</p>
+                <p className="text-sm mt-1">As linhas com "Média" serão importadas como médias semanais.</p>
               </div>
             </div>
           )}
