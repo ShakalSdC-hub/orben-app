@@ -13,6 +13,7 @@ import { Plus, Edit, Trash2, Building2, Package, FileInput, FileOutput, Cog, Use
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { ParceirosTab } from "@/components/cadastros/ParceirosTab";
 
 // Componentes de Cadastro
 function DonosMaterialTab() {
@@ -451,13 +452,22 @@ export default function Cadastros() {
           <p className="text-muted-foreground">Gerencie os cadastros auxiliares do sistema</p>
         </div>
 
-        <Tabs defaultValue="donos" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 lg:w-auto lg:inline-grid">
+        <Tabs defaultValue="parceiros" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 lg:w-auto lg:inline-grid">
+            <TabsTrigger value="parceiros" className="gap-2"><Building2 className="h-4 w-4" />Parceiros</TabsTrigger>
             <TabsTrigger value="donos" className="gap-2"><Users className="h-4 w-4" />Donos</TabsTrigger>
             <TabsTrigger value="produtos" className="gap-2"><Package className="h-4 w-4" />Produtos</TabsTrigger>
             <TabsTrigger value="processos" className="gap-2"><Cog className="h-4 w-4" />Processos</TabsTrigger>
             <TabsTrigger value="tipos" className="gap-2"><FileInput className="h-4 w-4" />Tipos E/S</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="parceiros" className="mt-6">
+            <Card>
+              <CardContent className="pt-6">
+                <ParceirosTab />
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           <TabsContent value="donos" className="mt-6">
             <Card>

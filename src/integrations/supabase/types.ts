@@ -187,15 +187,18 @@ export type Database = {
           data_inicio: string | null
           fornecedor_terceiro_id: string | null
           id: string
+          motorista: string | null
           observacoes: string | null
           perda_cobrada_pct: number | null
           perda_real_pct: number | null
           peso_entrada_kg: number | null
           peso_saida_kg: number | null
+          placa_veiculo: string | null
           processo_id: string | null
           status: string | null
           taxa_financeira_pct: number | null
           tipo_beneficiamento: string | null
+          transportadora_id: string | null
           updated_at: string
         }
         Insert: {
@@ -210,15 +213,18 @@ export type Database = {
           data_inicio?: string | null
           fornecedor_terceiro_id?: string | null
           id?: string
+          motorista?: string | null
           observacoes?: string | null
           perda_cobrada_pct?: number | null
           perda_real_pct?: number | null
           peso_entrada_kg?: number | null
           peso_saida_kg?: number | null
+          placa_veiculo?: string | null
           processo_id?: string | null
           status?: string | null
           taxa_financeira_pct?: number | null
           tipo_beneficiamento?: string | null
+          transportadora_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -233,15 +239,18 @@ export type Database = {
           data_inicio?: string | null
           fornecedor_terceiro_id?: string | null
           id?: string
+          motorista?: string | null
           observacoes?: string | null
           perda_cobrada_pct?: number | null
           perda_real_pct?: number | null
           peso_entrada_kg?: number | null
           peso_saida_kg?: number | null
+          placa_veiculo?: string | null
           processo_id?: string | null
           status?: string | null
           taxa_financeira_pct?: number | null
           tipo_beneficiamento?: string | null
+          transportadora_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -257,6 +266,13 @@ export type Database = {
             columns: ["processo_id"]
             isOneToOne: false
             referencedRelation: "processos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "beneficiamentos_transportadora_id_fkey"
+            columns: ["transportadora_id"]
+            isOneToOne: false
+            referencedRelation: "parceiros"
             referencedColumns: ["id"]
           },
         ]
@@ -378,66 +394,84 @@ export type Database = {
       entradas: {
         Row: {
           codigo: string
+          conferente_id: string | null
           created_at: string
           created_by: string | null
           data_entrada: string
           dono_id: string | null
           fornecedor_id: string | null
           id: string
+          motorista: string | null
           nota_fiscal: string | null
           observacoes: string | null
+          parceiro_id: string | null
           peso_bruto_kg: number
           peso_liquido_kg: number
+          peso_nf_kg: number | null
+          placa_veiculo: string | null
           status: string | null
           taxa_financeira_pct: number | null
           teor_cobre: number | null
           tipo_entrada_id: string | null
           tipo_material: string
           tipo_produto_id: string | null
+          transportadora_id: string | null
           updated_at: string
           valor_total: number | null
           valor_unitario: number | null
         }
         Insert: {
           codigo: string
+          conferente_id?: string | null
           created_at?: string
           created_by?: string | null
           data_entrada?: string
           dono_id?: string | null
           fornecedor_id?: string | null
           id?: string
+          motorista?: string | null
           nota_fiscal?: string | null
           observacoes?: string | null
+          parceiro_id?: string | null
           peso_bruto_kg: number
           peso_liquido_kg: number
+          peso_nf_kg?: number | null
+          placa_veiculo?: string | null
           status?: string | null
           taxa_financeira_pct?: number | null
           teor_cobre?: number | null
           tipo_entrada_id?: string | null
           tipo_material: string
           tipo_produto_id?: string | null
+          transportadora_id?: string | null
           updated_at?: string
           valor_total?: number | null
           valor_unitario?: number | null
         }
         Update: {
           codigo?: string
+          conferente_id?: string | null
           created_at?: string
           created_by?: string | null
           data_entrada?: string
           dono_id?: string | null
           fornecedor_id?: string | null
           id?: string
+          motorista?: string | null
           nota_fiscal?: string | null
           observacoes?: string | null
+          parceiro_id?: string | null
           peso_bruto_kg?: number
           peso_liquido_kg?: number
+          peso_nf_kg?: number | null
+          placa_veiculo?: string | null
           status?: string | null
           taxa_financeira_pct?: number | null
           teor_cobre?: number | null
           tipo_entrada_id?: string | null
           tipo_material?: string
           tipo_produto_id?: string | null
+          transportadora_id?: string | null
           updated_at?: string
           valor_total?: number | null
           valor_unitario?: number | null
@@ -458,6 +492,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "entradas_parceiro_id_fkey"
+            columns: ["parceiro_id"]
+            isOneToOne: false
+            referencedRelation: "parceiros"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "entradas_tipo_entrada_id_fkey"
             columns: ["tipo_entrada_id"]
             isOneToOne: false
@@ -469,6 +510,13 @@ export type Database = {
             columns: ["tipo_produto_id"]
             isOneToOne: false
             referencedRelation: "tipos_produto"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "entradas_transportadora_id_fkey"
+            columns: ["transportadora_id"]
+            isOneToOne: false
+            referencedRelation: "parceiros"
             referencedColumns: ["id"]
           },
         ]
@@ -663,6 +711,63 @@ export type Database = {
           },
         ]
       }
+      parceiros: {
+        Row: {
+          ativo: boolean | null
+          cep: string | null
+          cidade: string | null
+          cnpj: string | null
+          created_at: string
+          email: string | null
+          endereco: string | null
+          estado: string | null
+          id: string
+          is_cliente: boolean | null
+          is_fornecedor: boolean | null
+          is_transportadora: boolean | null
+          nome_fantasia: string | null
+          razao_social: string
+          telefone: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean | null
+          cep?: string | null
+          cidade?: string | null
+          cnpj?: string | null
+          created_at?: string
+          email?: string | null
+          endereco?: string | null
+          estado?: string | null
+          id?: string
+          is_cliente?: boolean | null
+          is_fornecedor?: boolean | null
+          is_transportadora?: boolean | null
+          nome_fantasia?: string | null
+          razao_social: string
+          telefone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean | null
+          cep?: string | null
+          cidade?: string | null
+          cnpj?: string | null
+          created_at?: string
+          email?: string | null
+          endereco?: string | null
+          estado?: string | null
+          id?: string
+          is_cliente?: boolean | null
+          is_fornecedor?: boolean | null
+          is_transportadora?: boolean | null
+          nome_fantasia?: string | null
+          razao_social?: string
+          telefone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       precos_mo_terceiros: {
         Row: {
           ativo: boolean | null
@@ -835,12 +940,15 @@ export type Database = {
           custos_cobrados: number | null
           data_saida: string
           id: string
+          motorista: string | null
           nota_fiscal: string | null
           observacoes: string | null
           peso_total_kg: number
+          placa_veiculo: string | null
           status: string | null
           tipo_saida: string
           tipo_saida_id: string | null
+          transportadora_id: string | null
           updated_at: string
           valor_repasse_dono: number | null
           valor_total: number | null
@@ -854,12 +962,15 @@ export type Database = {
           custos_cobrados?: number | null
           data_saida?: string
           id?: string
+          motorista?: string | null
           nota_fiscal?: string | null
           observacoes?: string | null
           peso_total_kg: number
+          placa_veiculo?: string | null
           status?: string | null
           tipo_saida: string
           tipo_saida_id?: string | null
+          transportadora_id?: string | null
           updated_at?: string
           valor_repasse_dono?: number | null
           valor_total?: number | null
@@ -873,12 +984,15 @@ export type Database = {
           custos_cobrados?: number | null
           data_saida?: string
           id?: string
+          motorista?: string | null
           nota_fiscal?: string | null
           observacoes?: string | null
           peso_total_kg?: number
+          placa_veiculo?: string | null
           status?: string | null
           tipo_saida?: string
           tipo_saida_id?: string | null
+          transportadora_id?: string | null
           updated_at?: string
           valor_repasse_dono?: number | null
           valor_total?: number | null
@@ -897,6 +1011,13 @@ export type Database = {
             columns: ["tipo_saida_id"]
             isOneToOne: false
             referencedRelation: "tipos_saida"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saidas_transportadora_id_fkey"
+            columns: ["transportadora_id"]
+            isOneToOne: false
+            referencedRelation: "parceiros"
             referencedColumns: ["id"]
           },
         ]
@@ -973,6 +1094,8 @@ export type Database = {
           entrada_id: string | null
           id: string
           local_estoque_id: string | null
+          lote_pai_id: string | null
+          numero_volume: number | null
           observacoes: string | null
           peso_kg: number
           status: string | null
@@ -988,6 +1111,8 @@ export type Database = {
           entrada_id?: string | null
           id?: string
           local_estoque_id?: string | null
+          lote_pai_id?: string | null
+          numero_volume?: number | null
           observacoes?: string | null
           peso_kg: number
           status?: string | null
@@ -1003,6 +1128,8 @@ export type Database = {
           entrada_id?: string | null
           id?: string
           local_estoque_id?: string | null
+          lote_pai_id?: string | null
+          numero_volume?: number | null
           observacoes?: string | null
           peso_kg?: number
           status?: string | null
@@ -1030,6 +1157,13 @@ export type Database = {
             columns: ["local_estoque_id"]
             isOneToOne: false
             referencedRelation: "locais_estoque"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sublotes_lote_pai_id_fkey"
+            columns: ["lote_pai_id"]
+            isOneToOne: false
+            referencedRelation: "sublotes"
             referencedColumns: ["id"]
           },
           {
