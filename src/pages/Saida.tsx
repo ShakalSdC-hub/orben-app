@@ -11,7 +11,24 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, FileOutput, Search, Truck, DollarSign, Loader2, Trash2, Printer } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Plus, FileOutput, Search, Truck, DollarSign, Loader2, Trash2, Printer, MoreHorizontal, Eye, Edit } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -47,7 +64,10 @@ interface SubloteSelecionado {
 
 export default function Saida() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { user, role } = useAuth();
+  const isAdmin = role === "admin";
+  const canEdit = role === "admin" || role === "operacao";
+  
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [searchLotes, setSearchLotes] = useState("");
@@ -55,6 +75,7 @@ export default function Saida() {
   const [selectedLotes, setSelectedLotes] = useState<SubloteSelecionado[]>([]);
   const [romaneioSaida, setRomaneioSaida] = useState<any | null>(null);
   const [selectedDono, setSelectedDono] = useState<string | null>(null);
+  const [deleteSaida, setDeleteSaida] = useState<any | null>(null);
 
   const [formData, setFormData] = useState({
     tipo_saida_id: "",
@@ -229,6 +250,51 @@ export default function Saida() {
       placa_veiculo: "",
     });
   };
+
+  // Mutation para deletar saída
+  const deleteMutation = useMutation({
+    mutationFn: async (saidaId: string) => {
+      // Buscar itens de saída para restaurar status dos sublotes
+      const { data: itensSaida } = await supabase
+        .from("saida_itens")
+        .select("sublote_id")
+        .eq("saida_id", saidaId);
+
+      // Restaurar status dos sublotes
+      if (itensSaida) {
+        for (const item of itensSaida) {
+          if (item.sublote_id) {
+            await supabase
+              .from("sublotes")
+              .update({ status: "disponivel" })
+              .eq("id", item.sublote_id);
+          }
+        }
+      }
+
+      // Deletar itens de saída
+      await supabase
+        .from("saida_itens")
+        .delete()
+        .eq("saida_id", saidaId);
+
+      // Deletar saída
+      const { error } = await supabase
+        .from("saidas")
+        .delete()
+        .eq("id", saidaId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["saidas"] });
+      queryClient.invalidateQueries({ queryKey: ["sublotes_disponiveis_saida"] });
+      toast({ title: "Saída excluída com sucesso!" });
+      setDeleteSaida(null);
+    },
+    onError: (error) => {
+      toast({ title: "Erro ao excluir", description: error.message, variant: "destructive" });
+    },
+  });
 
   const filteredSaidas = saidas.filter((s: any) =>
     s.codigo?.toLowerCase().includes(search.toLowerCase())
@@ -581,9 +647,41 @@ export default function Saida() {
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Button variant="ghost" size="icon" onClick={() => setRomaneioSaida(s)}>
-                          <Printer className="h-4 w-4" />
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem>
+                              <Eye className="mr-2 h-4 w-4" />
+                              Visualizar
+                            </DropdownMenuItem>
+                            {canEdit && (
+                              <DropdownMenuItem>
+                                <Edit className="mr-2 h-4 w-4" />
+                                Editar
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem onClick={() => setRomaneioSaida(s)}>
+                              <Printer className="mr-2 h-4 w-4" />
+                              Imprimir Romaneio
+                            </DropdownMenuItem>
+                            {isAdmin && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem 
+                                  onClick={() => setDeleteSaida(s)}
+                                  className="text-destructive focus:text-destructive"
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Excluir
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))
@@ -601,6 +699,30 @@ export default function Saida() {
             onClose={() => setRomaneioSaida(null)}
           />
         )}
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={!!deleteSaida} onOpenChange={() => setDeleteSaida(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tem certeza que deseja excluir a saída <strong>{deleteSaida?.codigo}</strong>?
+                <br />
+                Esta ação não pode ser desfeita. Os sublotes serão restaurados para disponíveis.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => deleteMutation.mutate(deleteSaida?.id)}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </MainLayout>
   );
