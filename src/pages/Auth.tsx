@@ -12,13 +12,20 @@ import orbenLogo from "@/assets/orben-logo.jpeg";
 
 const loginSchema = z.object({
   email: z.string().email("Email inválido"),
-  password: z.string().min(6, "Senha deve ter no mínimo 6 caracteres"),
+  password: z.string().min(8, "Senha deve ter no mínimo 8 caracteres"),
 });
+
+const passwordSchema = z.string()
+  .min(12, "Senha deve ter no mínimo 12 caracteres")
+  .regex(/[A-Z]/, "Deve conter pelo menos uma letra maiúscula")
+  .regex(/[a-z]/, "Deve conter pelo menos uma letra minúscula")
+  .regex(/[0-9]/, "Deve conter pelo menos um número")
+  .regex(/[^A-Za-z0-9]/, "Deve conter pelo menos um caractere especial (!@#$%^&*)");
 
 const signupSchema = z.object({
   fullName: z.string().min(2, "Nome deve ter no mínimo 2 caracteres"),
   email: z.string().email("Email inválido"),
-  password: z.string().min(6, "Senha deve ter no mínimo 6 caracteres"),
+  password: passwordSchema,
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Senhas não conferem",
@@ -215,11 +222,14 @@ export default function Auth() {
                   <Input
                     id="signup-password"
                     type="password"
-                    placeholder="••••••••"
+                    placeholder="••••••••••••"
                     value={signupData.password}
                     onChange={(e) => setSignupData({ ...signupData, password: e.target.value })}
                     className={errors.password ? "border-destructive" : ""}
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Mínimo 12 caracteres, com maiúscula, minúscula, número e caractere especial
+                  </p>
                   {errors.password && (
                     <p className="text-sm text-destructive">{errors.password}</p>
                   )}
