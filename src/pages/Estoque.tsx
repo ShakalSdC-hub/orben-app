@@ -67,7 +67,7 @@ export default function Estoque() {
   const [selectedDono, setSelectedDono] = useState<string | null>(null);
   const [selectedTipo, setSelectedTipo] = useState<string | null>(null);
   const [selectedLocal, setSelectedLocal] = useState<string | null>(null);
-  const [filterTipoLote, setFilterTipoLote] = useState<"todos" | "pai" | "filho">("todos");
+  const [filterTipoLote, setFilterTipoLote] = useState<"todos" | "pai" | "filho">("pai");
   const [isTransferOpen, setIsTransferOpen] = useState(false);
   const [selectedLote, setSelectedLote] = useState<any | null>(null);
   const [transferData, setTransferData] = useState({ local_destino_id: "", motivo: "" });
@@ -83,12 +83,33 @@ export default function Estoque() {
         .from("sublotes")
         .select(`
           *,
-          entrada:entradas(codigo),
+          entrada:entradas(codigo, tipo_material, dono:donos_material(nome), fornecedor:fornecedores(razao_social)),
           dono:donos_material(nome),
           tipo_produto:tipos_produto(nome),
           local_estoque:locais_estoque(nome, tipo)
         `)
         .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Fetch beneficiamentos em andamento para mostrar status
+  const { data: beneficiamentosEmAndamento } = useQuery({
+    queryKey: ["beneficiamentos-em-andamento"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("beneficiamento_itens_entrada")
+        .select(`
+          sublote_id,
+          beneficiamento:beneficiamentos(
+            codigo,
+            tipo_beneficiamento,
+            status,
+            fornecedor_terceiro:fornecedores(razao_social)
+          )
+        `)
+        .eq("beneficiamento.status", "em_andamento");
       if (error) throw error;
       return data;
     },
@@ -249,6 +270,51 @@ export default function Estoque() {
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
+  };
+
+  // Mapa de sublotes em beneficiamento
+  const beneficiamentoMap = new Map<string, { codigo: string; tipo: string; fornecedor?: string }>();
+  beneficiamentosEmAndamento?.forEach((item: any) => {
+    if (item.sublote_id && item.beneficiamento) {
+      beneficiamentoMap.set(item.sublote_id, {
+        codigo: item.beneficiamento.codigo,
+        tipo: item.beneficiamento.tipo_beneficiamento,
+        fornecedor: item.beneficiamento.fornecedor_terceiro?.razao_social,
+      });
+    }
+  });
+
+  // Função para obter descrição do tipo de estoque baseado no contexto
+  const getEstoqueDescricao = (lote: any) => {
+    // Se está em beneficiamento
+    if (lote.status === "em_beneficiamento") {
+      const benInfo = beneficiamentoMap.get(lote.id);
+      if (benInfo?.tipo === "externo" && benInfo.fornecedor) {
+        return { tipo: "Em Beneficiamento Externo", detalhe: benInfo.fornecedor, cor: "bg-warning/10 text-warning" };
+      }
+      return { tipo: "Em Beneficiamento Interno", detalhe: "IBRAC", cor: "bg-copper/10 text-copper" };
+    }
+
+    // Lógica de classificação do estoque
+    const donoNome = lote.dono?.nome;
+    const tipoMaterial = lote.entrada?.tipo_material;
+    
+    // Se é terceiro (fornecedor depositou material para beneficiamento)
+    if (tipoMaterial === "terceiro" && lote.entrada?.fornecedor) {
+      return { 
+        tipo: "Estoque Terceiro", 
+        detalhe: `Cliente: ${lote.entrada.fornecedor.razao_social}`, 
+        cor: "bg-blue-500/10 text-blue-600" 
+      };
+    }
+    
+    // Se é IBRAC próprio
+    if (!donoNome || donoNome === "IBRAC") {
+      return { tipo: "Estoque IBRAC", detalhe: "Material Próprio", cor: "bg-primary/10 text-primary" };
+    }
+    
+    // Se é de outro dono
+    return { tipo: `Estoque ${donoNome}`, detalhe: "Material de Terceiro", cor: "bg-success/10 text-success" };
   };
 
   // Identificar quais sublotes são pais (têm filhos)
@@ -441,7 +507,9 @@ export default function Estoque() {
               </div>
             ) : (
               <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                {filteredSublotes?.map((lote) => (
+                {filteredSublotes?.map((lote) => {
+                  const estoqueInfo = getEstoqueDescricao(lote);
+                  return (
                   <div
                     key={lote.id}
                     className="rounded-xl border bg-card p-4 shadow-sm hover:shadow-md transition-all hover:border-primary/30 group"
@@ -462,6 +530,12 @@ export default function Estoque() {
                       >
                         {statusConfig[lote.status as keyof typeof statusConfig]?.label || lote.status}
                       </Badge>
+                    </div>
+
+                    {/* Tipo de Estoque / Processo */}
+                    <div className={cn("rounded-lg px-3 py-2 mb-3", estoqueInfo.cor)}>
+                      <p className="text-xs font-medium">{estoqueInfo.tipo}</p>
+                      <p className="text-xs opacity-75">{estoqueInfo.detalhe}</p>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3 text-sm">
@@ -520,7 +594,8 @@ export default function Estoque() {
                       </div>
                     )}
                   </div>
-                ))}
+                )})}
+              
                 {(!filteredSublotes || filteredSublotes.length === 0) && (
                   <div className="col-span-full text-center py-8 text-muted-foreground">
                     {searchTerm || selectedDono || selectedTipo || selectedLocal ? "Nenhum sublote encontrado" : "Nenhum sublote no estoque ainda"}
