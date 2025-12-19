@@ -24,6 +24,7 @@ import {
   Loader2,
   MoveRight,
   History,
+  UserRoundCog,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -33,6 +34,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
+import { TransferenciaDono } from "@/components/estoque/TransferenciaDono";
 
 const statusConfig = {
   disponivel: { label: "Disponível", className: "bg-success/10 text-success border-success/20" },
@@ -60,6 +62,8 @@ export default function Estoque() {
   const [isTransferOpen, setIsTransferOpen] = useState(false);
   const [selectedLote, setSelectedLote] = useState<any | null>(null);
   const [transferData, setTransferData] = useState({ local_destino_id: "", motivo: "" });
+  const [isTransferDonoOpen, setIsTransferDonoOpen] = useState(false);
+  const [selectedLoteDono, setSelectedLoteDono] = useState<any | null>(null);
 
   // Fetch sublotes com relacionamentos
   const { data: sublotes, isLoading } = useQuery({
@@ -422,15 +426,27 @@ export default function Estoque() {
                     )}
 
                     {lote.status === "disponivel" && (
-                      <div className="mt-3 pt-3 border-t">
+                      <div className="mt-3 pt-3 border-t flex gap-2">
                         <Button
                           variant="outline"
                           size="sm"
-                          className="w-full"
+                          className="flex-1"
                           onClick={() => handleTransfer(lote)}
                         >
-                          <MoveRight className="h-4 w-4 mr-2" />
-                          Transferir
+                          <MoveRight className="h-4 w-4 mr-1" />
+                          Local
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => {
+                            setSelectedLoteDono(lote);
+                            setIsTransferDonoOpen(true);
+                          }}
+                        >
+                          <UserRoundCog className="h-4 w-4 mr-1" />
+                          Dono
                         </Button>
                       </div>
                     )}
@@ -642,6 +658,13 @@ export default function Estoque() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Transfer Dono Dialog */}
+        <TransferenciaDono
+          sublote={selectedLoteDono}
+          open={isTransferDonoOpen}
+          onOpenChange={setIsTransferDonoOpen}
+        />
       </div>
     </MainLayout>
   );
