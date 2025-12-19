@@ -220,20 +220,44 @@ export function ExcelImport() {
   const importMutation = useMutation({
     mutationFn: async (rows: LMERow[]) => {
       for (const row of rows) {
-        const { error } = await supabase.from("historico_lme").upsert({
-          data: row.data,
-          cobre_usd_t: row.cobre_usd_t,
-          aluminio_usd_t: row.aluminio_usd_t,
-          zinco_usd_t: row.zinco_usd_t,
-          chumbo_usd_t: row.chumbo_usd_t,
-          estanho_usd_t: row.estanho_usd_t,
-          niquel_usd_t: row.niquel_usd_t,
-          dolar_brl: row.dolar_brl,
-          cobre_brl_kg: row.cobre_brl_kg,
-          aluminio_brl_kg: row.aluminio_brl_kg,
-          fonte: "excel",
-        }, { onConflict: "data" });
-        if (error) throw error;
+        // Check if record exists first
+        const { data: existing } = await supabase
+          .from("historico_lme")
+          .select("id")
+          .eq("data", row.data)
+          .maybeSingle();
+
+        if (existing) {
+          // Update existing record
+          const { error } = await supabase
+            .from("historico_lme")
+            .update({
+              cobre_usd_t: row.cobre_usd_t,
+              aluminio_usd_t: row.aluminio_usd_t,
+              zinco_usd_t: row.zinco_usd_t,
+              chumbo_usd_t: row.chumbo_usd_t,
+              estanho_usd_t: row.estanho_usd_t,
+              niquel_usd_t: row.niquel_usd_t,
+              dolar_brl: row.dolar_brl,
+              fonte: "excel",
+            })
+            .eq("id", existing.id);
+          if (error) throw error;
+        } else {
+          // Insert new record
+          const { error } = await supabase.from("historico_lme").insert({
+            data: row.data,
+            cobre_usd_t: row.cobre_usd_t,
+            aluminio_usd_t: row.aluminio_usd_t,
+            zinco_usd_t: row.zinco_usd_t,
+            chumbo_usd_t: row.chumbo_usd_t,
+            estanho_usd_t: row.estanho_usd_t,
+            niquel_usd_t: row.niquel_usd_t,
+            dolar_brl: row.dolar_brl,
+            fonte: "excel",
+          });
+          if (error) throw error;
+        }
       }
     },
     onSuccess: () => {

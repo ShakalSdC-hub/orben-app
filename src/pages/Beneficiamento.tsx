@@ -28,7 +28,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, Cog, DollarSign, Scale, AlertTriangle, Truck, Package, Loader2, Search, Trash2, Printer, ChevronRight, ChevronDown, Info, MoreHorizontal, Eye, Edit } from "lucide-react";
+import { Plus, Cog, DollarSign, Scale, AlertTriangle, Truck, Package, Loader2, Search, Trash2, Printer, ChevronRight, ChevronDown, Info, MoreHorizontal, Eye, Edit, CheckCircle2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -75,6 +75,8 @@ export default function Beneficiamento() {
   const [searchBeneficiamento, setSearchBeneficiamento] = useState("");
   const [selectedDono, setSelectedDono] = useState<string | null>(null);
   const [deleteBeneficiamento, setDeleteBeneficiamento] = useState<any | null>(null);
+  const [finalizeBeneficiamento, setFinalizeBeneficiamento] = useState<any | null>(null);
+  const [finalizeData, setFinalizeData] = useState({ peso_saida_real: 0, local_destino_id: "", tipo_produto_saida_id: "" });
 
   const [formData, setFormData] = useState({
     processo_id: "",
@@ -162,6 +164,15 @@ export default function Beneficiamento() {
     queryKey: ["tipos_produto"],
     queryFn: async () => {
       const { data, error } = await supabase.from("tipos_produto").select("*").eq("ativo", true).order("nome");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: locaisEstoque = [] } = useQuery({
+    queryKey: ["locais_estoque"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("locais_estoque").select("*").eq("ativo", true).order("nome");
       if (error) throw error;
       return data;
     },
@@ -389,6 +400,113 @@ export default function Beneficiamento() {
     },
     onError: (error) => {
       toast({ title: "Erro ao excluir", description: error.message, variant: "destructive" });
+    },
+  });
+
+  // Mutation para finalizar beneficiamento
+  const finalizeMutation = useMutation({
+    mutationFn: async ({ beneficiamentoId, pesoSaida, localDestinoId, tipoProdutoSaidaId }: { 
+      beneficiamentoId: string; 
+      pesoSaida: number;
+      localDestinoId: string;
+      tipoProdutoSaidaId: string;
+    }) => {
+      // Buscar itens de entrada para obter os sublotes e criar saída
+      const { data: itensEntrada } = await supabase
+        .from("beneficiamento_itens_entrada")
+        .select("sublote_id, peso_kg, sublote:sublotes(dono_id, custo_unitario_total)")
+        .eq("beneficiamento_id", beneficiamentoId);
+
+      if (!itensEntrada || itensEntrada.length === 0) {
+        throw new Error("Nenhum item de entrada encontrado");
+      }
+
+      // Calcular custos do beneficiamento
+      const { data: beneficiamento } = await supabase
+        .from("beneficiamentos")
+        .select("*")
+        .eq("id", beneficiamentoId)
+        .single();
+
+      if (!beneficiamento) throw new Error("Beneficiamento não encontrado");
+
+      const pesoEntrada = beneficiamento.peso_entrada_kg || 0;
+      const custoTotal = (beneficiamento.custo_frete_ida || 0) + 
+                         (beneficiamento.custo_frete_volta || 0) + 
+                         (beneficiamento.custo_mo_ibrac || 0) + 
+                         (beneficiamento.custo_mo_terceiro || 0);
+      const custoAdicionalPorKg = pesoSaida > 0 ? custoTotal / pesoSaida : 0;
+
+      // Criar sublote de saída para cada sublote de entrada (proporcional ao peso)
+      for (const item of itensEntrada) {
+        if (!item.sublote_id) continue;
+
+        const proporcao = (item.peso_kg || 0) / pesoEntrada;
+        const pesoSaidaItem = pesoSaida * proporcao;
+        const custoOriginal = (item.sublote as any)?.custo_unitario_total || 0;
+        const novoCustoUnitario = custoOriginal + custoAdicionalPorKg;
+        const donoId = (item.sublote as any)?.dono_id;
+
+        // Gerar código para novo sublote
+        const codigoSaida = `TKT-${format(new Date(), "yyMMdd")}-${String(Math.floor(Math.random() * 999)).padStart(3, "0")}`;
+
+        // Criar sublote de saída (produto transformado)
+        const { data: novoSublote, error: subloteError } = await supabase
+          .from("sublotes")
+          .insert({
+            codigo: codigoSaida,
+            peso_kg: pesoSaidaItem,
+            tipo_produto_id: tipoProdutoSaidaId,
+            dono_id: donoId,
+            local_estoque_id: localDestinoId,
+            lote_pai_id: item.sublote_id,
+            custo_unitario_total: novoCustoUnitario,
+            status: "disponivel",
+          })
+          .select()
+          .single();
+
+        if (subloteError) throw subloteError;
+
+        // Registrar item de saída do beneficiamento
+        await supabase.from("beneficiamento_itens_saida").insert({
+          beneficiamento_id: beneficiamentoId,
+          sublote_gerado_id: novoSublote.id,
+          tipo_produto_id: tipoProdutoSaidaId,
+          local_estoque_id: localDestinoId,
+          peso_kg: pesoSaidaItem,
+          custo_unitario_calculado: novoCustoUnitario,
+        });
+
+        // Marcar sublote de entrada como consumido
+        await supabase
+          .from("sublotes")
+          .update({ status: "consumido", peso_kg: 0 })
+          .eq("id", item.sublote_id);
+      }
+
+      // Atualizar beneficiamento para finalizado
+      const { error: updateError } = await supabase
+        .from("beneficiamentos")
+        .update({ 
+          status: "finalizado", 
+          data_fim: new Date().toISOString().split("T")[0],
+          peso_saida_kg: pesoSaida
+        })
+        .eq("id", beneficiamentoId);
+
+      if (updateError) throw updateError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["beneficiamentos"] });
+      queryClient.invalidateQueries({ queryKey: ["sublotes_disponiveis"] });
+      queryClient.invalidateQueries({ queryKey: ["sublotes"] });
+      toast({ title: "Beneficiamento finalizado com sucesso!", description: "Material retornado ao estoque." });
+      setFinalizeBeneficiamento(null);
+      setFinalizeData({ peso_saida_real: 0, local_destino_id: "", tipo_produto_saida_id: "" });
+    },
+    onError: (error) => {
+      toast({ title: "Erro ao finalizar", description: error.message, variant: "destructive" });
     },
   });
 
@@ -927,17 +1045,33 @@ export default function Beneficiamento() {
                               <Eye className="mr-2 h-4 w-4" />
                               Visualizar
                             </DropdownMenuItem>
-                            {canEdit && (
-                              <DropdownMenuItem>
-                                <Edit className="mr-2 h-4 w-4" />
-                                Editar
-                              </DropdownMenuItem>
+                            {canEdit && b.status === "em_andamento" && (
+                              <>
+                                <DropdownMenuItem>
+                                  <Edit className="mr-2 h-4 w-4" />
+                                  Editar
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  onClick={() => {
+                                    setFinalizeBeneficiamento(b);
+                                    setFinalizeData({ 
+                                      peso_saida_real: b.peso_saida_kg || b.peso_entrada_kg * 0.97,
+                                      local_destino_id: "",
+                                      tipo_produto_saida_id: ""
+                                    });
+                                  }}
+                                  className="text-success focus:text-success"
+                                >
+                                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                                  Finalizar
+                                </DropdownMenuItem>
+                              </>
                             )}
                             <DropdownMenuItem onClick={() => setRomaneioBeneficiamento(b)}>
                               <Printer className="mr-2 h-4 w-4" />
                               Imprimir Romaneio
                             </DropdownMenuItem>
-                            {isAdmin && (
+                            {isAdmin && b.status !== "finalizado" && (
                               <>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem 
@@ -992,6 +1126,103 @@ export default function Beneficiamento() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Finalize Dialog */}
+        <Dialog open={!!finalizeBeneficiamento} onOpenChange={() => setFinalizeBeneficiamento(null)}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-success" />
+                Finalizar Beneficiamento
+              </DialogTitle>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-4">
+              <div className="rounded-lg bg-muted p-4 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Código:</span>
+                  <span className="font-mono font-medium">{finalizeBeneficiamento?.codigo}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>Peso Entrada:</span>
+                  <span className="font-medium">{formatWeight(finalizeBeneficiamento?.peso_entrada_kg || 0)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>Peso Saída Estimado:</span>
+                  <span className="font-medium">{formatWeight(finalizeBeneficiamento?.peso_saida_kg || 0)}</span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Peso Real de Saída (kg)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={finalizeData.peso_saida_real}
+                  onChange={(e) => setFinalizeData({ ...finalizeData, peso_saida_real: parseFloat(e.target.value) || 0 })}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Perda Real: {finalizeBeneficiamento?.peso_entrada_kg && finalizeData.peso_saida_real > 0
+                    ? ((1 - finalizeData.peso_saida_real / finalizeBeneficiamento.peso_entrada_kg) * 100).toFixed(2)
+                    : 0}%
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Tipo de Produto de Saída</Label>
+                <Select 
+                  value={finalizeData.tipo_produto_saida_id} 
+                  onValueChange={(v) => setFinalizeData({ ...finalizeData, tipo_produto_saida_id: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o produto resultante..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {tiposProduto.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>{t.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Local de Destino</Label>
+                <Select 
+                  value={finalizeData.local_destino_id} 
+                  onValueChange={(v) => setFinalizeData({ ...finalizeData, local_destino_id: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o local..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {locaisEstoque.map((l) => (
+                      <SelectItem key={l.id} value={l.id}>{l.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setFinalizeBeneficiamento(null)}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={() => finalizeMutation.mutate({
+                  beneficiamentoId: finalizeBeneficiamento?.id,
+                  pesoSaida: finalizeData.peso_saida_real,
+                  localDestinoId: finalizeData.local_destino_id,
+                  tipoProdutoSaidaId: finalizeData.tipo_produto_saida_id,
+                })}
+                disabled={finalizeMutation.isPending || !finalizeData.local_destino_id || !finalizeData.tipo_produto_saida_id || finalizeData.peso_saida_real <= 0}
+                className="bg-success hover:bg-success/90 text-success-foreground"
+              >
+                {finalizeMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Finalizar e Retornar ao Estoque
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </MainLayout>
   );
