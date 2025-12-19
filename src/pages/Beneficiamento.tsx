@@ -105,6 +105,31 @@ export default function Beneficiamento() {
     },
   });
 
+  // Função para verificar se um sublote é relacionado (pai/filho) a algum já selecionado
+  const isRelatedToSelected = (sublote: any): { isRelated: boolean; relatedCode: string | null } => {
+    for (const selected of selectedLotes) {
+      // Verifica se o sublote selecionado é pai do atual
+      if (sublote.lote_pai_id === selected.id) {
+        return { isRelated: true, relatedCode: selected.codigo };
+      }
+      // Verifica se o sublote atual é pai do selecionado
+      const selectedFull = sublotesDisponiveis.find((s: any) => s.id === selected.id);
+      if (selectedFull?.lote_pai_id === sublote.id) {
+        return { isRelated: true, relatedCode: selected.codigo };
+      }
+      // Verifica se compartilham o mesmo entrada_id e um é pai do outro (mesma entrada)
+      if (sublote.entrada_id && selectedFull?.entrada_id === sublote.entrada_id) {
+        if (sublote.lote_pai_id || selectedFull?.lote_pai_id) {
+          // Se um deles tem lote_pai_id, são relacionados (lote mãe e sublote)
+          if (sublote.lote_pai_id === selected.id || selectedFull?.lote_pai_id === sublote.id) {
+            return { isRelated: true, relatedCode: selected.codigo };
+          }
+        }
+      }
+    }
+    return { isRelated: false, relatedCode: null };
+  };
+
   const { data: processos = [] } = useQuery({
     queryKey: ["processos"],
     queryFn: async () => {
@@ -151,11 +176,21 @@ export default function Beneficiamento() {
       s.dono?.nome?.toLowerCase().includes(searchLotes.toLowerCase())
   );
 
-  const toggleLote = (sublote: SublotesSelecionados) => {
+  const toggleLote = (sublote: any) => {
     const isSelected = selectedLotes.some((l) => l.id === sublote.id);
     if (isSelected) {
       setSelectedLotes(selectedLotes.filter((l) => l.id !== sublote.id));
     } else {
+      // Verifica se já existe um sublote relacionado (pai/filho) selecionado
+      const { isRelated, relatedCode } = isRelatedToSelected(sublote);
+      if (isRelated) {
+        toast({
+          title: "Sublote relacionado já selecionado",
+          description: `O lote "${sublote.codigo}" é parte do mesmo material que "${relatedCode}". Não é possível selecionar ambos.`,
+          variant: "destructive",
+        });
+        return;
+      }
       setSelectedLotes([...selectedLotes, sublote]);
     }
   };
