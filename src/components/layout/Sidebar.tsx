@@ -29,8 +29,8 @@ const menuItems = [
   {
     title: "Operacional",
     items: [
-      { icon: FileInput, label: "ROM Entrada", path: "/rom-entrada" },
-      { icon: FileOutput, label: "ROM Saída", path: "/rom-saida" },
+      { icon: FileInput, label: "Entrada", path: "/entrada" },
+      { icon: FileOutput, label: "Saída", path: "/saida" },
       { icon: Package, label: "Sub-Lotes", path: "/sub-lotes" },
       { icon: Warehouse, label: "Estoque", path: "/estoque" },
     ],

@@ -45,7 +45,7 @@ interface ROMEntrada {
 
 const romsEntrada: ROMEntrada[] = [
   {
-    id: "ROM-ENT-2024-0156",
+    id: "ENT-2024-0156",
     fornecedor: "Reciclagem São Paulo",
     procedencia: "João Ferreira (informal)",
     dataEntrada: "18/12/2024",
@@ -57,7 +57,7 @@ const romsEntrada: ROMEntrada[] = [
     dono: "IBRAC",
   },
   {
-    id: "ROM-ENT-2024-0155",
+    id: "ENT-2024-0155",
     fornecedor: "Cobre Sul Ltda",
     dataEntrada: "18/12/2024",
     nf: "NF-12344",
@@ -68,7 +68,7 @@ const romsEntrada: ROMEntrada[] = [
     dono: "IBRAC",
   },
   {
-    id: "ROM-ENT-2024-0154",
+    id: "ENT-2024-0154",
     fornecedor: "Metal Norte",
     procedencia: "Renato - Parceiro",
     dataEntrada: "17/12/2024",
@@ -79,7 +79,7 @@ const romsEntrada: ROMEntrada[] = [
     dono: "Renato",
   },
   {
-    id: "ROM-ENT-2024-0153",
+    id: "ENT-2024-0153",
     fornecedor: "Sucatas BR",
     dataEntrada: "17/12/2024",
     nf: "NF-12340",
@@ -90,7 +90,7 @@ const romsEntrada: ROMEntrada[] = [
     dono: "IBRAC",
   },
   {
-    id: "ROM-ENT-2024-0152",
+    id: "ENT-2024-0152",
     fornecedor: "Cooper Metais",
     dataEntrada: "16/12/2024",
     nf: "NF-12338",
@@ -123,9 +123,9 @@ export default function RomEntrada() {
         {/* Page Header */}
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">ROM de Entrada</h1>
+            <h1 className="text-3xl font-bold tracking-tight">Entrada de Material</h1>
             <p className="text-muted-foreground">
-              Gerenciamento de ordens de recebimento de material
+              Gerenciamento de recebimento de material
             </p>
           </div>
           <div className="flex gap-2">
@@ -135,7 +135,7 @@ export default function RomEntrada() {
             </Button>
             <Button size="sm" className="bg-gradient-copper hover:opacity-90 shadow-copper">
               <Plus className="mr-2 h-4 w-4" />
-              Nova ROM
+              Nova Entrada
             </Button>
           </div>
         </div>
@@ -145,7 +145,7 @@ export default function RomEntrada() {
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Buscar por ROM, fornecedor..."
+              placeholder="Buscar por código, fornecedor..."
               className="pl-10"
             />
           </div>
@@ -166,7 +166,7 @@ export default function RomEntrada() {
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/50">
-                <TableHead className="font-semibold">ROM</TableHead>
+                <TableHead className="font-semibold">Código</TableHead>
                 <TableHead className="font-semibold">Fornecedor</TableHead>
                 <TableHead className="font-semibold">Data</TableHead>
                 <TableHead className="font-semibold">NF</TableHead>

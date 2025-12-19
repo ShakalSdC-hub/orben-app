@@ -14,7 +14,7 @@ interface ROM {
 
 const recentROMs: ROM[] = [
   {
-    id: "ROM-ENT-2024-0156",
+    id: "ENT-2024-0156",
     tipo: "entrada",
     fornecedor: "Reciclagem São Paulo",
     pesoKg: 5200,
@@ -23,7 +23,7 @@ const recentROMs: ROM[] = [
     hora: "14:32",
   },
   {
-    id: "ROM-ENT-2024-0155",
+    id: "ENT-2024-0155",
     tipo: "entrada",
     fornecedor: "Cobre Sul Ltda",
     pesoKg: 3800,
@@ -32,7 +32,7 @@ const recentROMs: ROM[] = [
     hora: "10:15",
   },
   {
-    id: "ROM-SAI-2024-0089",
+    id: "SAI-2024-0089",
     tipo: "saida",
     fornecedor: "Plasinco Sul",
     pesoKg: 4500,
@@ -41,7 +41,7 @@ const recentROMs: ROM[] = [
     hora: "16:45",
   },
   {
-    id: "ROM-ENT-2024-0154",
+    id: "ENT-2024-0154",
     tipo: "entrada",
     fornecedor: "Metal Norte",
     pesoKg: 6100,
@@ -75,7 +75,7 @@ export function RecentROMs() {
             <Clock className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <h3 className="font-semibold">ROMs Recentes</h3>
+            <h3 className="font-semibold">Entradas e Saídas Recentes</h3>
             <p className="text-xs text-muted-foreground">Últimas movimentações</p>
           </div>
         </div>
