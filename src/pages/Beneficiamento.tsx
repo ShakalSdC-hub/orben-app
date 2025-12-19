@@ -10,13 +10,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Cog, DollarSign, Scale, AlertTriangle, Truck, Package, Loader2, Search, Trash2 } from "lucide-react";
+import { Plus, Cog, DollarSign, Scale, AlertTriangle, Truck, Package, Loader2, Search, Trash2, Printer } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { BeneficiamentoRomaneioPrint } from "@/components/romaneio/BeneficiamentoRomaneioPrint";
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   em_andamento: { label: "Em Andamento", variant: "default" },
@@ -47,6 +48,7 @@ export default function Beneficiamento() {
   const [activeTab, setActiveTab] = useState("lotes");
   const [searchLotes, setSearchLotes] = useState("");
   const [selectedLotes, setSelectedLotes] = useState<SublotesSelecionados[]>([]);
+  const [romaneioBeneficiamento, setRomaneioBeneficiamento] = useState<any | null>(null);
 
   const [formData, setFormData] = useState({
     processo_id: "",
@@ -577,6 +579,7 @@ export default function Beneficiamento() {
                   <TableHead className="text-right">Peso Entrada</TableHead>
                   <TableHead className="text-right">Peso Saída</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="w-12"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -602,6 +605,11 @@ export default function Beneficiamento() {
                           {statusConfig[b.status]?.label || b.status}
                         </Badge>
                       </TableCell>
+                      <TableCell>
+                        <Button variant="ghost" size="icon" onClick={() => setRomaneioBeneficiamento(b)}>
+                          <Printer className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -609,6 +617,15 @@ export default function Beneficiamento() {
             </Table>
           </CardContent>
         </Card>
+
+        {/* Romaneio Print Dialog */}
+        {romaneioBeneficiamento && (
+          <BeneficiamentoRomaneioPrint
+            beneficiamento={romaneioBeneficiamento}
+            isOpen={!!romaneioBeneficiamento}
+            onClose={() => setRomaneioBeneficiamento(null)}
+          />
+        )}
       </div>
     </MainLayout>
   );
