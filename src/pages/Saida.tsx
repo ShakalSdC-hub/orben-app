@@ -106,7 +106,7 @@ export default function Saida() {
         .select(`
           *,
           tipos_saida(nome, cobra_custos),
-          cliente:parceiros!saidas_cliente_id_fkey(razao_social, nome_fantasia)
+          cliente:clientes(razao_social, nome_fantasia)
         `)
         .order("created_at", { ascending: false });
       if (error) throw error;
