@@ -6,8 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Factory } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { z } from "zod";
+import orbenLogo from "@/assets/orben-logo.jpeg";
 
 const loginSchema = z.object({
   email: z.string().email("Email inválido"),
@@ -108,8 +109,12 @@ export default function Auth() {
       
       <Card className="w-full max-w-md relative z-10 border-border/50 bg-card/95 backdrop-blur">
         <CardHeader className="text-center space-y-4">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-copper shadow-lg">
-            <Factory className="h-8 w-8 text-primary-foreground" />
+          <div className="mx-auto">
+            <img 
+              src={orbenLogo} 
+              alt="ORBEN Logo" 
+              className="h-20 w-20 rounded-2xl object-cover shadow-lg shadow-copper/30"
+            />
           </div>
           <div>
             <CardTitle className="text-2xl font-bold bg-gradient-to-r from-copper to-copper-light bg-clip-text text-transparent">
@@ -248,6 +253,13 @@ export default function Auth() {
               </form>
             </TabsContent>
           </Tabs>
+
+          {/* Branding Footer */}
+          <div className="mt-6 pt-4 border-t border-border/50 text-center">
+            <p className="text-[11px] text-muted-foreground/60">
+              by <span className="font-medium text-muted-foreground">Santos Soluções Digitais</span>
+            </p>
+          </div>
         </CardContent>
       </Card>
     </div>
