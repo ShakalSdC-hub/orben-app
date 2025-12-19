@@ -2,9 +2,15 @@ import { useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Warehouse,
   Package,
@@ -16,15 +22,22 @@ import {
   ArrowRightLeft,
   BarChart3,
   Loader2,
+  MoveRight,
+  History,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 
 const statusConfig = {
   disponivel: { label: "Disponível", className: "bg-success/10 text-success border-success/20" },
   reservado: { label: "Reservado", className: "bg-warning/10 text-warning border-warning/20" },
-  em_processo: { label: "Em Processo", className: "bg-copper/10 text-copper border-copper/20" },
+  em_beneficiamento: { label: "Em Beneficiamento", className: "bg-copper/10 text-copper border-copper/20" },
   vendido: { label: "Vendido", className: "bg-muted text-muted-foreground border-border" },
 };
 
@@ -35,9 +48,18 @@ const tipoColors = {
   cliente: "bg-success text-success-foreground",
 };
 
+const CHART_COLORS = ["hsl(28, 70%, 45%)", "hsl(220, 70%, 50%)", "hsl(142, 60%, 40%)", "hsl(45, 80%, 50%)", "hsl(280, 60%, 50%)", "hsl(0, 70%, 50%)"];
+
 export default function Estoque() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedDono, setSelectedDono] = useState<string | null>(null);
+  const [selectedTipo, setSelectedTipo] = useState<string | null>(null);
+  const [selectedLocal, setSelectedLocal] = useState<string | null>(null);
+  const [isTransferOpen, setIsTransferOpen] = useState(false);
+  const [selectedLote, setSelectedLote] = useState<any | null>(null);
+  const [transferData, setTransferData] = useState({ local_destino_id: "", motivo: "" });
 
   // Fetch sublotes com relacionamentos
   const { data: sublotes, isLoading } = useQuery({
@@ -68,6 +90,16 @@ export default function Estoque() {
     },
   });
 
+  // Fetch tipos de produto
+  const { data: tiposProduto } = useQuery({
+    queryKey: ["tipos-produto"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("tipos_produto").select("*").eq("ativo", true);
+      if (error) throw error;
+      return data;
+    },
+  });
+
   // Fetch locais de estoque
   const { data: locais } = useQuery({
     queryKey: ["locais-estoque"],
@@ -78,9 +110,65 @@ export default function Estoque() {
     },
   });
 
+  // Fetch movimentações
+  const { data: movimentacoes } = useQuery({
+    queryKey: ["movimentacoes"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("movimentacoes")
+        .select(`
+          *,
+          sublote:sublotes(codigo),
+          local_origem:locais_estoque!movimentacoes_local_origem_id_fkey(nome),
+          local_destino:locais_estoque!movimentacoes_local_destino_id_fkey(nome)
+        `)
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Transferência mutation
+  const transferMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedLote || !transferData.local_destino_id) return;
+
+      // Criar movimentação
+      const { error: movError } = await supabase.from("movimentacoes").insert({
+        sublote_id: selectedLote.id,
+        tipo: "transferencia",
+        peso_kg: selectedLote.peso_kg,
+        local_origem_id: selectedLote.local_estoque_id,
+        local_destino_id: transferData.local_destino_id,
+        motivo: transferData.motivo || "Transferência de estoque",
+        created_by: user?.id,
+      });
+      if (movError) throw movError;
+
+      // Atualizar sublote
+      const { error: subError } = await supabase
+        .from("sublotes")
+        .update({ local_estoque_id: transferData.local_destino_id })
+        .eq("id", selectedLote.id);
+      if (subError) throw subError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sublotes"] });
+      queryClient.invalidateQueries({ queryKey: ["movimentacoes"] });
+      toast({ title: "Transferência realizada com sucesso!" });
+      setIsTransferOpen(false);
+      setSelectedLote(null);
+      setTransferData({ local_destino_id: "", motivo: "" });
+    },
+    onError: (error) => {
+      toast({ title: "Erro na transferência", description: error.message, variant: "destructive" });
+    },
+  });
+
   // Calcular estatísticas por localização
   const localizacoes = locais?.map((local) => {
-    const sublotesLocal = sublotes?.filter((s) => s.local_estoque_id === local.id) || [];
+    const sublotesLocal = sublotes?.filter((s) => s.local_estoque_id === local.id && s.status === "disponivel") || [];
     const pesoTotal = sublotesLocal.reduce((acc, s) => acc + (s.peso_kg || 0), 0);
     return {
       ...local,
@@ -93,7 +181,7 @@ export default function Estoque() {
 
   // Calcular estatísticas por dono
   const estatisticasPorDono = donos?.map((dono) => {
-    const sublotesDono = sublotes?.filter((s) => s.dono_id === dono.id) || [];
+    const sublotesDono = sublotes?.filter((s) => s.dono_id === dono.id && s.status === "disponivel") || [];
     const pesoTotal = sublotesDono.reduce((acc, s) => acc + (s.peso_kg || 0), 0);
     return {
       ...dono,
@@ -102,15 +190,32 @@ export default function Estoque() {
     };
   }) || [];
 
+  // Calcular por tipo de produto
+  const estatisticasPorTipo = tiposProduto?.map((tipo) => {
+    const sublotesTipo = sublotes?.filter((s) => s.tipo_produto_id === tipo.id && s.status === "disponivel") || [];
+    const pesoTotal = sublotesTipo.reduce((acc, s) => acc + (s.peso_kg || 0), 0);
+    return {
+      name: tipo.nome,
+      id: tipo.id,
+      value: pesoTotal,
+      qtdLotes: sublotesTipo.length,
+    };
+  }).filter(t => t.value > 0) || [];
+
   // Estoque IBRAC (sem dono ou dono null)
-  const estoqueIbrac = sublotes?.filter((s) => !s.dono_id) || [];
+  const estoqueIbrac = sublotes?.filter((s) => !s.dono_id && s.status === "disponivel") || [];
   const pesoIbrac = estoqueIbrac.reduce((acc, s) => acc + (s.peso_kg || 0), 0);
 
-  const totalEstoque = sublotes?.reduce((acc, s) => acc + (s.peso_kg || 0), 0) || 0;
+  const sublotesDisponiveis = sublotes?.filter(s => s.status === "disponivel") || [];
+  const totalEstoque = sublotesDisponiveis.reduce((acc, s) => acc + (s.peso_kg || 0), 0);
 
   const formatWeight = (kg: number) => {
-    if (kg >= 1000) return `${(kg / 1000).toFixed(1)}t`;
-    return `${kg}kg`;
+    if (kg >= 1000) return `${(kg / 1000).toFixed(2)}t`;
+    return `${kg.toFixed(0)}kg`;
+  };
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
   };
 
   // Filtrar sublotes
@@ -120,8 +225,15 @@ export default function Estoque() {
       s.entrada?.codigo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       s.dono?.nome?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesDono = !selectedDono || s.dono_id === selectedDono;
-    return matchesSearch && matchesDono;
+    const matchesTipo = !selectedTipo || s.tipo_produto_id === selectedTipo;
+    const matchesLocal = !selectedLocal || s.local_estoque_id === selectedLocal;
+    return matchesSearch && matchesDono && matchesTipo && matchesLocal;
   });
+
+  const handleTransfer = (lote: any) => {
+    setSelectedLote(lote);
+    setIsTransferOpen(true);
+  };
 
   return (
     <MainLayout>
@@ -139,10 +251,6 @@ export default function Estoque() {
               <BarChart3 className="mr-2 h-4 w-4" />
               Relatório
             </Button>
-            <Button size="sm" className="bg-gradient-copper hover:opacity-90 shadow-copper">
-              <ArrowRightLeft className="mr-2 h-4 w-4" />
-              Transferir
-            </Button>
           </div>
         </div>
 
@@ -156,7 +264,11 @@ export default function Estoque() {
             {localizacoes.slice(0, 4).map((loc) => (
               <div
                 key={loc.id}
-                className="rounded-xl border bg-card p-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                onClick={() => setSelectedLocal(selectedLocal === loc.id ? null : loc.id)}
+                className={cn(
+                  "rounded-xl border bg-card p-4 shadow-sm hover:shadow-md transition-shadow cursor-pointer",
+                  selectedLocal === loc.id && "border-primary ring-1 ring-primary"
+                )}
               >
                 <div className="flex items-center gap-3 mb-3">
                   <div className={cn("flex h-10 w-10 items-center justify-center rounded-lg", loc.tipoColor)}>
@@ -199,7 +311,7 @@ export default function Estoque() {
               <p className="text-lg font-bold">{formatWeight(pesoIbrac)}</p>
               <p className="text-xs text-muted-foreground">{estoqueIbrac.length} lotes</p>
             </div>
-            {estatisticasPorDono.map((dono) => (
+            {estatisticasPorDono.filter(d => d.pesoKg > 0).map((dono) => (
               <div
                 key={dono.id}
                 onClick={() => setSelectedDono(selectedDono === dono.id ? null : dono.id)}
@@ -235,10 +347,17 @@ export default function Estoque() {
                   className="pl-10"
                 />
               </div>
-              <Button variant="outline" size="sm">
-                <Filter className="mr-2 h-4 w-4" />
-                Filtros
-              </Button>
+              <Select value={selectedTipo || ""} onValueChange={(v) => setSelectedTipo(v || null)}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Tipo Produto" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Todos</SelectItem>
+                  {tiposProduto?.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>{t.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -252,7 +371,7 @@ export default function Estoque() {
                 {filteredSublotes?.map((lote) => (
                   <div
                     key={lote.id}
-                    className="rounded-xl border bg-card p-4 shadow-sm hover:shadow-md transition-all hover:border-primary/30 cursor-pointer group"
+                    className="rounded-xl border bg-card p-4 shadow-sm hover:shadow-md transition-all hover:border-primary/30 group"
                   >
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-2">
@@ -301,11 +420,25 @@ export default function Estoque() {
                         </p>
                       </div>
                     )}
+
+                    {lote.status === "disponivel" && (
+                      <div className="mt-3 pt-3 border-t">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => handleTransfer(lote)}
+                        >
+                          <MoveRight className="h-4 w-4 mr-2" />
+                          Transferir
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 ))}
                 {(!filteredSublotes || filteredSublotes.length === 0) && (
                   <div className="col-span-full text-center py-8 text-muted-foreground">
-                    {searchTerm || selectedDono ? "Nenhum sublote encontrado" : "Nenhum sublote no estoque ainda"}
+                    {searchTerm || selectedDono || selectedTipo || selectedLocal ? "Nenhum sublote encontrado" : "Nenhum sublote no estoque ainda"}
                   </div>
                 )}
               </div>
@@ -313,25 +446,202 @@ export default function Estoque() {
           </TabsContent>
 
           <TabsContent value="consolidado">
-            <div className="rounded-xl border bg-card p-8 text-center">
-              <BarChart3 className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="font-semibold mb-2">Visão Consolidada</h3>
-              <p className="text-muted-foreground text-sm">
-                Estoque total: <span className="font-bold">{formatWeight(totalEstoque)}</span>
-              </p>
+            <div className="grid gap-6 lg:grid-cols-2">
+              {/* Por Tipo de Produto */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Estoque por Tipo de Produto</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {estatisticasPorTipo.length > 0 ? (
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={estatisticasPorTipo}
+                            dataKey="value"
+                            nameKey="name"
+                            cx="50%"
+                            cy="50%"
+                            outerRadius={80}
+                            label={({ name, value }) => `${name}: ${formatWeight(value)}`}
+                          >
+                            {estatisticasPorTipo.map((_, index) => (
+                              <Cell key={index} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip formatter={(value: number) => formatWeight(value)} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <div className="h-64 flex items-center justify-center text-muted-foreground">
+                      Sem dados para exibir
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Por Local */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Estoque por Local</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {localizacoes.filter(l => l.pesoKg > 0).length > 0 ? (
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={localizacoes.filter(l => l.pesoKg > 0)}>
+                          <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                          <XAxis dataKey="nome" className="text-xs" />
+                          <YAxis tickFormatter={(v) => formatWeight(v)} className="text-xs" />
+                          <Tooltip formatter={(value: number) => formatWeight(value)} />
+                          <Bar dataKey="pesoKg" fill="hsl(28, 70%, 45%)" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <div className="h-64 flex items-center justify-center text-muted-foreground">
+                      Sem dados para exibir
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Resumo Geral */}
+              <Card className="lg:col-span-2">
+                <CardHeader>
+                  <CardTitle className="text-lg">Resumo Geral do Estoque</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-4 md:grid-cols-4">
+                    <div className="rounded-lg bg-primary/10 p-4">
+                      <p className="text-sm text-muted-foreground">Peso Total Disponível</p>
+                      <p className="text-2xl font-bold text-primary">{formatWeight(totalEstoque)}</p>
+                    </div>
+                    <div className="rounded-lg bg-copper/10 p-4">
+                      <p className="text-sm text-muted-foreground">Total de Sub-lotes</p>
+                      <p className="text-2xl font-bold text-copper">{sublotesDisponiveis.length}</p>
+                    </div>
+                    <div className="rounded-lg bg-success/10 p-4">
+                      <p className="text-sm text-muted-foreground">Locais Ativos</p>
+                      <p className="text-2xl font-bold text-success">{localizacoes.filter(l => l.qtdLotes > 0).length}</p>
+                    </div>
+                    <div className="rounded-lg bg-warning/10 p-4">
+                      <p className="text-sm text-muted-foreground">Donos com Estoque</p>
+                      <p className="text-2xl font-bold text-warning">{estatisticasPorDono.filter(d => d.pesoKg > 0).length + (pesoIbrac > 0 ? 1 : 0)}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           </TabsContent>
 
           <TabsContent value="movimentacoes">
-            <div className="rounded-xl border bg-card p-8 text-center">
-              <ArrowRightLeft className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="font-semibold mb-2">Histórico de Movimentações</h3>
-              <p className="text-muted-foreground text-sm">
-                Rastreabilidade completa de cada sub-lote
-              </p>
-            </div>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <History className="h-5 w-5" />
+                  Histórico de Movimentações
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Data</TableHead>
+                      <TableHead>Sublote</TableHead>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Origem</TableHead>
+                      <TableHead>Destino</TableHead>
+                      <TableHead className="text-right">Peso</TableHead>
+                      <TableHead>Motivo</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {!movimentacoes || movimentacoes.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center text-muted-foreground">
+                          Nenhuma movimentação registrada
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      movimentacoes.map((mov: any) => (
+                        <TableRow key={mov.id}>
+                          <TableCell>{format(new Date(mov.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}</TableCell>
+                          <TableCell className="font-mono">{mov.sublote?.codigo || "-"}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="capitalize">{mov.tipo}</Badge>
+                          </TableCell>
+                          <TableCell>{mov.local_origem?.nome || "-"}</TableCell>
+                          <TableCell>{mov.local_destino?.nome || "-"}</TableCell>
+                          <TableCell className="text-right">{formatWeight(mov.peso_kg)}</TableCell>
+                          <TableCell className="max-w-[200px] truncate">{mov.motivo || "-"}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Transfer Dialog */}
+        <Dialog open={isTransferOpen} onOpenChange={setIsTransferOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Transferir Sublote</DialogTitle>
+            </DialogHeader>
+            {selectedLote && (
+              <div className="space-y-4">
+                <div className="rounded-lg bg-muted/50 p-3">
+                  <p className="text-sm text-muted-foreground">Sublote</p>
+                  <p className="font-bold">{selectedLote.codigo}</p>
+                  <p className="text-sm">{formatWeight(selectedLote.peso_kg)} - {selectedLote.tipo_produto?.nome || "-"}</p>
+                  <p className="text-sm text-muted-foreground">Local atual: {selectedLote.local_estoque?.nome || "Não definido"}</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Local de Destino</Label>
+                  <Select
+                    value={transferData.local_destino_id}
+                    onValueChange={(v) => setTransferData({ ...transferData, local_destino_id: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o local de destino" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {locais?.filter(l => l.id !== selectedLote.local_estoque_id).map((local) => (
+                        <SelectItem key={local.id} value={local.id}>{local.nome}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Motivo (opcional)</Label>
+                  <Textarea
+                    value={transferData.motivo}
+                    onChange={(e) => setTransferData({ ...transferData, motivo: e.target.value })}
+                    placeholder="Ex: Reorganização de estoque, envio para processo..."
+                  />
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsTransferOpen(false)}>Cancelar</Button>
+              <Button
+                onClick={() => transferMutation.mutate()}
+                disabled={transferMutation.isPending || !transferData.local_destino_id}
+                className="bg-gradient-copper hover:opacity-90"
+              >
+                {transferMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Transferir
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </MainLayout>
   );
