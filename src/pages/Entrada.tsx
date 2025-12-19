@@ -376,9 +376,16 @@ export default function Entrada() {
                             </TableCell>
                             <TableCell>{entrada.dono?.nome || "-"}</TableCell>
                             <TableCell>
-                              <Badge className={cn("border", status.className)}>
-                                {status.label}
-                              </Badge>
+                              <div className="flex flex-col gap-1">
+                                <Badge className={cn("border", status.className)}>
+                                  {status.label}
+                                </Badge>
+                                {isEntradaProcessada(entrada.id) && (
+                                  <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 text-[10px]">
+                                    Processado
+                                  </Badge>
+                                )}
+                              </div>
                             </TableCell>
                             <TableCell>
                               <DropdownMenu>
