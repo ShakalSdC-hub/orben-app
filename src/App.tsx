@@ -1,5 +1,4 @@
 import { Toaster } from "@/components/ui/toaster";
-import Permissoes from "./pages/Permissoes";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -19,6 +18,8 @@ import Saida from "./pages/Saida";
 import Financeiro from "./pages/Financeiro";
 import Relatorios from "./pages/Relatorios";
 import AuditLogs from "./pages/AuditLogs";
+import Permissoes from "./pages/Permissoes";
+import Configuracoes from "./pages/Configuracoes";
 
 const queryClient = new QueryClient();
 
@@ -42,6 +43,8 @@ const App = () => (
             <Route path="/financeiro" element={<ProtectedRoute><Financeiro /></ProtectedRoute>} />
             <Route path="/relatorios" element={<ProtectedRoute><Relatorios /></ProtectedRoute>} />
             <Route path="/auditoria" element={<ProtectedRoute><AuditLogs /></ProtectedRoute>} />
+            <Route path="/usuarios" element={<ProtectedRoute><Permissoes /></ProtectedRoute>} />
+            <Route path="/configuracoes" element={<ProtectedRoute><Configuracoes /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
