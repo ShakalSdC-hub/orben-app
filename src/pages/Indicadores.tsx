@@ -12,6 +12,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { format, subDays, startOfMonth, endOfMonth } from "date-fns";
+import { ExcelImport } from "@/components/lme/ExcelImport";
 import { ptBR } from "date-fns/locale";
 
 function formatCurrency(value: number) {
@@ -121,6 +122,7 @@ export default function Indicadores() {
             <p className="text-muted-foreground">Acompanhe as cotações de Cobre e Alumínio em tempo real</p>
           </div>
           <div className="flex gap-2">
+            <ExcelImport />
             <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
               <DialogTrigger asChild>
                 <Button variant="outline"><Upload className="h-4 w-4 mr-2" />Cadastrar Cotação</Button>
