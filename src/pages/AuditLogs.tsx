@@ -93,7 +93,7 @@ export default function AuditLogs() {
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
   const { role } = useAuth();
 
-  const isAdmin = role === "admin" || role === "gerente_geral";
+  const isAdmin = role === "admin";
 
   const { data: logs, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ["audit-logs", filterTable, filterAction],

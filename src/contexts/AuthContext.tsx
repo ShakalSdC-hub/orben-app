@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 
-type AppRole = "admin" | "gerente_geral" | "financeiro" | "compras" | "pcp" | "comercial" | "expedicao";
+type AppRole = "admin" | "dono" | "operacao" | "financeiro";
 
 interface Profile {
   id: string;
