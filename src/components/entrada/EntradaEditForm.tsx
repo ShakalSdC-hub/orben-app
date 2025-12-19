@@ -15,9 +15,10 @@ import { format } from "date-fns";
 interface EntradaEditFormProps {
   entrada: any;
   onClose: () => void;
+  readOnly?: boolean;
 }
 
-export function EntradaEditForm({ entrada, onClose }: EntradaEditFormProps) {
+export function EntradaEditForm({ entrada, onClose, readOnly = false }: EntradaEditFormProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("info");
@@ -145,6 +146,7 @@ export function EntradaEditForm({ entrada, onClose }: EntradaEditFormProps) {
               <Select
                 value={formData.status}
                 onValueChange={(v) => setFormData({ ...formData, status: v })}
+                disabled={readOnly}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -165,6 +167,7 @@ export function EntradaEditForm({ entrada, onClose }: EntradaEditFormProps) {
               <Select
                 value={formData.tipo_entrada_id}
                 onValueChange={(v) => setFormData({ ...formData, tipo_entrada_id: v })}
+                disabled={readOnly}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione..." />
@@ -181,6 +184,7 @@ export function EntradaEditForm({ entrada, onClose }: EntradaEditFormProps) {
               <Select
                 value={formData.parceiro_id}
                 onValueChange={(v) => setFormData({ ...formData, parceiro_id: v })}
+                disabled={readOnly}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione..." />
@@ -200,6 +204,7 @@ export function EntradaEditForm({ entrada, onClose }: EntradaEditFormProps) {
               <Select
                 value={formData.dono_id}
                 onValueChange={(v) => setFormData({ ...formData, dono_id: v })}
+                disabled={readOnly}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="IBRAC (Próprio)" />
@@ -217,6 +222,7 @@ export function EntradaEditForm({ entrada, onClose }: EntradaEditFormProps) {
               <Input
                 value={formData.nota_fiscal}
                 onChange={(e) => setFormData({ ...formData, nota_fiscal: e.target.value })}
+                disabled={readOnly}
               />
             </div>
           </div>
@@ -228,6 +234,7 @@ export function EntradaEditForm({ entrada, onClose }: EntradaEditFormProps) {
                 type="date"
                 value={formData.data_entrada}
                 onChange={(e) => setFormData({ ...formData, data_entrada: e.target.value })}
+                disabled={readOnly}
               />
             </div>
             <div className="space-y-2">
@@ -237,6 +244,7 @@ export function EntradaEditForm({ entrada, onClose }: EntradaEditFormProps) {
                 step="0.01"
                 value={formData.valor_unitario}
                 onChange={(e) => setFormData({ ...formData, valor_unitario: e.target.value })}
+                disabled={readOnly}
               />
             </div>
           </div>
@@ -247,6 +255,7 @@ export function EntradaEditForm({ entrada, onClose }: EntradaEditFormProps) {
               <Input
                 value={formData.motorista}
                 onChange={(e) => setFormData({ ...formData, motorista: e.target.value })}
+                disabled={readOnly}
               />
             </div>
             <div className="space-y-2">
@@ -254,6 +263,7 @@ export function EntradaEditForm({ entrada, onClose }: EntradaEditFormProps) {
               <Input
                 value={formData.placa_veiculo}
                 onChange={(e) => setFormData({ ...formData, placa_veiculo: e.target.value.toUpperCase() })}
+                disabled={readOnly}
               />
             </div>
           </div>
@@ -263,6 +273,7 @@ export function EntradaEditForm({ entrada, onClose }: EntradaEditFormProps) {
             <Select
               value={formData.transportadora_id}
               onValueChange={(v) => setFormData({ ...formData, transportadora_id: v })}
+              disabled={readOnly}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Selecione..." />
@@ -277,10 +288,11 @@ export function EntradaEditForm({ entrada, onClose }: EntradaEditFormProps) {
 
           <div className="space-y-2">
             <Label>Observações</Label>
-            <Input
-              value={formData.observacoes}
-              onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
-            />
+              <Input
+                value={formData.observacoes}
+                onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
+                disabled={readOnly}
+              />
           </div>
         </TabsContent>
 
@@ -329,15 +341,19 @@ export function EntradaEditForm({ entrada, onClose }: EntradaEditFormProps) {
       </Tabs>
 
       <DialogFooter>
-        <Button variant="outline" onClick={onClose}>Cancelar</Button>
-        <Button 
-          onClick={() => updateMutation.mutate()} 
-          disabled={updateMutation.isPending}
-          className="bg-gradient-copper"
-        >
-          {updateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Salvar Alterações
+        <Button variant="outline" onClick={onClose}>
+          {readOnly ? "Fechar" : "Cancelar"}
         </Button>
+        {!readOnly && (
+          <Button 
+            onClick={() => updateMutation.mutate()} 
+            disabled={updateMutation.isPending}
+            className="bg-gradient-copper"
+          >
+            {updateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Salvar Alterações
+          </Button>
+        )}
       </DialogFooter>
     </div>
   );
