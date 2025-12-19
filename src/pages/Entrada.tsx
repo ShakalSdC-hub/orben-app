@@ -49,6 +49,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { EntradaForm } from "@/components/entrada/EntradaForm";
+import { EntradaRomaneioPrint } from "@/components/romaneio/EntradaRomaneioPrint";
 
 const statusConfig: Record<string, { label: string; className: string }> = {
   pendente: { label: "Pendente", className: "bg-warning/10 text-warning border-warning/20" },
@@ -61,6 +62,7 @@ export default function Entrada() {
   const [searchTerm, setSearchTerm] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [romaneioEntrada, setRomaneioEntrada] = useState<any | null>(null);
 
   // Fetch entradas with sublotes
   const { data: entradas, isLoading } = useQuery({
@@ -270,7 +272,13 @@ export default function Entrada() {
                                     <Edit className="mr-2 h-4 w-4" />
                                     Editar
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => setRomaneioEntrada({
+                                    ...entrada,
+                                    parceiros: entrada.fornecedor ? { razao_social: (entrada.fornecedor as any).razao_social } : null,
+                                    donos_material: entrada.dono,
+                                    tipos_produto: entrada.tipo_produto,
+                                    sublotes: volumesEntrada,
+                                  })}>
                                     <Printer className="mr-2 h-4 w-4" />
                                     Imprimir Romaneio
                                   </DropdownMenuItem>
@@ -323,6 +331,15 @@ export default function Entrada() {
             </Table>
           )}
         </div>
+
+        {/* Romaneio Print Dialog */}
+        {romaneioEntrada && (
+          <EntradaRomaneioPrint
+            entrada={romaneioEntrada}
+            isOpen={!!romaneioEntrada}
+            onClose={() => setRomaneioEntrada(null)}
+          />
+        )}
       </div>
     </MainLayout>
   );
