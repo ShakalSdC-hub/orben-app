@@ -18,6 +18,7 @@ interface Volume {
   codigo: string;
   peso_kg: string;
   tipo_produto_id: string;
+  valor_unitario: string;
 }
 
 interface EntradaFormProps {
@@ -44,7 +45,7 @@ export function EntradaForm({ onClose }: EntradaFormProps) {
   });
 
   const [volumes, setVolumes] = useState<Volume[]>([]);
-  const [newVolume, setNewVolume] = useState({ codigo: "", peso_kg: "", tipo_produto_id: "" });
+  const [newVolume, setNewVolume] = useState({ codigo: "", peso_kg: "", tipo_produto_id: "", valor_unitario: "" });
 
   // Queries
   const { data: tiposEntrada } = useQuery({
@@ -102,8 +103,14 @@ export function EntradaForm({ onClose }: EntradaFormProps) {
       return;
     }
     const codigo = newVolume.codigo || generateVolumeCode();
-    setVolumes([...volumes, { id: crypto.randomUUID(), codigo, peso_kg: newVolume.peso_kg, tipo_produto_id: newVolume.tipo_produto_id }]);
-    setNewVolume({ codigo: "", peso_kg: "", tipo_produto_id: newVolume.tipo_produto_id }); // Keep tipo_produto_id for convenience
+    setVolumes([...volumes, { 
+      id: crypto.randomUUID(), 
+      codigo, 
+      peso_kg: newVolume.peso_kg, 
+      tipo_produto_id: newVolume.tipo_produto_id,
+      valor_unitario: newVolume.valor_unitario 
+    }]);
+    setNewVolume({ codigo: "", peso_kg: "", tipo_produto_id: newVolume.tipo_produto_id, valor_unitario: newVolume.valor_unitario });
   };
 
   const removeVolume = (id: string) => {
@@ -111,6 +118,15 @@ export function EntradaForm({ onClose }: EntradaFormProps) {
   };
 
   const totalPeso = volumes.reduce((acc, v) => acc + (parseFloat(v.peso_kg) || 0), 0);
+  const totalValor = volumes.reduce((acc, v) => {
+    const peso = parseFloat(v.peso_kg) || 0;
+    const valor = parseFloat(v.valor_unitario) || 0;
+    return acc + (peso * valor);
+  }, 0);
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
+  };
 
   const createMutation = useMutation({
     mutationFn: async () => {
@@ -118,6 +134,10 @@ export function EntradaForm({ onClose }: EntradaFormProps) {
       const codigo = `ENT-${format(new Date(), "yyyyMMdd")}-${String(Math.floor(Math.random() * 9999)).padStart(4, "0")}`;
       const firstTipoProduto = volumes[0]?.tipo_produto_id || null;
       const tipoMaterial = tiposProduto?.find((t) => t.id === firstTipoProduto)?.nome || "Material";
+      
+      // Calcular valor total e unitário médio
+      const valorTotal = totalValor;
+      const valorUnitarioMedio = totalPeso > 0 ? valorTotal / totalPeso : null;
       
       // Criar entrada
       const { data: entrada, error: entradaError } = await supabase
@@ -128,7 +148,7 @@ export function EntradaForm({ onClose }: EntradaFormProps) {
           peso_bruto_kg: totalPeso,
           peso_liquido_kg: totalPeso,
           peso_nf_kg: parseFloat(formData.peso_nf_kg) || null,
-          fornecedor_id: null, // Mantido para compatibilidade
+          fornecedor_id: null,
           parceiro_id: formData.parceiro_id || null,
           dono_id: formData.dono_id || null,
           tipo_entrada_id: formData.tipo_entrada_id || null,
@@ -141,6 +161,8 @@ export function EntradaForm({ onClose }: EntradaFormProps) {
           conferente_id: user?.id || null,
           observacoes: formData.observacoes || null,
           created_by: user?.id,
+          valor_total: valorTotal || null,
+          valor_unitario: valorUnitarioMedio || null,
         })
         .select()
         .single();
@@ -157,7 +179,8 @@ export function EntradaForm({ onClose }: EntradaFormProps) {
           dono_id: formData.dono_id || null,
           tipo_produto_id: firstTipoProduto,
           status: "disponivel",
-          numero_volume: 0, // 0 indica lote mãe
+          numero_volume: 0,
+          custo_unitario_total: valorUnitarioMedio || null,
         })
         .select()
         .single();
@@ -167,6 +190,8 @@ export function EntradaForm({ onClose }: EntradaFormProps) {
       // Criar sublotes filhos (volumes)
       for (let i = 0; i < volumes.length; i++) {
         const volume = volumes[i];
+        const custoUnitario = parseFloat(volume.valor_unitario) || null;
+        
         const { error: subloteError } = await supabase.from("sublotes").insert({
           codigo: volume.codigo,
           entrada_id: entrada.id,
@@ -176,6 +201,7 @@ export function EntradaForm({ onClose }: EntradaFormProps) {
           tipo_produto_id: volume.tipo_produto_id || null,
           status: "disponivel",
           numero_volume: i + 1,
+          custo_unitario_total: custoUnitario,
         });
 
         if (subloteError) throw subloteError;
@@ -360,7 +386,7 @@ export function EntradaForm({ onClose }: EntradaFormProps) {
         <TabsContent value="volumes" className="space-y-4 pt-4">
           <div className="p-4 rounded-lg border bg-muted/30 space-y-4">
             <Label className="text-base font-medium">Adicionar Volume/Ticket</Label>
-            <div className="grid grid-cols-3 gap-2 items-end">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 items-end">
               <div className="space-y-2">
                 <Label className="text-sm">Tipo Produto *</Label>
                 <Select
@@ -382,20 +408,30 @@ export function EntradaForm({ onClose }: EntradaFormProps) {
                 <Input
                   value={newVolume.codigo}
                   onChange={(e) => setNewVolume({ ...newVolume, codigo: e.target.value })}
-                  placeholder="Auto (opcional)"
+                  placeholder="Auto"
                 />
               </div>
               <div className="space-y-2">
                 <Label className="text-sm">Peso (kg) *</Label>
+                <Input
+                  type="number"
+                  value={newVolume.peso_kg}
+                  onChange={(e) => setNewVolume({ ...newVolume, peso_kg: e.target.value })}
+                  placeholder="0"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm">Valor (R$/kg)</Label>
                 <div className="flex gap-2">
                   <Input
                     type="number"
-                    value={newVolume.peso_kg}
-                    onChange={(e) => setNewVolume({ ...newVolume, peso_kg: e.target.value })}
-                    placeholder="0"
+                    step="0.01"
+                    value={newVolume.valor_unitario}
+                    onChange={(e) => setNewVolume({ ...newVolume, valor_unitario: e.target.value })}
+                    placeholder="0,00"
                   />
-                  <Button onClick={addVolume} className="bg-primary">
-                    <Plus className="h-4 w-4 mr-1" /> Add
+                  <Button onClick={addVolume} className="bg-primary shrink-0">
+                    <Plus className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
@@ -410,25 +446,36 @@ export function EntradaForm({ onClose }: EntradaFormProps) {
                     <TableHead>Código</TableHead>
                     <TableHead>Tipo Produto</TableHead>
                     <TableHead className="text-right">Peso (kg)</TableHead>
+                    <TableHead className="text-right">Valor (R$/kg)</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
                     <TableHead className="w-12"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {volumes.map((volume) => (
-                    <TableRow key={volume.id}>
-                      <TableCell className="font-mono text-primary">{volume.codigo}</TableCell>
-                      <TableCell>{tiposProduto?.find(t => t.id === volume.tipo_produto_id)?.nome || "—"}</TableCell>
-                      <TableCell className="text-right font-medium">{parseFloat(volume.peso_kg).toLocaleString("pt-BR")} kg</TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="icon" onClick={() => removeVolume(volume.id)}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {volumes.map((volume) => {
+                    const peso = parseFloat(volume.peso_kg) || 0;
+                    const valor = parseFloat(volume.valor_unitario) || 0;
+                    const total = peso * valor;
+                    return (
+                      <TableRow key={volume.id}>
+                        <TableCell className="font-mono text-primary">{volume.codigo}</TableCell>
+                        <TableCell>{tiposProduto?.find(t => t.id === volume.tipo_produto_id)?.nome || "—"}</TableCell>
+                        <TableCell className="text-right font-medium">{peso.toLocaleString("pt-BR")} kg</TableCell>
+                        <TableCell className="text-right">{valor > 0 ? formatCurrency(valor) : "—"}</TableCell>
+                        <TableCell className="text-right font-medium">{total > 0 ? formatCurrency(total) : "—"}</TableCell>
+                        <TableCell>
+                          <Button variant="ghost" size="icon" onClick={() => removeVolume(volume.id)}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                   <TableRow className="bg-muted/30 font-bold">
                     <TableCell colSpan={2}>TOTAL ({volumes.length} volumes)</TableCell>
                     <TableCell className="text-right">{totalPeso.toLocaleString("pt-BR")} kg</TableCell>
+                    <TableCell className="text-right">—</TableCell>
+                    <TableCell className="text-right">{totalValor > 0 ? formatCurrency(totalValor) : "—"}</TableCell>
                     <TableCell></TableCell>
                   </TableRow>
                 </TableBody>
