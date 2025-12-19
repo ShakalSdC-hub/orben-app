@@ -28,7 +28,7 @@ export default function Index() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("sublotes")
-        .select("peso_kg, dono_id, status, custo_unitario_total");
+        .select("id, peso_kg, dono_id, status, custo_unitario_total, lote_pai_id");
       if (error) throw error;
       return data;
     },
@@ -76,13 +76,18 @@ export default function Index() {
     },
   });
 
-  // Cálculos
-  const estoqueTotal = sublotes?.reduce((acc, s) => acc + (s.peso_kg || 0), 0) || 0;
-  const estoqueDisponiveis = sublotes?.filter((s) => s.status === "disponivel") || [];
+  // Filtrar sublotes que são pais (têm filhos) para evitar duplicação
+  // Um sublote é pai se outro sublote tem lote_pai_id apontando para ele
+  const parentIds = new Set(sublotes?.filter(s => s.lote_pai_id).map(s => s.lote_pai_id) || []);
+  const sublotesSemDuplicacao = sublotes?.filter(s => !parentIds.has(s.id)) || [];
+
+  // Cálculos usando sublotes sem duplicação
+  const estoqueTotal = sublotesSemDuplicacao.reduce((acc, s) => acc + (s.peso_kg || 0), 0);
+  const estoqueDisponiveis = sublotesSemDuplicacao.filter((s) => s.status === "disponivel");
   const estoqueDisponivel = estoqueDisponiveis.reduce((acc, s) => acc + (s.peso_kg || 0), 0);
 
-  const custoMedio = sublotes?.length
-    ? sublotes.reduce((acc, s) => acc + (s.custo_unitario_total || 0), 0) / sublotes.length
+  const custoMedio = sublotesSemDuplicacao.length
+    ? sublotesSemDuplicacao.reduce((acc, s) => acc + (s.custo_unitario_total || 0), 0) / sublotesSemDuplicacao.length
     : 0;
 
   const lmeAtual = ultimaLme?.[0];
@@ -109,9 +114,9 @@ export default function Index() {
     }).format(value);
   };
 
-  // Estoque por dono
+  // Estoque por dono (usando sublotes sem duplicação)
   const estoquePorDono = donos?.map((dono) => {
-    const sublotesDono = sublotes?.filter((s) => s.dono_id === dono.id) || [];
+    const sublotesDono = sublotesSemDuplicacao.filter((s) => s.dono_id === dono.id);
     return {
       ...dono,
       peso: sublotesDono.reduce((acc, s) => acc + (s.peso_kg || 0), 0),
