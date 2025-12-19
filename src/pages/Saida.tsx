@@ -62,6 +62,7 @@ interface SubloteSelecionado {
   custo_unitario_total: number;
   tipo_produto?: { nome: string } | null;
   dono?: { nome: string } | null;
+  entrada?: { codigo: string; tipo_entrada: { id: string; nome: string } | null } | null;
 }
 
 export default function Saida() {
@@ -121,7 +122,8 @@ export default function Saida() {
         .select(`
           *,
           tipo_produto:tipos_produto(nome),
-          dono:donos_material(nome)
+          dono:donos_material(nome),
+          entrada:entradas(codigo, tipo_entrada:tipos_entrada(id, nome))
         `)
         .eq("status", "disponivel")
         .gt("peso_kg", 0)
@@ -365,6 +367,7 @@ export default function Saida() {
                         <TableRow className="bg-muted/50">
                           <TableHead className="w-10"></TableHead>
                           <TableHead>Código</TableHead>
+                          <TableHead>Tipo Entrada</TableHead>
                           <TableHead>Produto</TableHead>
                           <TableHead>Dono</TableHead>
                           <TableHead className="text-right">Peso</TableHead>
@@ -374,7 +377,7 @@ export default function Saida() {
                       <TableBody>
                         {sublotesFiltrados.length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                            <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                               Nenhum lote disponível
                             </TableCell>
                           </TableRow>
@@ -391,6 +394,11 @@ export default function Saida() {
                                   <Checkbox checked={isSelected} />
                                 </TableCell>
                                 <TableCell className="font-mono text-primary">{sublote.codigo}</TableCell>
+                                <TableCell>
+                                  <Badge variant="outline" className="text-xs">
+                                    {sublote.entrada?.tipo_entrada?.nome || "N/A"}
+                                  </Badge>
+                                </TableCell>
                                 <TableCell>{sublote.tipo_produto?.nome || "-"}</TableCell>
                                 <TableCell>{sublote.dono?.nome || "-"}</TableCell>
                                 <TableCell className="text-right font-medium">{formatWeight(sublote.peso_kg)}</TableCell>
