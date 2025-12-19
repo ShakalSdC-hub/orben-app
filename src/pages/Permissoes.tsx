@@ -51,50 +51,32 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 
-type AppRole = "admin" | "gerente_geral" | "financeiro" | "compras" | "pcp" | "comercial" | "expedicao";
+type AppRole = "admin" | "dono" | "operacao" | "financeiro";
 
 const roleConfig: Record<AppRole, { label: string; color: string; icon: React.ReactNode; permissions: string[] }> = {
   admin: {
     label: "Administrador",
     color: "bg-destructive/10 text-destructive border-destructive/20",
     icon: <ShieldAlert className="h-4 w-4" />,
-    permissions: ["Acesso total ao sistema", "Gerenciar usuários", "Configurações"],
+    permissions: ["Acesso total ao sistema", "Gerenciar usuários", "Configurações", "Todas as operações"],
   },
-  gerente_geral: {
-    label: "Gerente Geral",
+  dono: {
+    label: "Dono de Material",
     color: "bg-primary/10 text-primary border-primary/20",
-    icon: <ShieldCheck className="h-4 w-4" />,
-    permissions: ["Visualizar tudo", "Gerenciar cadastros", "Aprovar operações"],
+    icon: <Eye className="h-4 w-4" />,
+    permissions: ["Visualizar tudo", "Sem permissão de edição", "Acompanhar operações"],
+  },
+  operacao: {
+    label: "Operação",
+    color: "bg-copper/10 text-copper border-copper/20",
+    icon: <Factory className="h-4 w-4" />,
+    permissions: ["Entrada de materiais", "Beneficiamento", "Saída de materiais", "Estoque"],
   },
   financeiro: {
     label: "Financeiro",
     color: "bg-success/10 text-success border-success/20",
     icon: <DollarSign className="h-4 w-4" />,
-    permissions: ["Acertos financeiros", "Relatórios financeiros", "Comparativo fiscal"],
-  },
-  compras: {
-    label: "Compras",
-    color: "bg-copper/10 text-copper border-copper/20",
-    icon: <Package className="h-4 w-4" />,
-    permissions: ["Entradas", "Fornecedores", "Cotações LME"],
-  },
-  pcp: {
-    label: "PCP",
-    color: "bg-warning/10 text-warning border-warning/20",
-    icon: <Factory className="h-4 w-4" />,
-    permissions: ["Beneficiamentos", "Movimentações", "Estoque"],
-  },
-  comercial: {
-    label: "Comercial",
-    color: "bg-blue-500/10 text-blue-500 border-blue-500/20",
-    icon: <BarChart3 className="h-4 w-4" />,
-    permissions: ["Saídas", "Clientes", "Simulações"],
-  },
-  expedicao: {
-    label: "Expedição",
-    color: "bg-purple-500/10 text-purple-500 border-purple-500/20",
-    icon: <Truck className="h-4 w-4" />,
-    permissions: ["Saídas", "Movimentações", "Estoque (visualização)"],
+    permissions: ["Visualizar tudo", "Lançar custos", "Dar baixa em dívidas e receitas"],
   },
 };
 
@@ -104,12 +86,12 @@ export default function Permissoes() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [selectedRole, setSelectedRole] = useState<AppRole | null>(null);
-  const [newUserData, setNewUserData] = useState({ email: "", password: "", fullName: "", role: "comercial" as AppRole });
+  const [newUserData, setNewUserData] = useState({ email: "", password: "", fullName: "", role: "operacao" as AppRole });
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { role: currentUserRole } = useAuth();
 
-  const isAdmin = currentUserRole === "admin" || currentUserRole === "gerente_geral";
+  const isAdmin = currentUserRole === "admin";
 
   // Fetch users with profiles and roles
   const { data: usersWithRoles, isLoading } = useQuery({
@@ -168,7 +150,7 @@ export default function Permissoes() {
         description: "O usuário receberá um email de confirmação.",
       });
       setCreateDialogOpen(false);
-      setNewUserData({ email: "", password: "", fullName: "", role: "comercial" });
+      setNewUserData({ email: "", password: "", fullName: "", role: "operacao" });
     },
     onError: (error: any) => {
       let message = error.message;
