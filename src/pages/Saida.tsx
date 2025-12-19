@@ -152,15 +152,19 @@ export default function Saida() {
   const clientes = parceiros.filter((p) => p.is_cliente);
   const transportadoras = parceiros.filter((p) => p.is_transportadora);
 
-  // Cálculos
+  // Cálculos base
   const pesoTotal = selectedLotes.reduce((acc, l) => acc + l.peso_kg, 0);
   const custoTotalAcumulado = selectedLotes.reduce((acc, l) => acc + (l.custo_unitario_total || 0) * l.peso_kg, 0);
   const valorBruto = pesoTotal * formData.valor_unitario;
   const perdaPeso = pesoTotal * (formData.perda_cobrada_pct / 100);
   const custoPerda = perdaPeso * formData.valor_unitario;
-  const valorFinal = valorBruto - custoPerda - formData.custos_adicionais;
 
   const tipoSelecionado = tiposSaida.find((t: any) => t.id === formData.tipo_saida_id);
+  
+  // Para tipos que cobram custos (Retorno Industrialização, etc): usar custo acumulado automaticamente
+  const custosAutomaticos = tipoSelecionado?.cobra_custos ? custoTotalAcumulado : 0;
+  const custosTotaisCobrados = custoPerda + formData.custos_adicionais + custosAutomaticos;
+  const valorFinal = valorBruto - custosTotaisCobrados;
 
   // Filtro de sublotes
   const sublotesFiltrados = sublotesDisponiveis.filter(
@@ -197,7 +201,7 @@ export default function Saida() {
           valor_unitario: formData.valor_unitario,
           valor_total: valorBruto,
           valor_repasse_dono: valorFinal,
-          custos_cobrados: custoPerda + formData.custos_adicionais,
+          custos_cobrados: custosTotaisCobrados,
           nota_fiscal: formData.nota_fiscal || null,
           observacoes: formData.observacoes || null,
           transportadora_id: formData.transportadora_id || null,
@@ -515,15 +519,19 @@ export default function Saida() {
                             <span>- Custos Adicionais:</span>
                             <span>{formatCurrency(formData.custos_adicionais)}</span>
                           </div>
+                          <div className="flex justify-between text-sm font-medium text-amber-600">
+                            <span>- Custo MO/Beneficiamento:</span>
+                            <span>{formatCurrency(custosAutomaticos)}</span>
+                          </div>
+                          <div className="flex justify-between text-sm border-t pt-1 mt-1">
+                            <span className="font-medium">Total Custos Cobrados:</span>
+                            <span className="font-medium">{formatCurrency(custosTotaisCobrados)}</span>
+                          </div>
                         </>
                       )}
-                      <div className="flex justify-between font-bold text-lg border-t pt-2">
+                      <div className="flex justify-between font-bold text-lg border-t pt-2 mt-2">
                         <span>Valor Repasse Dono:</span>
                         <span className="text-primary">{formatCurrency(valorFinal)}</span>
-                      </div>
-                      <div className="flex justify-between text-sm text-muted-foreground">
-                        <span>Custo Acumulado dos Lotes:</span>
-                        <span>{formatCurrency(custoTotalAcumulado)}</span>
                       </div>
                     </CardContent>
                   </Card>
