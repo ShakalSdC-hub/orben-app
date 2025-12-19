@@ -27,36 +27,52 @@ import {
   RefreshCw,
   Save,
   Printer,
-  Upload,
   History,
   Loader2,
+  Plus,
+  Trash2,
+  CalendarDays,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { format } from "date-fns";
+import { format, addDays } from "date-fns";
+import { ExcelImport } from "@/components/lme/ExcelImport";
+
+interface Parcela {
+  numero: number;
+  percentual: number;
+  dias: number;
+  dataVencimento: string;
+  valor: number;
+}
 
 export default function Simulador() {
-  // LME Inputs
-  const [cobreUsdT, setCobreUsdT] = useState(9300);
-  const [dolarBrl, setDolarBrl] = useState(6.10);
-  const [fatorImposto, setFatorImposto] = useState(0.7986);
-  const [pctLmeNegociada, setPctLmeNegociada] = useState(8);
-  const [taxaFinanceiraPct, setTaxaFinanceiraPct] = useState(1.80);
-  const [prazoDias, setPrazoDias] = useState(40);
-
-  // Custos Sucata
-  const [custoSucataKg, setCustoSucataKg] = useState(35);
-  const [custoFreteColeta, setCustoFreteColeta] = useState(0.80);
-  const [custoFreteLaminacao, setCustoFreteLaminacao] = useState(1.20);
-  const [custoMO, setCustoMO] = useState(2.50);
-  const [perdaProcesso, setPerdaProcesso] = useState(12);
-
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+
+  // Common inputs
+  const [cobreUsdT, setCobreUsdT] = useState(11500);
+  const [dolarBrl, setDolarBrl] = useState(5.40);
+  const [dataCompra, setDataCompra] = useState(format(new Date(), "yyyy-MM-dd"));
+
+  // LME Vergalhão inputs
+  const [fatorImposto, setFatorImposto] = useState(0.7986);
+  const [pctLmeNegociada, setPctLmeNegociada] = useState(8);
+  const [parcelas, setParcelas] = useState<Parcela[]>([
+    { numero: 1, percentual: 40, dias: 40, dataVencimento: "", valor: 0 },
+    { numero: 2, percentual: 30, dias: 50, dataVencimento: "", valor: 0 },
+    { numero: 3, percentual: 30, dias: 60, dataVencimento: "", valor: 0 },
+  ]);
+
+  // Sucata inputs
+  const [pctLmeSucata, setPctLmeSucata] = useState(97); // % do LME para sucata mista
+  const [custoCompraKg, setCustoCompraKg] = useState(66.09);
+  const [custoMO, setCustoMO] = useState(3.40);
+  const [pesoKg, setPesoKg] = useState(10000);
 
   // Buscar última cotação LME
   const { data: ultimaLme } = useQuery({
@@ -95,27 +111,71 @@ export default function Simulador() {
     }
   }, [ultimaLme]);
 
-  // === CÁLCULOS LME (Vergalhão Nacional) ===
+  // Atualizar datas de vencimento das parcelas
+  useEffect(() => {
+    if (dataCompra) {
+      const baseDate = new Date(dataCompra);
+      setParcelas(prev => prev.map(p => ({
+        ...p,
+        dataVencimento: format(addDays(baseDate, p.dias), "yyyy-MM-dd")
+      })));
+    }
+  }, [dataCompra]);
+
+  // === CÁLCULOS LME VERGALHÃO ===
   const lmeSemanaBrlKg = (cobreUsdT * dolarBrl) / 1000;
   const precoComImposto = lmeSemanaBrlKg / fatorImposto;
   const precoAVista = precoComImposto * (1 - pctLmeNegociada / 100);
-  const precoAPrazo = precoAVista * (1 + (taxaFinanceiraPct / 100) * (prazoDias / 30));
 
-  // === CÁLCULOS SUCATA + CUSTOS ===
-  const custoTotalSucata = custoSucataKg + custoFreteColeta + custoFreteLaminacao + custoMO;
-  const perdaMultiplicador = 1 / (1 - perdaProcesso / 100);
-  const custoFinalIndustrializado = custoTotalSucata * perdaMultiplicador;
+  // Calcular valores das parcelas
+  const parcelasComValor = parcelas.map(p => ({
+    ...p,
+    valor: precoAVista * (p.percentual / 100)
+  }));
+  const totalParcelas = parcelasComValor.reduce((acc, p) => acc + p.valor, 0);
+
+  // === CÁLCULOS SUCATA ===
+  const totalMediaBrl = (cobreUsdT * dolarBrl); // Total por tonelada em BRL
+  const precoFinalKg = (totalMediaBrl / 1000) * (pctLmeSucata / 100); // Preço final R$/kg
+  const valorVendaSucata = precoFinalKg * pesoKg;
+  const valorCompra = custoCompraKg * pesoKg;
+  const valorMO = custoMO * pesoKg;
+  const difOperacoes = valorCompra - valorVendaSucata;
+  const saldoOperacao = valorVendaSucata - valorCompra - valorMO;
+  const precoIndustrializado = custoCompraKg + custoMO + (difOperacoes > 0 ? difOperacoes / pesoKg : 0);
 
   // === COMPARATIVO ===
-  const diferenca = precoAVista - custoFinalIndustrializado;
+  const diferenca = precoAVista - precoIndustrializado;
   const economiaPct = ((diferenca / precoAVista) * 100);
-  const valeAPena = diferenca > 0;
+  const valeAPena = saldoOperacao > 0;
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-BR", {
       style: "currency",
       currency: "BRL",
     }).format(value);
+  };
+
+  // Parcelas handlers
+  const addParcela = () => {
+    const lastParcela = parcelas[parcelas.length - 1];
+    setParcelas([...parcelas, {
+      numero: parcelas.length + 1,
+      percentual: 0,
+      dias: (lastParcela?.dias || 30) + 10,
+      dataVencimento: "",
+      valor: 0
+    }]);
+  };
+
+  const removeParcela = (idx: number) => {
+    setParcelas(parcelas.filter((_, i) => i !== idx));
+  };
+
+  const updateParcela = (idx: number, field: keyof Parcela, value: number) => {
+    setParcelas(prev => prev.map((p, i) => 
+      i === idx ? { ...p, [field]: value } : p
+    ));
   };
 
   // Salvar simulação
@@ -126,13 +186,12 @@ export default function Simulador() {
         dolar_brl: dolarBrl,
         fator_imposto: fatorImposto,
         pct_lme_negociada: pctLmeNegociada,
-        taxa_financeira_pct: taxaFinanceiraPct,
-        prazo_dias: prazoDias,
+        prazo_dias: parcelas[0]?.dias || 40,
         lme_semana_brl_kg: lmeSemanaBrlKg,
         preco_com_imposto: precoComImposto,
         preco_a_vista: precoAVista,
-        preco_a_prazo: precoAPrazo,
-        custo_sucata_kg: custoFinalIndustrializado,
+        preco_a_prazo: totalParcelas,
+        custo_sucata_kg: precoIndustrializado,
         economia_pct: economiaPct,
         resultado: valeAPena ? "COMPRAR SUCATA" : "COMPRAR VERGALHÃO",
         created_by: user?.id,
@@ -148,10 +207,6 @@ export default function Simulador() {
     },
   });
 
-  const handlePrint = () => {
-    window.print();
-  };
-
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -160,17 +215,14 @@ export default function Simulador() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Simulador LME</h1>
             <p className="text-muted-foreground">
-              Compare: Vergalhão LME à Vista vs Sucata + Custos
+              Simule compra de Vergalhão LME ou Sucata + Industrialização
             </p>
           </div>
           <div className="flex gap-2">
+            <ExcelImport />
             <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
               <RefreshCw className="mr-2 h-4 w-4" />
               Resetar
-            </Button>
-            <Button variant="outline" size="sm" onClick={handlePrint}>
-              <Printer className="mr-2 h-4 w-4" />
-              Imprimir
             </Button>
             <Button
               size="sm"
@@ -188,15 +240,16 @@ export default function Simulador() {
           </div>
         </div>
 
-        <Tabs defaultValue="simulador" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="simulador">Simulador</TabsTrigger>
+        <Tabs defaultValue="vergalhao" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-grid">
+            <TabsTrigger value="vergalhao">Vergalhão LME</TabsTrigger>
+            <TabsTrigger value="sucata">Sucata + Industrialização</TabsTrigger>
             <TabsTrigger value="historico">Histórico</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="simulador">
+          {/* ========== TAB VERGALHÃO LME ========== */}
+          <TabsContent value="vergalhao">
             <div className="grid gap-6 lg:grid-cols-3">
-              {/* Inputs */}
               <div className="lg:col-span-2 space-y-6">
                 {/* Cotação LME */}
                 <Card>
@@ -206,10 +259,10 @@ export default function Simulador() {
                       Cotação LME
                     </CardTitle>
                     <CardDescription>
-                      Defina os parâmetros do mercado
+                      Parâmetros do mercado
                       {ultimaLme && (
-                        <span className="text-xs ml-2 text-muted-foreground">
-                          (última cotação: {format(new Date(ultimaLme.data), "dd/MM/yyyy")})
+                        <span className="text-xs ml-2">
+                          (última: {format(new Date(ultimaLme.data), "dd/MM/yyyy")})
                         </span>
                       )}
                     </CardDescription>
@@ -234,7 +287,7 @@ export default function Simulador() {
                         />
                       </div>
                     </div>
-                    <div className="grid gap-6 md:grid-cols-3">
+                    <div className="grid gap-6 md:grid-cols-2">
                       <div className="space-y-2">
                         <Label>Fator Imposto</Label>
                         <Input
@@ -245,7 +298,7 @@ export default function Simulador() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>% LME Negociada</Label>
+                        <Label>% LME Negociada (desconto)</Label>
                         <div className="flex items-center gap-4">
                           <Slider
                             value={[pctLmeNegociada]}
@@ -258,96 +311,223 @@ export default function Simulador() {
                           <span className="w-12 text-right font-medium">{pctLmeNegociada}%</span>
                         </div>
                       </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Parcelas */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <CalendarDays className="h-5 w-5 text-primary" />
+                      Condições de Pagamento
+                    </CardTitle>
+                    <CardDescription>Configure as parcelas e prazos</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid gap-4 md:grid-cols-2">
                       <div className="space-y-2">
-                        <Label>Prazo (dias)</Label>
+                        <Label>Data da Compra</Label>
                         <Input
-                          type="number"
-                          value={prazoDias}
-                          onChange={(e) => setPrazoDias(Number(e.target.value))}
+                          type="date"
+                          value={dataCompra}
+                          onChange={(e) => setDataCompra(e.target.value)}
                         />
                       </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label>Taxa Financeira (%/mês)</Label>
-                      <div className="flex items-center gap-4">
-                        <Slider
-                          value={[taxaFinanceiraPct]}
-                          onValueChange={([value]) => setTaxaFinanceiraPct(value)}
-                          min={0}
-                          max={5}
-                          step={0.1}
-                          className="flex-1"
+                    
+                    <div className="rounded-lg border overflow-hidden">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-muted/50">
+                            <TableHead>Parcela</TableHead>
+                            <TableHead className="w-24">% do Total</TableHead>
+                            <TableHead className="w-24">Dias</TableHead>
+                            <TableHead>Vencimento</TableHead>
+                            <TableHead className="text-right">Valor (R$/kg)</TableHead>
+                            <TableHead className="w-12"></TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {parcelasComValor.map((p, idx) => (
+                            <TableRow key={idx}>
+                              <TableCell className="font-medium">{p.numero}ª</TableCell>
+                              <TableCell>
+                                <Input
+                                  type="number"
+                                  value={p.percentual}
+                                  onChange={(e) => updateParcela(idx, "percentual", Number(e.target.value))}
+                                  className="h-8 w-20"
+                                />
+                              </TableCell>
+                              <TableCell>
+                                <Input
+                                  type="number"
+                                  value={p.dias}
+                                  onChange={(e) => updateParcela(idx, "dias", Number(e.target.value))}
+                                  className="h-8 w-20"
+                                />
+                              </TableCell>
+                              <TableCell>
+                                {p.dataVencimento ? format(new Date(p.dataVencimento), "dd/MM/yyyy") : "-"}
+                              </TableCell>
+                              <TableCell className="text-right font-medium">
+                                {formatCurrency(p.valor)}
+                              </TableCell>
+                              <TableCell>
+                                {parcelas.length > 1 && (
+                                  <Button variant="ghost" size="icon" onClick={() => removeParcela(idx)}>
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                          <TableRow className="bg-muted/30 font-bold">
+                            <TableCell colSpan={4}>TOTAL</TableCell>
+                            <TableCell className="text-right">{formatCurrency(totalParcelas)}/kg</TableCell>
+                            <TableCell></TableCell>
+                          </TableRow>
+                        </TableBody>
+                      </Table>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={addParcela}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Adicionar Parcela
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Resultado Vergalhão */}
+              <div className="space-y-6">
+                <Card className="border-primary/50">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <Calculator className="h-5 w-5" />
+                      Resultado Vergalhão
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-3 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">LME Semana (R$/kg)</span>
+                        <span className="font-medium">{formatCurrency(lmeSemanaBrlKg)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Preço c/ Imposto</span>
+                        <span className="font-medium">{formatCurrency(precoComImposto)}</span>
+                      </div>
+                      <Separator />
+                      <div className="flex justify-between text-lg font-bold">
+                        <span>Preço à Vista</span>
+                        <span className="text-primary">{formatCurrency(precoAVista)}/kg</span>
+                      </div>
+                      <div className="flex justify-between text-lg font-bold">
+                        <span>Preço a Prazo</span>
+                        <span className="text-primary">{formatCurrency(totalParcelas)}/kg</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* ========== TAB SUCATA ========== */}
+          <TabsContent value="sucata">
+            <div className="grid gap-6 lg:grid-cols-3">
+              <div className="lg:col-span-2 space-y-6">
+                {/* Cotação LME */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <DollarSign className="h-5 w-5 text-copper" />
+                      Média Semana LME
+                    </CardTitle>
+                    <CardDescription>Base para cálculo do preço da sucata</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="grid gap-6 md:grid-cols-3">
+                      <div className="space-y-2">
+                        <Label>Cobre (US$/t)</Label>
+                        <Input
+                          type="number"
+                          value={cobreUsdT}
+                          onChange={(e) => setCobreUsdT(Number(e.target.value))}
                         />
-                        <span className="w-16 text-right font-medium">{taxaFinanceiraPct}%</span>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Dólar (R$/US$)</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={dolarBrl}
+                          onChange={(e) => setDolarBrl(Number(e.target.value))}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Total Média (R$/t)</Label>
+                        <Input
+                          value={formatCurrency(totalMediaBrl)}
+                          disabled
+                          className="bg-muted font-bold"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid gap-6 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>% LME Sucata (Mista: 97%, Mel: 102%)</Label>
+                        <div className="flex items-center gap-4">
+                          <Slider
+                            value={[pctLmeSucata]}
+                            onValueChange={([value]) => setPctLmeSucata(value)}
+                            min={90}
+                            max={110}
+                            step={1}
+                            className="flex-1"
+                          />
+                          <span className="w-16 text-right font-medium">{pctLmeSucata}%</span>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Preço Final Sucata (R$/kg)</Label>
+                        <Input
+                          value={formatCurrency(precoFinalKg)}
+                          disabled
+                          className="bg-muted font-bold text-copper"
+                        />
                       </div>
                     </div>
                   </CardContent>
                 </Card>
 
-                {/* Custos Sucata */}
+                {/* Operação Sucata */}
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Scale className="h-5 w-5 text-copper" />
-                      Custos Sucata + Industrialização
+                      Simulação Operação
                     </CardTitle>
-                    <CardDescription>
-                      Defina os custos para comprar sucata e processar
-                    </CardDescription>
+                    <CardDescription>Compare venda da sucata vs compra + industrialização</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    <div className="grid gap-6 md:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label>Custo Sucata (R$/kg)</Label>
-                        <div className="flex items-center gap-4">
-                          <Slider
-                            value={[custoSucataKg]}
-                            onValueChange={([value]) => setCustoSucataKg(value)}
-                            min={20}
-                            max={50}
-                            step={0.5}
-                            className="flex-1"
-                          />
-                          <Input
-                            type="number"
-                            value={custoSucataKg}
-                            onChange={(e) => setCustoSucataKg(Number(e.target.value))}
-                            className="w-24"
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Perda no Processo (%)</Label>
-                        <div className="flex items-center gap-4">
-                          <Slider
-                            value={[perdaProcesso]}
-                            onValueChange={([value]) => setPerdaProcesso(value)}
-                            min={5}
-                            max={25}
-                            step={0.5}
-                            className="flex-1"
-                          />
-                          <span className="w-16 text-right font-medium">{perdaProcesso}%</span>
-                        </div>
-                      </div>
-                    </div>
                     <div className="grid gap-6 md:grid-cols-3">
                       <div className="space-y-2">
-                        <Label>Frete Coleta (R$/kg)</Label>
+                        <Label>Peso (kg)</Label>
                         <Input
                           type="number"
-                          step="0.01"
-                          value={custoFreteColeta}
-                          onChange={(e) => setCustoFreteColeta(Number(e.target.value))}
+                          value={pesoKg}
+                          onChange={(e) => setPesoKg(Number(e.target.value))}
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>Frete Laminação (R$/kg)</Label>
+                        <Label>Custo Compra (R$/kg)</Label>
                         <Input
                           type="number"
                           step="0.01"
-                          value={custoFreteLaminacao}
-                          onChange={(e) => setCustoFreteLaminacao(Number(e.target.value))}
+                          value={custoCompraKg}
+                          onChange={(e) => setCustoCompraKg(Number(e.target.value))}
                         />
                       </div>
                       <div className="space-y-2">
@@ -360,18 +540,69 @@ export default function Simulador() {
                         />
                       </div>
                     </div>
+
+                    <Separator />
+
+                    {/* Tabela de cálculo */}
+                    <div className="rounded-lg border overflow-hidden">
+                      <Table>
+                        <TableBody>
+                          <TableRow>
+                            <TableCell className="font-medium">Venda da Sucata</TableCell>
+                            <TableCell className="text-right">{pesoKg.toLocaleString("pt-BR")} kg</TableCell>
+                            <TableCell className="text-right">{formatCurrency(precoFinalKg)}/kg</TableCell>
+                            <TableCell className="text-right font-bold text-success">
+                              {formatCurrency(valorVendaSucata)}
+                            </TableCell>
+                          </TableRow>
+                          <TableRow>
+                            <TableCell className="font-medium">(-) Compra</TableCell>
+                            <TableCell className="text-right">{pesoKg.toLocaleString("pt-BR")} kg</TableCell>
+                            <TableCell className="text-right">{formatCurrency(custoCompraKg)}/kg</TableCell>
+                            <TableCell className="text-right font-bold text-destructive">
+                              {formatCurrency(valorCompra)}
+                            </TableCell>
+                          </TableRow>
+                          <TableRow className="bg-muted/30">
+                            <TableCell colSpan={3} className="font-medium">Diferença das Operações</TableCell>
+                            <TableCell className={cn("text-right font-bold", difOperacoes > 0 ? "text-destructive" : "text-success")}>
+                              {formatCurrency(valorVendaSucata - valorCompra)}
+                            </TableCell>
+                          </TableRow>
+                          <TableRow>
+                            <TableCell className="font-medium">(-) Mão de Obra</TableCell>
+                            <TableCell className="text-right">{pesoKg.toLocaleString("pt-BR")} kg</TableCell>
+                            <TableCell className="text-right">{formatCurrency(custoMO)}/kg</TableCell>
+                            <TableCell className="text-right font-bold text-destructive">
+                              {formatCurrency(valorMO)}
+                            </TableCell>
+                          </TableRow>
+                          <TableRow className="bg-primary/10">
+                            <TableCell colSpan={3} className="font-bold text-lg">SALDO</TableCell>
+                            <TableCell className={cn("text-right font-bold text-lg", saldoOperacao > 0 ? "text-success" : "text-destructive")}>
+                              {formatCurrency(saldoOperacao)}
+                            </TableCell>
+                          </TableRow>
+                          <TableRow className="bg-muted/50">
+                            <TableCell colSpan={3} className="font-bold">Preço do KG (Industrialização)</TableCell>
+                            <TableCell className="text-right font-bold text-copper text-lg">
+                              {formatCurrency(precoIndustrializado)}
+                            </TableCell>
+                          </TableRow>
+                        </TableBody>
+                      </Table>
+                    </div>
                   </CardContent>
                 </Card>
               </div>
 
-              {/* Results */}
+              {/* Resultado Sucata */}
               <div className="space-y-6">
-                {/* Main Result */}
                 <Card className={cn(valeAPena ? "border-success/50" : "border-destructive/50")}>
                   <CardHeader className="pb-3">
                     <CardTitle className="flex items-center gap-2 text-lg">
                       <Zap className="h-5 w-5" />
-                      Resultado
+                      Resultado Comparativo
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
@@ -388,9 +619,9 @@ export default function Simulador() {
                         )}
                       >
                         {valeAPena ? (
-                          <TrendingDown className="h-6 w-6 text-success" />
+                          <TrendingUp className="h-6 w-6 text-success" />
                         ) : (
-                          <TrendingUp className="h-6 w-6 text-destructive" />
+                          <TrendingDown className="h-6 w-6 text-destructive" />
                         )}
                       </div>
                       <p
@@ -399,18 +630,17 @@ export default function Simulador() {
                           valeAPena ? "text-success" : "text-destructive"
                         )}
                       >
-                        {valeAPena ? "COMPRAR SUCATA" : "COMPRAR VERGALHÃO"}
+                        {valeAPena ? "OPERAÇÃO VIÁVEL" : "OPERAÇÃO INVIÁVEL"}
                       </p>
                       <p className="text-sm text-muted-foreground mt-1">
                         {valeAPena
-                          ? `Economia de ${economiaPct.toFixed(1)}%`
-                          : `Prejuízo de ${Math.abs(economiaPct).toFixed(1)}%`}
+                          ? `Lucro de ${formatCurrency(saldoOperacao)}`
+                          : `Prejuízo de ${formatCurrency(Math.abs(saldoOperacao))}`}
                       </p>
                     </div>
 
                     <Separator />
 
-                    {/* Comparativo */}
                     <div className="space-y-3">
                       <div className="rounded-lg bg-primary/5 p-3">
                         <p className="text-xs text-muted-foreground mb-1">Vergalhão LME à Vista</p>
@@ -420,55 +650,28 @@ export default function Simulador() {
                       </div>
                       <div className="text-center text-2xl font-bold text-muted-foreground">vs</div>
                       <div className="rounded-lg bg-copper/5 p-3">
-                        <p className="text-xs text-muted-foreground mb-1">Custo Sucata Industrializado</p>
+                        <p className="text-xs text-muted-foreground mb-1">Custo Industrializado</p>
                         <p className="text-2xl font-bold text-copper">
-                          {formatCurrency(custoFinalIndustrializado)}/kg
+                          {formatCurrency(precoIndustrializado)}/kg
                         </p>
                       </div>
                     </div>
 
                     <Separator />
 
-                    {/* Breakdown LME */}
                     <div className="space-y-2 text-sm">
-                      <p className="font-medium text-muted-foreground">Cálculo LME:</p>
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">LME Semana (R$/kg)</span>
-                        <span className="font-medium">{formatCurrency(lmeSemanaBrlKg)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">÷ Fator Imposto</span>
-                        <span className="font-medium">{formatCurrency(precoComImposto)}</span>
+                        <span className="text-muted-foreground">Diferença</span>
+                        <span className={cn("font-bold", diferenca > 0 ? "text-success" : "text-destructive")}>
+                          {formatCurrency(diferenca)}/kg
+                        </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">- {pctLmeNegociada}% Desconto</span>
-                        <span className="font-bold text-primary">{formatCurrency(precoAVista)}</span>
+                        <span className="text-muted-foreground">Economia</span>
+                        <span className={cn("font-bold", economiaPct > 0 ? "text-success" : "text-destructive")}>
+                          {economiaPct.toFixed(1)}%
+                        </span>
                       </div>
-                      <div className="flex justify-between pt-2 border-t">
-                        <span className="text-muted-foreground">A Prazo ({prazoDias}d)</span>
-                        <span className="font-medium">{formatCurrency(precoAPrazo)}</span>
-                      </div>
-                    </div>
-
-                    <Separator />
-
-                    {/* Diferença */}
-                    <div
-                      className={cn(
-                        "rounded-lg p-3 text-center",
-                        valeAPena ? "bg-success/5" : "bg-destructive/5"
-                      )}
-                    >
-                      <p className="text-sm text-muted-foreground">Diferença por kg</p>
-                      <p
-                        className={cn(
-                          "text-2xl font-bold",
-                          valeAPena ? "text-success" : "text-destructive"
-                        )}
-                      >
-                        {valeAPena ? "-" : "+"}
-                        {formatCurrency(Math.abs(diferenca))}
-                      </p>
                     </div>
                   </CardContent>
                 </Card>
@@ -476,6 +679,7 @@ export default function Simulador() {
             </div>
           </TabsContent>
 
+          {/* ========== TAB HISTÓRICO ========== */}
           <TabsContent value="historico">
             <Card>
               <CardHeader>
@@ -483,9 +687,6 @@ export default function Simulador() {
                   <History className="h-5 w-5" />
                   Histórico de Simulações
                 </CardTitle>
-                <CardDescription>
-                  Últimas 10 simulações salvas
-                </CardDescription>
               </CardHeader>
               <CardContent>
                 <Table>
@@ -494,54 +695,40 @@ export default function Simulador() {
                       <TableHead>Data</TableHead>
                       <TableHead>Cobre (US$/t)</TableHead>
                       <TableHead>Dólar</TableHead>
-                      <TableHead>LME à Vista</TableHead>
+                      <TableHead>Preço à Vista</TableHead>
                       <TableHead>Custo Sucata</TableHead>
                       <TableHead>Economia</TableHead>
                       <TableHead>Resultado</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {historicoSimulacoes?.map((sim) => (
-                      <TableRow key={sim.id}>
-                        <TableCell className="text-sm">
-                          {format(new Date(sim.data_simulacao), "dd/MM/yyyy HH:mm")}
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          {sim.cobre_usd_t?.toLocaleString("pt-BR")}
-                        </TableCell>
-                        <TableCell>R$ {sim.dolar_brl?.toFixed(2)}</TableCell>
-                        <TableCell className="text-primary font-medium">
-                          R$ {sim.preco_a_vista?.toFixed(2)}
-                        </TableCell>
-                        <TableCell className="text-copper font-medium">
-                          R$ {sim.custo_sucata_kg?.toFixed(2)}
-                        </TableCell>
-                        <TableCell>
-                          <span className={cn(
-                            "font-medium",
-                            (sim.economia_pct || 0) > 0 ? "text-success" : "text-destructive"
-                          )}>
-                            {sim.economia_pct?.toFixed(1)}%
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <span className={cn(
-                            "text-xs font-medium px-2 py-1 rounded",
-                            sim.resultado === "COMPRAR SUCATA"
-                              ? "bg-success/10 text-success"
-                              : "bg-destructive/10 text-destructive"
-                          )}>
-                            {sim.resultado}
-                          </span>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {(!historicoSimulacoes || historicoSimulacoes.length === 0) && (
+                    {!historicoSimulacoes?.length ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                          Nenhuma simulação salva ainda
+                        <TableCell colSpan={7} className="text-center text-muted-foreground">
+                          Nenhuma simulação salva
                         </TableCell>
                       </TableRow>
+                    ) : (
+                      historicoSimulacoes.map((sim: any) => (
+                        <TableRow key={sim.id}>
+                          <TableCell>{format(new Date(sim.data_simulacao), "dd/MM/yyyy HH:mm")}</TableCell>
+                          <TableCell>{sim.cobre_usd_t?.toLocaleString("pt-BR")}</TableCell>
+                          <TableCell>{sim.dolar_brl?.toFixed(4)}</TableCell>
+                          <TableCell>{formatCurrency(sim.preco_a_vista)}</TableCell>
+                          <TableCell>{formatCurrency(sim.custo_sucata_kg)}</TableCell>
+                          <TableCell className={cn(sim.economia_pct > 0 ? "text-success" : "text-destructive")}>
+                            {sim.economia_pct?.toFixed(1)}%
+                          </TableCell>
+                          <TableCell>
+                            <span className={cn(
+                              "px-2 py-1 rounded text-xs font-medium",
+                              sim.resultado?.includes("SUCATA") ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"
+                            )}>
+                              {sim.resultado}
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      ))
                     )}
                   </TableBody>
                 </Table>

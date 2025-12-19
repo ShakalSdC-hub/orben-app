@@ -9,16 +9,17 @@ import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Edit, Trash2, Building2, Package, FileInput, FileOutput, Cog, Users, DollarSign } from "lucide-react";
+import { Plus, Edit, Trash2, Building2, Package, FileInput, FileOutput, Cog, Users } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { ParceirosTab } from "@/components/cadastros/ParceirosTab";
 
-// Componentes de Cadastro
+// Donos de Material
 function DonosMaterialTab() {
   const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ nome: "", documento: "", telefone: "", email: "", taxa_operacao_pct: 0 });
 
   const { data: donos = [], isLoading } = useQuery({
@@ -30,18 +31,22 @@ function DonosMaterialTab() {
     },
   });
 
-  const createMutation = useMutation({
+  const saveMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      const { error } = await supabase.from("donos_material").insert(data);
-      if (error) throw error;
+      if (editingId) {
+        const { error } = await supabase.from("donos_material").update(data).eq("id", editingId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("donos_material").insert(data);
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["donos_material"] });
-      setIsOpen(false);
-      setFormData({ nome: "", documento: "", telefone: "", email: "", taxa_operacao_pct: 0 });
-      toast({ title: "Dono cadastrado com sucesso!" });
+      handleClose();
+      toast({ title: editingId ? "Dono atualizado!" : "Dono cadastrado!" });
     },
-    onError: () => toast({ title: "Erro ao cadastrar", variant: "destructive" }),
+    onError: () => toast({ title: "Erro ao salvar", variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -51,21 +56,33 @@ function DonosMaterialTab() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["donos_material"] });
-      toast({ title: "Dono excluído com sucesso!" });
+      toast({ title: "Dono excluído!" });
     },
     onError: () => toast({ title: "Erro ao excluir", variant: "destructive" }),
   });
+
+  const handleEdit = (dono: any) => {
+    setEditingId(dono.id);
+    setFormData({ nome: dono.nome, documento: dono.documento || "", telefone: dono.telefone || "", email: dono.email || "", taxa_operacao_pct: dono.taxa_operacao_pct || 0 });
+    setIsOpen(true);
+  };
+
+  const handleClose = () => {
+    setIsOpen(false);
+    setEditingId(null);
+    setFormData({ nome: "", documento: "", telefone: "", email: "", taxa_operacao_pct: 0 });
+  };
 
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-semibold">Donos de Material</h3>
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); else setIsOpen(true); }}>
           <DialogTrigger asChild>
             <Button><Plus className="h-4 w-4 mr-2" />Novo Dono</Button>
           </DialogTrigger>
           <DialogContent>
-            <DialogHeader><DialogTitle>Novo Dono de Material</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{editingId ? "Editar" : "Novo"} Dono de Material</DialogTitle></DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label>Nome</Label>
@@ -89,8 +106,8 @@ function DonosMaterialTab() {
                 <Label>Email</Label>
                 <Input type="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
               </div>
-              <Button className="w-full" onClick={() => createMutation.mutate(formData)} disabled={createMutation.isPending}>
-                {createMutation.isPending ? "Salvando..." : "Salvar"}
+              <Button className="w-full" onClick={() => saveMutation.mutate(formData)} disabled={saveMutation.isPending}>
+                {saveMutation.isPending ? "Salvando..." : "Salvar"}
               </Button>
             </div>
           </DialogContent>
@@ -104,7 +121,7 @@ function DonosMaterialTab() {
             <TableHead>Telefone</TableHead>
             <TableHead>Taxa IBRAC</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead className="w-[50px]"></TableHead>
+            <TableHead className="w-[100px]">Ações</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -121,9 +138,10 @@ function DonosMaterialTab() {
                 <TableCell>{dono.taxa_operacao_pct}%</TableCell>
                 <TableCell><Badge variant={dono.ativo ? "default" : "secondary"}>{dono.ativo ? "Ativo" : "Inativo"}</Badge></TableCell>
                 <TableCell>
-                  <Button variant="ghost" size="icon" onClick={() => deleteMutation.mutate(dono.id)} disabled={deleteMutation.isPending}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="icon" onClick={() => handleEdit(dono)}><Edit className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" onClick={() => deleteMutation.mutate(dono.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))
@@ -134,9 +152,11 @@ function DonosMaterialTab() {
   );
 }
 
+// Tipos de Produto
 function TiposProdutoTab() {
   const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ nome: "", codigo: "", ncm: "", icms_pct: 12, pis_cofins_pct: 9.25 });
 
   const { data: tipos = [], isLoading } = useQuery({
@@ -148,18 +168,22 @@ function TiposProdutoTab() {
     },
   });
 
-  const createMutation = useMutation({
+  const saveMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      const { error } = await supabase.from("tipos_produto").insert(data);
-      if (error) throw error;
+      if (editingId) {
+        const { error } = await supabase.from("tipos_produto").update(data).eq("id", editingId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("tipos_produto").insert(data);
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tipos_produto"] });
-      setIsOpen(false);
-      setFormData({ nome: "", codigo: "", ncm: "", icms_pct: 12, pis_cofins_pct: 9.25 });
-      toast({ title: "Tipo de produto cadastrado com sucesso!" });
+      handleClose();
+      toast({ title: editingId ? "Tipo atualizado!" : "Tipo cadastrado!" });
     },
-    onError: () => toast({ title: "Erro ao cadastrar", variant: "destructive" }),
+    onError: () => toast({ title: "Erro ao salvar", variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -169,21 +193,33 @@ function TiposProdutoTab() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tipos_produto"] });
-      toast({ title: "Tipo excluído com sucesso!" });
+      toast({ title: "Tipo excluído!" });
     },
     onError: () => toast({ title: "Erro ao excluir", variant: "destructive" }),
   });
+
+  const handleEdit = (tipo: any) => {
+    setEditingId(tipo.id);
+    setFormData({ nome: tipo.nome, codigo: tipo.codigo || "", ncm: tipo.ncm || "", icms_pct: tipo.icms_pct || 12, pis_cofins_pct: tipo.pis_cofins_pct || 9.25 });
+    setIsOpen(true);
+  };
+
+  const handleClose = () => {
+    setIsOpen(false);
+    setEditingId(null);
+    setFormData({ nome: "", codigo: "", ncm: "", icms_pct: 12, pis_cofins_pct: 9.25 });
+  };
 
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-semibold">Tipos de Produto</h3>
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); else setIsOpen(true); }}>
           <DialogTrigger asChild>
             <Button><Plus className="h-4 w-4 mr-2" />Novo Tipo</Button>
           </DialogTrigger>
           <DialogContent>
-            <DialogHeader><DialogTitle>Novo Tipo de Produto</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{editingId ? "Editar" : "Novo"} Tipo de Produto</DialogTitle></DialogHeader>
             <div className="space-y-4 py-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -209,8 +245,8 @@ function TiposProdutoTab() {
                   <Input type="number" step="0.01" value={formData.pis_cofins_pct} onChange={(e) => setFormData({ ...formData, pis_cofins_pct: parseFloat(e.target.value) || 0 })} />
                 </div>
               </div>
-              <Button className="w-full" onClick={() => createMutation.mutate(formData)} disabled={createMutation.isPending}>
-                {createMutation.isPending ? "Salvando..." : "Salvar"}
+              <Button className="w-full" onClick={() => saveMutation.mutate(formData)} disabled={saveMutation.isPending}>
+                {saveMutation.isPending ? "Salvando..." : "Salvar"}
               </Button>
             </div>
           </DialogContent>
@@ -224,7 +260,7 @@ function TiposProdutoTab() {
             <TableHead>NCM</TableHead>
             <TableHead>ICMS</TableHead>
             <TableHead>PIS/COFINS</TableHead>
-            <TableHead className="w-[50px]"></TableHead>
+            <TableHead className="w-[100px]">Ações</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -241,9 +277,10 @@ function TiposProdutoTab() {
                 <TableCell>{tipo.icms_pct}%</TableCell>
                 <TableCell>{tipo.pis_cofins_pct}%</TableCell>
                 <TableCell>
-                  <Button variant="ghost" size="icon" onClick={() => deleteMutation.mutate(tipo.id)} disabled={deleteMutation.isPending}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="icon" onClick={() => handleEdit(tipo)}><Edit className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" onClick={() => deleteMutation.mutate(tipo.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))
@@ -254,9 +291,11 @@ function TiposProdutoTab() {
   );
 }
 
+// Processos
 function ProcessosTab() {
   const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ nome: "", descricao: "", inclui_frete_ida: false, inclui_frete_volta: false, inclui_mo: true });
 
   const { data: processos = [], isLoading } = useQuery({
@@ -268,18 +307,22 @@ function ProcessosTab() {
     },
   });
 
-  const createMutation = useMutation({
+  const saveMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      const { error } = await supabase.from("processos").insert(data);
-      if (error) throw error;
+      if (editingId) {
+        const { error } = await supabase.from("processos").update(data).eq("id", editingId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("processos").insert(data);
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["processos"] });
-      setIsOpen(false);
-      setFormData({ nome: "", descricao: "", inclui_frete_ida: false, inclui_frete_volta: false, inclui_mo: true });
-      toast({ title: "Processo cadastrado com sucesso!" });
+      handleClose();
+      toast({ title: editingId ? "Processo atualizado!" : "Processo cadastrado!" });
     },
-    onError: () => toast({ title: "Erro ao cadastrar", variant: "destructive" }),
+    onError: () => toast({ title: "Erro ao salvar", variant: "destructive" }),
   });
 
   const deleteMutation = useMutation({
@@ -289,21 +332,33 @@ function ProcessosTab() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["processos"] });
-      toast({ title: "Processo excluído com sucesso!" });
+      toast({ title: "Processo excluído!" });
     },
     onError: () => toast({ title: "Erro ao excluir", variant: "destructive" }),
   });
+
+  const handleEdit = (p: any) => {
+    setEditingId(p.id);
+    setFormData({ nome: p.nome, descricao: p.descricao || "", inclui_frete_ida: p.inclui_frete_ida || false, inclui_frete_volta: p.inclui_frete_volta || false, inclui_mo: p.inclui_mo !== false });
+    setIsOpen(true);
+  };
+
+  const handleClose = () => {
+    setIsOpen(false);
+    setEditingId(null);
+    setFormData({ nome: "", descricao: "", inclui_frete_ida: false, inclui_frete_volta: false, inclui_mo: true });
+  };
 
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-semibold">Processos de Beneficiamento</h3>
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <Dialog open={isOpen} onOpenChange={(open) => { if (!open) handleClose(); else setIsOpen(true); }}>
           <DialogTrigger asChild>
             <Button><Plus className="h-4 w-4 mr-2" />Novo Processo</Button>
           </DialogTrigger>
           <DialogContent>
-            <DialogHeader><DialogTitle>Novo Processo</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{editingId ? "Editar" : "Novo"} Processo</DialogTitle></DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label>Nome</Label>
@@ -327,8 +382,8 @@ function ProcessosTab() {
                   <Switch checked={formData.inclui_mo} onCheckedChange={(v) => setFormData({ ...formData, inclui_mo: v })} />
                 </div>
               </div>
-              <Button className="w-full" onClick={() => createMutation.mutate(formData)} disabled={createMutation.isPending}>
-                {createMutation.isPending ? "Salvando..." : "Salvar"}
+              <Button className="w-full" onClick={() => saveMutation.mutate(formData)} disabled={saveMutation.isPending}>
+                {saveMutation.isPending ? "Salvando..." : "Salvar"}
               </Button>
             </div>
           </DialogContent>
@@ -342,7 +397,7 @@ function ProcessosTab() {
             <TableHead>Frete Ida</TableHead>
             <TableHead>Frete Volta</TableHead>
             <TableHead>MO</TableHead>
-            <TableHead className="w-[50px]"></TableHead>
+            <TableHead className="w-[100px]">Ações</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -359,9 +414,10 @@ function ProcessosTab() {
                 <TableCell>{p.inclui_frete_volta ? <Badge variant="default">Sim</Badge> : <Badge variant="secondary">Não</Badge>}</TableCell>
                 <TableCell>{p.inclui_mo ? <Badge variant="default">Sim</Badge> : <Badge variant="secondary">Não</Badge>}</TableCell>
                 <TableCell>
-                  <Button variant="ghost" size="icon" onClick={() => deleteMutation.mutate(p.id)} disabled={deleteMutation.isPending}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="icon" onClick={() => handleEdit(p)}><Edit className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" onClick={() => deleteMutation.mutate(p.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                  </div>
                 </TableCell>
               </TableRow>
             ))
@@ -372,8 +428,21 @@ function ProcessosTab() {
   );
 }
 
+// Tipos de Entrada/Saída com CRUD completo
 function TiposEntradaSaidaTab() {
-  const { data: tiposEntrada = [] } = useQuery({
+  const queryClient = useQueryClient();
+  
+  // Estados Entrada
+  const [isOpenEntrada, setIsOpenEntrada] = useState(false);
+  const [editingEntradaId, setEditingEntradaId] = useState<string | null>(null);
+  const [formEntrada, setFormEntrada] = useState({ nome: "", descricao: "", gera_custo: true });
+  
+  // Estados Saída
+  const [isOpenSaida, setIsOpenSaida] = useState(false);
+  const [editingSaidaId, setEditingSaidaId] = useState<string | null>(null);
+  const [formSaida, setFormSaida] = useState({ nome: "", descricao: "", cobra_custos: true });
+
+  const { data: tiposEntrada = [], isLoading: loadingEntrada } = useQuery({
     queryKey: ["tipos_entrada"],
     queryFn: async () => {
       const { data, error } = await supabase.from("tipos_entrada").select("*").order("nome");
@@ -382,7 +451,7 @@ function TiposEntradaSaidaTab() {
     },
   });
 
-  const { data: tiposSaida = [] } = useQuery({
+  const { data: tiposSaida = [], isLoading: loadingSaida } = useQuery({
     queryKey: ["tipos_saida"],
     queryFn: async () => {
       const { data, error } = await supabase.from("tipos_saida").select("*").order("nome");
@@ -391,11 +460,125 @@ function TiposEntradaSaidaTab() {
     },
   });
 
+  // Mutations Entrada
+  const saveEntradaMutation = useMutation({
+    mutationFn: async (data: typeof formEntrada) => {
+      if (editingEntradaId) {
+        const { error } = await supabase.from("tipos_entrada").update(data).eq("id", editingEntradaId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("tipos_entrada").insert(data);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tipos_entrada"] });
+      handleCloseEntrada();
+      toast({ title: editingEntradaId ? "Tipo atualizado!" : "Tipo cadastrado!" });
+    },
+    onError: () => toast({ title: "Erro ao salvar", variant: "destructive" }),
+  });
+
+  const deleteEntradaMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("tipos_entrada").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tipos_entrada"] });
+      toast({ title: "Tipo excluído!" });
+    },
+    onError: () => toast({ title: "Erro ao excluir", variant: "destructive" }),
+  });
+
+  // Mutations Saída
+  const saveSaidaMutation = useMutation({
+    mutationFn: async (data: typeof formSaida) => {
+      if (editingSaidaId) {
+        const { error } = await supabase.from("tipos_saida").update(data).eq("id", editingSaidaId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("tipos_saida").insert(data);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tipos_saida"] });
+      handleCloseSaida();
+      toast({ title: editingSaidaId ? "Tipo atualizado!" : "Tipo cadastrado!" });
+    },
+    onError: () => toast({ title: "Erro ao salvar", variant: "destructive" }),
+  });
+
+  const deleteSaidaMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("tipos_saida").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tipos_saida"] });
+      toast({ title: "Tipo excluído!" });
+    },
+    onError: () => toast({ title: "Erro ao excluir", variant: "destructive" }),
+  });
+
+  const handleEditEntrada = (t: any) => {
+    setEditingEntradaId(t.id);
+    setFormEntrada({ nome: t.nome, descricao: t.descricao || "", gera_custo: t.gera_custo !== false });
+    setIsOpenEntrada(true);
+  };
+
+  const handleCloseEntrada = () => {
+    setIsOpenEntrada(false);
+    setEditingEntradaId(null);
+    setFormEntrada({ nome: "", descricao: "", gera_custo: true });
+  };
+
+  const handleEditSaida = (t: any) => {
+    setEditingSaidaId(t.id);
+    setFormSaida({ nome: t.nome, descricao: t.descricao || "", cobra_custos: t.cobra_custos !== false });
+    setIsOpenSaida(true);
+  };
+
+  const handleCloseSaida = () => {
+    setIsOpenSaida(false);
+    setEditingSaidaId(null);
+    setFormSaida({ nome: "", descricao: "", cobra_custos: true });
+  };
+
   return (
     <div className="grid md:grid-cols-2 gap-6">
+      {/* Tipos de Entrada */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><FileInput className="h-5 w-5" />Tipos de Entrada</CardTitle>
+          <div className="flex justify-between items-center">
+            <CardTitle className="flex items-center gap-2"><FileInput className="h-5 w-5" />Tipos de Entrada</CardTitle>
+            <Dialog open={isOpenEntrada} onOpenChange={(open) => { if (!open) handleCloseEntrada(); else setIsOpenEntrada(true); }}>
+              <DialogTrigger asChild>
+                <Button size="sm"><Plus className="h-4 w-4 mr-1" />Novo</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader><DialogTitle>{editingEntradaId ? "Editar" : "Novo"} Tipo de Entrada</DialogTitle></DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label>Nome</Label>
+                    <Input value={formEntrada.nome} onChange={(e) => setFormEntrada({ ...formEntrada, nome: e.target.value })} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Descrição</Label>
+                    <Input value={formEntrada.descricao} onChange={(e) => setFormEntrada({ ...formEntrada, descricao: e.target.value })} />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label>Gera Custo</Label>
+                    <Switch checked={formEntrada.gera_custo} onCheckedChange={(v) => setFormEntrada({ ...formEntrada, gera_custo: v })} />
+                  </div>
+                  <Button className="w-full" onClick={() => saveEntradaMutation.mutate(formEntrada)} disabled={saveEntradaMutation.isPending}>
+                    {saveEntradaMutation.isPending ? "Salvando..." : "Salvar"}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
         </CardHeader>
         <CardContent>
           <Table>
@@ -403,22 +586,64 @@ function TiposEntradaSaidaTab() {
               <TableRow>
                 <TableHead>Nome</TableHead>
                 <TableHead>Gera Custo</TableHead>
+                <TableHead className="w-[80px]">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {tiposEntrada.map((t: any) => (
-                <TableRow key={t.id}>
-                  <TableCell className="font-medium">{t.nome}</TableCell>
-                  <TableCell>{t.gera_custo ? <Badge>Sim</Badge> : <Badge variant="secondary">Não</Badge>}</TableCell>
-                </TableRow>
-              ))}
+              {loadingEntrada ? (
+                <TableRow><TableCell colSpan={3} className="text-center">Carregando...</TableCell></TableRow>
+              ) : tiposEntrada.length === 0 ? (
+                <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">Nenhum tipo</TableCell></TableRow>
+              ) : (
+                tiposEntrada.map((t: any) => (
+                  <TableRow key={t.id}>
+                    <TableCell className="font-medium">{t.nome}</TableCell>
+                    <TableCell>{t.gera_custo ? <Badge>Sim</Badge> : <Badge variant="secondary">Não</Badge>}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => handleEditEntrada(t)}><Edit className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => deleteEntradaMutation.mutate(t.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
       </Card>
+
+      {/* Tipos de Saída */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><FileOutput className="h-5 w-5" />Tipos de Saída</CardTitle>
+          <div className="flex justify-between items-center">
+            <CardTitle className="flex items-center gap-2"><FileOutput className="h-5 w-5" />Tipos de Saída</CardTitle>
+            <Dialog open={isOpenSaida} onOpenChange={(open) => { if (!open) handleCloseSaida(); else setIsOpenSaida(true); }}>
+              <DialogTrigger asChild>
+                <Button size="sm"><Plus className="h-4 w-4 mr-1" />Novo</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader><DialogTitle>{editingSaidaId ? "Editar" : "Novo"} Tipo de Saída</DialogTitle></DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label>Nome</Label>
+                    <Input value={formSaida.nome} onChange={(e) => setFormSaida({ ...formSaida, nome: e.target.value })} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Descrição</Label>
+                    <Input value={formSaida.descricao} onChange={(e) => setFormSaida({ ...formSaida, descricao: e.target.value })} />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label>Cobra Custos</Label>
+                    <Switch checked={formSaida.cobra_custos} onCheckedChange={(v) => setFormSaida({ ...formSaida, cobra_custos: v })} />
+                  </div>
+                  <Button className="w-full" onClick={() => saveSaidaMutation.mutate(formSaida)} disabled={saveSaidaMutation.isPending}>
+                    {saveSaidaMutation.isPending ? "Salvando..." : "Salvar"}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
         </CardHeader>
         <CardContent>
           <Table>
@@ -426,15 +651,28 @@ function TiposEntradaSaidaTab() {
               <TableRow>
                 <TableHead>Nome</TableHead>
                 <TableHead>Cobra Custos</TableHead>
+                <TableHead className="w-[80px]">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {tiposSaida.map((t: any) => (
-                <TableRow key={t.id}>
-                  <TableCell className="font-medium">{t.nome}</TableCell>
-                  <TableCell>{t.cobra_custos ? <Badge>Sim</Badge> : <Badge variant="secondary">Não</Badge>}</TableCell>
-                </TableRow>
-              ))}
+              {loadingSaida ? (
+                <TableRow><TableCell colSpan={3} className="text-center">Carregando...</TableCell></TableRow>
+              ) : tiposSaida.length === 0 ? (
+                <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground">Nenhum tipo</TableCell></TableRow>
+              ) : (
+                tiposSaida.map((t: any) => (
+                  <TableRow key={t.id}>
+                    <TableCell className="font-medium">{t.nome}</TableCell>
+                    <TableCell>{t.cobra_custos ? <Badge>Sim</Badge> : <Badge variant="secondary">Não</Badge>}</TableCell>
+                    <TableCell>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => handleEditSaida(t)}><Edit className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => deleteSaidaMutation.mutate(t.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>
