@@ -42,6 +42,7 @@ import {
   ChevronDown,
   ChevronRight,
   Trash2,
+  FileSpreadsheet,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -60,10 +61,12 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { EntradaForm } from "@/components/entrada/EntradaForm";
+import { EntradaEditForm } from "@/components/entrada/EntradaEditForm";
 import { EntradaRomaneioPrint } from "@/components/romaneio/EntradaRomaneioPrint";
 import { GlobalFilters } from "@/components/filters/GlobalFilters";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
+import { useExportReport } from "@/hooks/useExportReport";
 
 const statusConfig: Record<string, { label: string; className: string }> = {
   pendente: { label: "Pendente", className: "bg-warning/10 text-warning border-warning/20" },
@@ -85,6 +88,9 @@ export default function Entrada() {
   const [selectedParceiro, setSelectedParceiro] = useState<string | null>(null);
   const [selectedDono, setSelectedDono] = useState<string | null>(null);
   const [deleteEntrada, setDeleteEntrada] = useState<any | null>(null);
+  const [editEntrada, setEditEntrada] = useState<any | null>(null);
+  
+  const { exportToExcel, formatEntradaReport, printReport } = useExportReport();
 
   // Fetch entradas with sublotes
   const { data: entradas, isLoading } = useQuery({
@@ -232,10 +238,33 @@ export default function Entrada() {
             onParceiroChange={setSelectedParceiro}
             onDonoChange={setSelectedDono}
           />
-          <Button variant="outline" size="sm">
-            <Download className="mr-2 h-4 w-4" />
-            Exportar
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Download className="mr-2 h-4 w-4" />
+                Exportar
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={() => {
+                if (filteredEntradas) {
+                  exportToExcel(formatEntradaReport(filteredEntradas), { filename: "entradas", sheetName: "Entradas" });
+                }
+              }}>
+                <FileSpreadsheet className="mr-2 h-4 w-4" />
+                Excel
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => {
+                if (filteredEntradas) {
+                  const data = formatEntradaReport(filteredEntradas);
+                  printReport("Relatório de Entradas", data, Object.keys(data[0] || {}));
+                }
+              }}>
+                <Printer className="mr-2 h-4 w-4" />
+                Imprimir/PDF
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {/* Table */}
@@ -329,7 +358,7 @@ export default function Entrada() {
                                     Visualizar
                                   </DropdownMenuItem>
                                   {canEdit && (
-                                    <DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => setEditEntrada(entrada)}>
                                       <Edit className="mr-2 h-4 w-4" />
                                       Editar
                                     </DropdownMenuItem>
