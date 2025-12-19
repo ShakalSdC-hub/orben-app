@@ -17,6 +17,7 @@ import {
   Cog,
   Menu,
   X,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -54,6 +55,7 @@ const menuItems = [
     items: [
       { icon: Package, label: "Cadastros", path: "/cadastros" },
       { icon: Users, label: "Usuários", path: "/usuarios" },
+      { icon: ShieldCheck, label: "Auditoria", path: "/auditoria" },
       { icon: Settings, label: "Configurações", path: "/configuracoes" },
     ],
   },
