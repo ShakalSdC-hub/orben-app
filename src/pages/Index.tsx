@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -20,8 +21,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { GlobalFilters } from "@/components/filters/GlobalFilters";
 
 export default function Index() {
+  const [selectedDono, setSelectedDono] = useState<string | null>(null);
+
   // Fetch sublotes para estoque total
   const { data: sublotes, isLoading: loadingSublotes } = useQuery({
     queryKey: ["dashboard-sublotes"],
@@ -81,13 +85,20 @@ export default function Index() {
   const parentIds = new Set(sublotes?.filter(s => s.lote_pai_id).map(s => s.lote_pai_id) || []);
   const sublotesSemDuplicacao = sublotes?.filter(s => !parentIds.has(s.id)) || [];
 
-  // Cálculos usando sublotes sem duplicação
-  const estoqueTotal = sublotesSemDuplicacao.reduce((acc, s) => acc + (s.peso_kg || 0), 0);
-  const estoqueDisponiveis = sublotesSemDuplicacao.filter((s) => s.status === "disponivel");
+  // Filtrar por dono selecionado
+  const sublotesFiltrados = sublotesSemDuplicacao.filter(s => {
+    if (!selectedDono) return true;
+    if (selectedDono === "ibrac") return !s.dono_id;
+    return s.dono_id === selectedDono;
+  });
+
+  // Cálculos usando sublotes filtrados
+  const estoqueTotal = sublotesFiltrados.reduce((acc, s) => acc + (s.peso_kg || 0), 0);
+  const estoqueDisponiveis = sublotesFiltrados.filter((s) => s.status === "disponivel");
   const estoqueDisponivel = estoqueDisponiveis.reduce((acc, s) => acc + (s.peso_kg || 0), 0);
 
-  const custoMedio = sublotesSemDuplicacao.length
-    ? sublotesSemDuplicacao.reduce((acc, s) => acc + (s.custo_unitario_total || 0), 0) / sublotesSemDuplicacao.length
+  const custoMedio = sublotesFiltrados.length
+    ? sublotesFiltrados.reduce((acc, s) => acc + (s.custo_unitario_total || 0), 0) / sublotesFiltrados.length
     : 0;
 
   const lmeAtual = ultimaLme?.[0];
@@ -127,13 +138,22 @@ export default function Index() {
     <MainLayout>
       <div className="space-y-6">
         {/* Page Header */}
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Calendar className="h-4 w-4" />
-            <span>{format(new Date(), "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR })}</span>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Calendar className="h-4 w-4" />
+              <span>{format(new Date(), "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR })}</span>
+            </div>
+            <h1 className="text-3xl font-bold tracking-tight">Painel de Controle</h1>
+            <p className="text-muted-foreground">Visão geral das operações da IBRAC</p>
           </div>
-          <h1 className="text-3xl font-bold tracking-tight">Painel de Controle</h1>
-          <p className="text-muted-foreground">Visão geral das operações da IBRAC</p>
+          <GlobalFilters
+            showParceiro={false}
+            selectedParceiro={null}
+            selectedDono={selectedDono}
+            onParceiroChange={() => {}}
+            onDonoChange={setSelectedDono}
+          />
         </div>
 
         {/* KPI Cards */}

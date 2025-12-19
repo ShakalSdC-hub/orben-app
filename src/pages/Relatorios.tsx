@@ -17,7 +17,6 @@ import {
   DollarSign,
   Loader2,
   Calendar,
-  Filter,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -25,6 +24,7 @@ import { format, startOfMonth, endOfMonth, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import * as XLSX from "xlsx";
 import { toast } from "@/hooks/use-toast";
+import { GlobalFilters } from "@/components/filters/GlobalFilters";
 
 export default function Relatorios() {
   const [dataInicio, setDataInicio] = useState(
@@ -240,7 +240,7 @@ export default function Relatorios() {
         <Card>
           <CardHeader className="pb-4">
             <CardTitle className="text-lg flex items-center gap-2">
-              <Filter className="h-5 w-5" />
+              <Calendar className="h-5 w-5" />
               Filtros
             </CardTitle>
           </CardHeader>
