@@ -16,6 +16,7 @@ import Indicadores from "./pages/Indicadores";
 import Beneficiamento from "./pages/Beneficiamento";
 import Saida from "./pages/Saida";
 import Financeiro from "./pages/Financeiro";
+import ExtratoDono from "./pages/ExtratoDono";
 import Relatorios from "./pages/Relatorios";
 import AuditLogs from "./pages/AuditLogs";
 import Permissoes from "./pages/Permissoes";
@@ -41,6 +42,7 @@ const App = () => (
             <Route path="/beneficiamento" element={<ProtectedRoute><Beneficiamento /></ProtectedRoute>} />
             <Route path="/saida" element={<ProtectedRoute><Saida /></ProtectedRoute>} />
             <Route path="/financeiro" element={<ProtectedRoute><Financeiro /></ProtectedRoute>} />
+            <Route path="/extrato-dono" element={<ProtectedRoute><ExtratoDono /></ProtectedRoute>} />
             <Route path="/relatorios" element={<ProtectedRoute><Relatorios /></ProtectedRoute>} />
             <Route path="/auditoria" element={<ProtectedRoute><AuditLogs /></ProtectedRoute>} />
             <Route path="/usuarios" element={<ProtectedRoute><Permissoes /></ProtectedRoute>} />
