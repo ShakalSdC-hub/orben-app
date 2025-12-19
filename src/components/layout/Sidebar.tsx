@@ -46,6 +46,7 @@ const menuItems = [
     title: "Financeiro",
     items: [
       { icon: DollarSign, label: "Financeiro", path: "/financeiro" },
+      { icon: Users, label: "Extrato por Dono", path: "/extrato-dono" },
       { icon: Calculator, label: "Simulador LME", path: "/simulador" },
       { icon: FileText, label: "Relatórios", path: "/relatorios" },
     ],

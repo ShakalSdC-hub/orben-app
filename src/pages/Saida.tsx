@@ -78,6 +78,7 @@ export default function Saida() {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [searchLotes, setSearchLotes] = useState("");
+  const [filtroGeraCusto, setFiltroGeraCusto] = useState<"todos" | "sim" | "nao">("todos");
   const [activeTab, setActiveTab] = useState("lotes");
   const [selectedLotes, setSelectedLotes] = useState<SubloteSelecionado[]>([]);
   const [romaneioSaida, setRomaneioSaida] = useState<any | null>(null);
@@ -215,12 +216,20 @@ export default function Saida() {
   };
 
   // Filtro de sublotes
-  const sublotesFiltrados = sublotesDisponiveis.filter(
-    (s) =>
-      s.codigo.toLowerCase().includes(searchLotes.toLowerCase()) ||
+  const sublotesFiltrados = sublotesDisponiveis.filter((s) => {
+    // Filtro de texto
+    const matchTexto = s.codigo.toLowerCase().includes(searchLotes.toLowerCase()) ||
       s.tipo_produto?.nome?.toLowerCase().includes(searchLotes.toLowerCase()) ||
-      s.dono?.nome?.toLowerCase().includes(searchLotes.toLowerCase())
-  );
+      s.dono?.nome?.toLowerCase().includes(searchLotes.toLowerCase());
+    
+    // Filtro de gera custo
+    const geraCusto = s.entrada?.tipo_entrada?.gera_custo ?? true;
+    const matchGeraCusto = filtroGeraCusto === "todos" || 
+      (filtroGeraCusto === "sim" && geraCusto) || 
+      (filtroGeraCusto === "nao" && !geraCusto);
+    
+    return matchTexto && matchGeraCusto;
+  });
 
   const toggleLote = (sublote: SubloteSelecionado) => {
     const isSelected = selectedLotes.some((l) => l.id === sublote.id);
@@ -397,14 +406,26 @@ export default function Saida() {
 
                 {/* Tab 1: Seleção de Lotes */}
                 <TabsContent value="lotes" className="space-y-4 pt-4">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Buscar lotes por código, produto ou dono..."
-                      value={searchLotes}
-                      onChange={(e) => setSearchLotes(e.target.value)}
-                      className="pl-10"
-                    />
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Buscar lotes por código, produto ou dono..."
+                        value={searchLotes}
+                        onChange={(e) => setSearchLotes(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                    <Select value={filtroGeraCusto} onValueChange={(v) => setFiltroGeraCusto(v as "todos" | "sim" | "nao")}>
+                      <SelectTrigger className="w-full sm:w-44">
+                        <SelectValue placeholder="Tipo custo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="todos">Todos os lotes</SelectItem>
+                        <SelectItem value="sim">Geram custo (Compra)</SelectItem>
+                        <SelectItem value="nao">Não geram (Industrial.)</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div className="rounded-lg border max-h-[300px] overflow-y-auto">
