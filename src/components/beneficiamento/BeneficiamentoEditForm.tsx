@@ -15,9 +15,10 @@ import { useToast } from "@/hooks/use-toast";
 interface BeneficiamentoEditFormProps {
   beneficiamento: any;
   onClose: () => void;
+  readOnly?: boolean;
 }
 
-export function BeneficiamentoEditForm({ beneficiamento, onClose }: BeneficiamentoEditFormProps) {
+export function BeneficiamentoEditForm({ beneficiamento, onClose, readOnly = false }: BeneficiamentoEditFormProps) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState("info");
@@ -39,6 +40,9 @@ export function BeneficiamentoEditForm({ beneficiamento, onClose }: Beneficiamen
     observacoes: beneficiamento.observacoes || "",
     status: beneficiamento.status || "em_andamento",
   });
+
+  // Calcular custo por kg para exibição
+  const pesoEntrada = beneficiamento.peso_entrada_kg || 1;
 
   const { data: processos } = useQuery({
     queryKey: ["processos"],
@@ -140,8 +144,9 @@ export function BeneficiamentoEditForm({ beneficiamento, onClose }: Beneficiamen
               <Select
                 value={formData.status}
                 onValueChange={(v) => setFormData({ ...formData, status: v })}
+                disabled={readOnly}
               >
-                <SelectTrigger>
+                <SelectTrigger className={readOnly ? "bg-muted" : ""}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -159,8 +164,9 @@ export function BeneficiamentoEditForm({ beneficiamento, onClose }: Beneficiamen
               <Select
                 value={formData.processo_id}
                 onValueChange={(v) => setFormData({ ...formData, processo_id: v })}
+                disabled={readOnly}
               >
-                <SelectTrigger>
+                <SelectTrigger className={readOnly ? "bg-muted" : ""}>
                   <SelectValue placeholder="Selecione..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -175,8 +181,9 @@ export function BeneficiamentoEditForm({ beneficiamento, onClose }: Beneficiamen
               <Select
                 value={formData.tipo_beneficiamento}
                 onValueChange={(v) => setFormData({ ...formData, tipo_beneficiamento: v })}
+                disabled={readOnly}
               >
-                <SelectTrigger>
+                <SelectTrigger className={readOnly ? "bg-muted" : ""}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -193,8 +200,9 @@ export function BeneficiamentoEditForm({ beneficiamento, onClose }: Beneficiamen
               <Select
                 value={formData.fornecedor_terceiro_id}
                 onValueChange={(v) => setFormData({ ...formData, fornecedor_terceiro_id: v })}
+                disabled={readOnly}
               >
-                <SelectTrigger>
+                <SelectTrigger className={readOnly ? "bg-muted" : ""}>
                   <SelectValue placeholder="Selecione..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -223,6 +231,8 @@ export function BeneficiamentoEditForm({ beneficiamento, onClose }: Beneficiamen
               <Input
                 value={formData.motorista}
                 onChange={(e) => setFormData({ ...formData, motorista: e.target.value })}
+                disabled={readOnly}
+                className={readOnly ? "bg-muted" : ""}
               />
             </div>
             <div className="space-y-2">
@@ -230,6 +240,8 @@ export function BeneficiamentoEditForm({ beneficiamento, onClose }: Beneficiamen
               <Input
                 value={formData.placa_veiculo}
                 onChange={(e) => setFormData({ ...formData, placa_veiculo: e.target.value.toUpperCase() })}
+                disabled={readOnly}
+                className={readOnly ? "bg-muted" : ""}
               />
             </div>
           </div>
@@ -239,8 +251,9 @@ export function BeneficiamentoEditForm({ beneficiamento, onClose }: Beneficiamen
             <Select
               value={formData.transportadora_id}
               onValueChange={(v) => setFormData({ ...formData, transportadora_id: v })}
+              disabled={readOnly}
             >
-              <SelectTrigger>
+              <SelectTrigger className={readOnly ? "bg-muted" : ""}>
                 <SelectValue placeholder="Selecione..." />
               </SelectTrigger>
               <SelectContent>
@@ -257,6 +270,8 @@ export function BeneficiamentoEditForm({ beneficiamento, onClose }: Beneficiamen
               value={formData.observacoes}
               onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
               rows={3}
+              disabled={readOnly}
+              className={readOnly ? "bg-muted" : ""}
             />
           </div>
         </TabsContent>
@@ -270,6 +285,8 @@ export function BeneficiamentoEditForm({ beneficiamento, onClose }: Beneficiamen
                 step="0.01"
                 value={formData.custo_frete_ida}
                 onChange={(e) => setFormData({ ...formData, custo_frete_ida: e.target.value })}
+                disabled={readOnly}
+                className={readOnly ? "bg-muted" : ""}
               />
             </div>
             <div className="space-y-2">
@@ -279,6 +296,8 @@ export function BeneficiamentoEditForm({ beneficiamento, onClose }: Beneficiamen
                 step="0.01"
                 value={formData.custo_frete_volta}
                 onChange={(e) => setFormData({ ...formData, custo_frete_volta: e.target.value })}
+                disabled={readOnly}
+                className={readOnly ? "bg-muted" : ""}
               />
             </div>
           </div>
@@ -291,6 +310,8 @@ export function BeneficiamentoEditForm({ beneficiamento, onClose }: Beneficiamen
                 step="0.01"
                 value={formData.custo_mo_terceiro}
                 onChange={(e) => setFormData({ ...formData, custo_mo_terceiro: e.target.value })}
+                disabled={readOnly}
+                className={readOnly ? "bg-muted" : ""}
               />
             </div>
             <div className="space-y-2">
@@ -300,13 +321,23 @@ export function BeneficiamentoEditForm({ beneficiamento, onClose }: Beneficiamen
                 step="0.01"
                 value={formData.custo_mo_ibrac}
                 onChange={(e) => setFormData({ ...formData, custo_mo_ibrac: e.target.value })}
+                disabled={readOnly}
+                className={readOnly ? "bg-muted" : ""}
               />
             </div>
           </div>
 
           <div className="p-4 rounded-lg bg-muted/50">
-            <p className="text-sm text-muted-foreground">Custo Total</p>
-            <p className="text-2xl font-bold text-primary">{formatCurrency(custoTotal)}</p>
+            <div className="flex justify-between items-center">
+              <div>
+                <p className="text-sm text-muted-foreground">Custo Total</p>
+                <p className="text-2xl font-bold text-primary">{formatCurrency(custoTotal)}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-muted-foreground">R$/kg</p>
+                <p className="text-lg font-semibold">{formatCurrency(custoTotal / pesoEntrada)}</p>
+              </div>
+            </div>
           </div>
 
           <div className="grid grid-cols-3 gap-4">
@@ -317,6 +348,8 @@ export function BeneficiamentoEditForm({ beneficiamento, onClose }: Beneficiamen
                 step="0.01"
                 value={formData.taxa_financeira_pct}
                 onChange={(e) => setFormData({ ...formData, taxa_financeira_pct: e.target.value })}
+                disabled={readOnly}
+                className={readOnly ? "bg-muted" : ""}
               />
             </div>
             <div className="space-y-2">
@@ -326,6 +359,8 @@ export function BeneficiamentoEditForm({ beneficiamento, onClose }: Beneficiamen
                 step="0.01"
                 value={formData.perda_real_pct}
                 onChange={(e) => setFormData({ ...formData, perda_real_pct: e.target.value })}
+                disabled={readOnly}
+                className={readOnly ? "bg-muted" : ""}
               />
             </div>
             <div className="space-y-2">
@@ -335,6 +370,8 @@ export function BeneficiamentoEditForm({ beneficiamento, onClose }: Beneficiamen
                 step="0.01"
                 value={formData.perda_cobrada_pct}
                 onChange={(e) => setFormData({ ...formData, perda_cobrada_pct: e.target.value })}
+                disabled={readOnly}
+                className={readOnly ? "bg-muted" : ""}
               />
             </div>
           </div>
@@ -381,15 +418,17 @@ export function BeneficiamentoEditForm({ beneficiamento, onClose }: Beneficiamen
       </Tabs>
 
       <DialogFooter>
-        <Button variant="outline" onClick={onClose}>Cancelar</Button>
-        <Button 
-          onClick={() => updateMutation.mutate()} 
-          disabled={updateMutation.isPending}
-          className="bg-gradient-copper"
-        >
-          {updateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Salvar Alterações
-        </Button>
+        <Button variant="outline" onClick={onClose}>{readOnly ? "Fechar" : "Cancelar"}</Button>
+        {!readOnly && (
+          <Button 
+            onClick={() => updateMutation.mutate()} 
+            disabled={updateMutation.isPending}
+            className="bg-gradient-copper"
+          >
+            {updateMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Salvar Alterações
+          </Button>
+        )}
       </DialogFooter>
     </div>
   );
