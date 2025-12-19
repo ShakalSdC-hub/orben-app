@@ -241,8 +241,12 @@ export default function Estoque() {
     return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
   };
 
-  // Filtrar sublotes
+  // Filtrar sublotes - apenas mostrar "disponivel" por padrão, mas também "em_beneficiamento" quando filtrado
   const filteredSublotes = sublotes?.filter((s) => {
+    // Só mostrar sublotes disponíveis ou em beneficiamento
+    const statusValido = s.status === "disponivel" || s.status === "em_beneficiamento";
+    if (!statusValido) return false;
+    
     const matchesSearch =
       s.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
       s.entrada?.codigo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
