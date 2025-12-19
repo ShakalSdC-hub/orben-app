@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Cog, DollarSign, Scale, AlertTriangle, Truck, Package, Loader2, Search, Trash2, Printer } from "lucide-react";
+import { Plus, Cog, DollarSign, Scale, AlertTriangle, Truck, Package, Loader2, Search, Trash2, Printer, ChevronRight, ChevronDown } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -48,6 +48,7 @@ export default function Beneficiamento() {
   const [activeTab, setActiveTab] = useState("lotes");
   const [searchLotes, setSearchLotes] = useState("");
   const [selectedLotes, setSelectedLotes] = useState<SublotesSelecionados[]>([]);
+  const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
   const [romaneioBeneficiamento, setRomaneioBeneficiamento] = useState<any | null>(null);
 
   const [formData, setFormData] = useState({
@@ -168,13 +169,54 @@ export default function Beneficiamento() {
   const pesoSaidaEstimado = pesoTotalEntrada * (1 - formData.perda_real_pct / 100);
   const lucroPerda = formData.perda_cobrada_pct - formData.perda_real_pct;
 
-  // Filtro de sublotes
-  const sublotesFiltrados = sublotesDisponiveis.filter(
-    (s) =>
+  // Identificar sublotes pais (que têm filhos)
+  const parentIds = new Set(
+    sublotesDisponiveis.filter((s: any) => s.lote_pai_id).map((s: any) => s.lote_pai_id)
+  );
+
+  // Agrupar sublotes: mostrar apenas filhos (ou pais sem filhos), com opção de expandir
+  const sublotesAgrupados = sublotesDisponiveis.filter((s: any) => {
+    const matchSearch = 
       s.codigo.toLowerCase().includes(searchLotes.toLowerCase()) ||
       s.tipo_produto?.nome?.toLowerCase().includes(searchLotes.toLowerCase()) ||
-      s.dono?.nome?.toLowerCase().includes(searchLotes.toLowerCase())
-  );
+      s.dono?.nome?.toLowerCase().includes(searchLotes.toLowerCase());
+    
+    if (!matchSearch) return false;
+
+    // Se é um pai e está selecionado, ocultar seus filhos
+    const parentSelected = selectedLotes.some(sel => sel.id === s.lote_pai_id);
+    if (parentSelected) return false;
+
+    // Se é um pai com filhos, só mostrar se expandido
+    if (parentIds.has(s.id)) {
+      return expandedParents.has(s.id);
+    }
+
+    return true;
+  });
+
+  // Sublotes pais para exibir como grupos colapsáveis
+  const sublotesPais = sublotesDisponiveis.filter((s: any) => {
+    const matchSearch = 
+      s.codigo.toLowerCase().includes(searchLotes.toLowerCase()) ||
+      s.tipo_produto?.nome?.toLowerCase().includes(searchLotes.toLowerCase()) ||
+      s.dono?.nome?.toLowerCase().includes(searchLotes.toLowerCase());
+    return matchSearch && parentIds.has(s.id);
+  });
+
+  // Filhos de um pai específico
+  const getChildrenOf = (parentId: string) => 
+    sublotesDisponiveis.filter((s: any) => s.lote_pai_id === parentId);
+
+  const toggleExpand = (parentId: string) => {
+    const newExpanded = new Set(expandedParents);
+    if (newExpanded.has(parentId)) {
+      newExpanded.delete(parentId);
+    } else {
+      newExpanded.add(parentId);
+    }
+    setExpandedParents(newExpanded);
+  };
 
   const toggleLote = (sublote: any) => {
     const isSelected = selectedLotes.some((l) => l.id === sublote.id);
@@ -323,6 +365,7 @@ export default function Beneficiamento() {
                       <TableHeader>
                         <TableRow className="bg-muted/50">
                           <TableHead className="w-10"></TableHead>
+                          <TableHead className="w-8"></TableHead>
                           <TableHead>Código</TableHead>
                           <TableHead>Produto</TableHead>
                           <TableHead>Dono</TableHead>
@@ -330,31 +373,101 @@ export default function Beneficiamento() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {sublotesFiltrados.length === 0 ? (
+                        {sublotesPais.length === 0 && sublotesAgrupados.filter((s: any) => !s.lote_pai_id).length === 0 ? (
                           <TableRow>
-                            <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                            <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                               Nenhum lote disponível
                             </TableCell>
                           </TableRow>
                         ) : (
-                          sublotesFiltrados.map((sublote) => {
-                            const isSelected = selectedLotes.some((l) => l.id === sublote.id);
-                            return (
-                              <TableRow
-                                key={sublote.id}
-                                className={`cursor-pointer ${isSelected ? "bg-primary/10" : "hover:bg-muted/30"}`}
-                                onClick={() => toggleLote(sublote)}
-                              >
-                                <TableCell>
-                                  <Checkbox checked={isSelected} />
-                                </TableCell>
-                                <TableCell className="font-mono text-primary">{sublote.codigo}</TableCell>
-                                <TableCell>{sublote.tipo_produto?.nome || "-"}</TableCell>
-                                <TableCell>{sublote.dono?.nome || "-"}</TableCell>
-                                <TableCell className="text-right font-medium">{formatWeight(sublote.peso_kg)}</TableCell>
-                              </TableRow>
-                            );
-                          })
+                          <>
+                            {/* Sublotes pais com filhos (grupos expansíveis) */}
+                            {sublotesPais.map((parent: any) => {
+                              const isExpanded = expandedParents.has(parent.id);
+                              const isParentSelected = selectedLotes.some((l) => l.id === parent.id);
+                              const children = getChildrenOf(parent.id);
+                              const childrenCount = children.length;
+
+                              return (
+                                <>
+                                  {/* Linha do pai */}
+                                  <TableRow
+                                    key={parent.id}
+                                    className={`cursor-pointer ${isParentSelected ? "bg-primary/10" : "hover:bg-muted/30"}`}
+                                  >
+                                    <TableCell onClick={() => toggleLote(parent)}>
+                                      <Checkbox checked={isParentSelected} />
+                                    </TableCell>
+                                    <TableCell 
+                                      className="cursor-pointer" 
+                                      onClick={() => toggleExpand(parent.id)}
+                                    >
+                                      {isExpanded ? (
+                                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                      ) : (
+                                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                      )}
+                                    </TableCell>
+                                    <TableCell 
+                                      className="font-mono text-primary cursor-pointer"
+                                      onClick={() => toggleExpand(parent.id)}
+                                    >
+                                      {parent.codigo}
+                                      <Badge variant="secondary" className="ml-2 text-xs">
+                                        {childrenCount} sublote{childrenCount > 1 ? 's' : ''}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell>{parent.tipo_produto?.nome || "-"}</TableCell>
+                                    <TableCell>{parent.dono?.nome || "-"}</TableCell>
+                                    <TableCell className="text-right font-medium">{formatWeight(parent.peso_kg)}</TableCell>
+                                  </TableRow>
+                                  {/* Filhos expandidos */}
+                                  {isExpanded && children.map((child: any) => {
+                                    const isChildSelected = selectedLotes.some((l) => l.id === child.id);
+                                    const isDisabled = isParentSelected;
+                                    return (
+                                      <TableRow
+                                        key={child.id}
+                                        className={`${isChildSelected ? "bg-primary/10" : isDisabled ? "opacity-50" : "hover:bg-muted/30"} ${!isDisabled && "cursor-pointer"}`}
+                                        onClick={() => !isDisabled && toggleLote(child)}
+                                      >
+                                        <TableCell>
+                                          <Checkbox checked={isChildSelected} disabled={isDisabled} />
+                                        </TableCell>
+                                        <TableCell></TableCell>
+                                        <TableCell className="font-mono text-primary pl-6">
+                                          └ {child.codigo}
+                                        </TableCell>
+                                        <TableCell>{child.tipo_produto?.nome || "-"}</TableCell>
+                                        <TableCell>{child.dono?.nome || "-"}</TableCell>
+                                        <TableCell className="text-right font-medium">{formatWeight(child.peso_kg)}</TableCell>
+                                      </TableRow>
+                                    );
+                                  })}
+                                </>
+                              );
+                            })}
+                            {/* Sublotes sem pai (não são filhos de ninguém e não têm filhos) */}
+                            {sublotesAgrupados.filter((s: any) => !s.lote_pai_id && !parentIds.has(s.id)).map((sublote: any) => {
+                              const isSelected = selectedLotes.some((l) => l.id === sublote.id);
+                              return (
+                                <TableRow
+                                  key={sublote.id}
+                                  className={`cursor-pointer ${isSelected ? "bg-primary/10" : "hover:bg-muted/30"}`}
+                                  onClick={() => toggleLote(sublote)}
+                                >
+                                  <TableCell>
+                                    <Checkbox checked={isSelected} />
+                                  </TableCell>
+                                  <TableCell></TableCell>
+                                  <TableCell className="font-mono text-primary">{sublote.codigo}</TableCell>
+                                  <TableCell>{sublote.tipo_produto?.nome || "-"}</TableCell>
+                                  <TableCell>{sublote.dono?.nome || "-"}</TableCell>
+                                  <TableCell className="text-right font-medium">{formatWeight(sublote.peso_kg)}</TableCell>
+                                </TableRow>
+                              );
+                            })}
+                          </>
                         )}
                       </TableBody>
                     </Table>
