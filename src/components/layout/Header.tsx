@@ -10,8 +10,24 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/contexts/AuthContext";
+
+const roleLabels: Record<string, string> = {
+  admin: "Administrador",
+  gerente_geral: "Gerente Geral",
+  financeiro: "Financeiro",
+  compras: "Compras",
+  pcp: "PCP",
+  comercial: "Comercial",
+  expedicao: "Expedição",
+};
 
 export function Header() {
+  const { profile, role, signOut } = useAuth();
+
+  const displayName = profile?.full_name || profile?.email?.split("@")[0] || "Usuário";
+  const roleLabel = role ? roleLabels[role] : "Sem perfil";
+
   return (
     <header className="sticky top-0 z-30 h-16 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="flex h-full items-center justify-between px-6">
@@ -20,7 +36,7 @@ export function Header() {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             type="search"
-            placeholder="Buscar ROM, lote, fornecedor..."
+            placeholder="Buscar entrada, lote, fornecedor..."
             className="pl-10 bg-muted/50 border-0 focus-visible:ring-1 focus-visible:ring-primary/50"
           />
         </div>
@@ -43,8 +59,8 @@ export function Header() {
                   <User className="h-4 w-4 text-primary-foreground" />
                 </div>
                 <div className="hidden text-left md:block">
-                  <p className="text-sm font-medium">Admin</p>
-                  <p className="text-xs text-muted-foreground">IBRAC</p>
+                  <p className="text-sm font-medium">{displayName}</p>
+                  <p className="text-xs text-muted-foreground">{roleLabel}</p>
                 </div>
               </Button>
             </DropdownMenuTrigger>
@@ -56,7 +72,7 @@ export function Header() {
                 Perfil
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive">
+              <DropdownMenuItem className="text-destructive" onClick={signOut}>
                 <LogOut className="mr-2 h-4 w-4" />
                 Sair
               </DropdownMenuItem>
