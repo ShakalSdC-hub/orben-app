@@ -67,6 +67,7 @@ export default function Estoque() {
   const [selectedDono, setSelectedDono] = useState<string | null>(null);
   const [selectedTipo, setSelectedTipo] = useState<string | null>(null);
   const [selectedLocal, setSelectedLocal] = useState<string | null>(null);
+  const [filterTipoLote, setFilterTipoLote] = useState<"todos" | "pai" | "filho">("todos");
   const [isTransferOpen, setIsTransferOpen] = useState(false);
   const [selectedLote, setSelectedLote] = useState<any | null>(null);
   const [transferData, setTransferData] = useState({ local_destino_id: "", motivo: "" });
@@ -250,11 +251,22 @@ export default function Estoque() {
     return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
   };
 
+  // Identificar quais sublotes são pais (têm filhos)
+  const parentIdsSet = new Set(
+    sublotes?.filter((s: any) => s.lote_pai_id).map((s: any) => s.lote_pai_id) || []
+  );
+
   // Filtrar sublotes - apenas mostrar "disponivel" por padrão, mas também "em_beneficiamento" quando filtrado
   const filteredSublotes = sublotes?.filter((s) => {
     // Só mostrar sublotes disponíveis ou em beneficiamento
     const statusValido = s.status === "disponivel" || s.status === "em_beneficiamento";
     if (!statusValido) return false;
+    
+    // Filtro de tipo de lote (pai/filho)
+    const isPai = parentIdsSet.has(s.id);
+    const isFilho = !!s.lote_pai_id;
+    if (filterTipoLote === "pai" && !isPai) return false;
+    if (filterTipoLote === "filho" && !isFilho) return false;
     
     const matchesSearch =
       s.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -407,6 +419,16 @@ export default function Estoque() {
                   {tiposProduto?.map((t) => (
                     <SelectItem key={t.id} value={t.id}>{t.nome}</SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+              <Select value={filterTipoLote} onValueChange={(v: "todos" | "pai" | "filho") => setFilterTipoLote(v)}>
+                <SelectTrigger className="w-36">
+                  <SelectValue placeholder="Tipo Lote" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value="pai">Lote Mãe</SelectItem>
+                  <SelectItem value="filho">Sub-Lotes</SelectItem>
                 </SelectContent>
               </Select>
             </div>
