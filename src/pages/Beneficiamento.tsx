@@ -79,6 +79,7 @@ export default function Beneficiamento() {
   const [deleteBeneficiamento, setDeleteBeneficiamento] = useState<any | null>(null);
   const [finalizeBeneficiamento, setFinalizeBeneficiamento] = useState<any | null>(null);
   const [editBeneficiamento, setEditBeneficiamento] = useState<any | null>(null);
+  const [viewBeneficiamento, setViewBeneficiamento] = useState<any | null>(null);
   const [finalizeData, setFinalizeData] = useState({ peso_saida_real: 0, local_destino_id: "", tipo_produto_saida_id: "" });
   const { exportToExcel, formatBeneficiamentoReport, printReport } = useExportReport();
 
@@ -1064,7 +1065,7 @@ export default function Beneficiamento() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => setEditBeneficiamento(b)}>
+                            <DropdownMenuItem onClick={() => setViewBeneficiamento(b)}>
                               <Eye className="mr-2 h-4 w-4" />
                               Visualizar
                             </DropdownMenuItem>
@@ -1075,12 +1076,27 @@ export default function Beneficiamento() {
                                   Editar
                                 </DropdownMenuItem>
                                 <DropdownMenuItem 
-                                  onClick={() => {
+                                  onClick={async () => {
+                                    // Buscar tipo de produto do primeiro item de entrada
+                                    const { data: itensEntrada } = await supabase
+                                      .from("beneficiamento_itens_entrada")
+                                      .select("sublote:sublotes(tipo_produto_id)")
+                                      .eq("beneficiamento_id", b.id)
+                                      .limit(1);
+                                    
+                                    const tipoProdutoId = itensEntrada?.[0]?.sublote?.tipo_produto_id || "";
+                                    
+                                    // Buscar local padrão (primeiro que contenha "IBRAC" ou o primeiro disponível)
+                                    const localIbrac = locaisEstoque.find((l: any) => 
+                                      l.nome.toLowerCase().includes("ibrac") || 
+                                      l.nome.toLowerCase().includes("estoque")
+                                    ) || locaisEstoque[0];
+                                    
                                     setFinalizeBeneficiamento(b);
                                     setFinalizeData({ 
                                       peso_saida_real: b.peso_saida_kg || b.peso_entrada_kg * 0.97,
-                                      local_destino_id: "",
-                                      tipo_produto_saida_id: ""
+                                      local_destino_id: localIbrac?.id || "",
+                                      tipo_produto_saida_id: tipoProdutoId
                                     });
                                   }}
                                   className="text-success focus:text-success"
@@ -1116,6 +1132,16 @@ export default function Beneficiamento() {
             </Table>
           </CardContent>
         </Card>
+
+        {/* View Dialog (Read-only) */}
+        <Dialog open={!!viewBeneficiamento} onOpenChange={() => setViewBeneficiamento(null)}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Visualizar Beneficiamento - {viewBeneficiamento?.codigo}</DialogTitle>
+            </DialogHeader>
+            {viewBeneficiamento && <BeneficiamentoEditForm beneficiamento={viewBeneficiamento} onClose={() => setViewBeneficiamento(null)} readOnly />}
+          </DialogContent>
+        </Dialog>
 
         {/* Edit Dialog */}
         <Dialog open={!!editBeneficiamento} onOpenChange={() => setEditBeneficiamento(null)}>

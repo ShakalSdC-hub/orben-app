@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { TrendingUp, TrendingDown, Minus, Upload, Calendar, Printer, Save } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Upload, Calendar, Printer, Save, DollarSign, RefreshCw } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -59,6 +59,12 @@ export default function Indicadores() {
   const [cotacaoSemana, setCotacaoSemana] = useState<string>("");
   const [cotacaoMes, setCotacaoMes] = useState<string>(format(new Date(), "yyyy-MM"));
   const [uploadData, setUploadData] = useState({ data: "", cobre_usd_t: "", aluminio_usd_t: "", dolar_brl: "", zinco_usd_t: "", chumbo_usd_t: "", estanho_usd_t: "", niquel_usd_t: "" });
+  
+  // Estado para o card de Cotação LME
+  const [lmeTipoFiltro, setLmeTipoFiltro] = useState<"dia" | "semana" | "mes">("semana");
+  const [lmeSemana, setLmeSemana] = useState<string>("");
+  const [lmeData, setLmeData] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [lmeMes, setLmeMes] = useState<string>(format(subMonths(new Date(), 1), "yyyy-MM"));
 
   // Fetch histórico diário (não média)
   const { data: historico = [] } = useQuery({
@@ -96,6 +102,59 @@ export default function Indicadores() {
     label: `Semana ${m.semana_numero}`,
     data: m
   }));
+
+  // Auto-selecionar a primeira semana disponível para o card de cotação
+  useEffect(() => {
+    if (mediasSemanais.length > 0 && !lmeSemana) {
+      setLmeSemana(String(mediasSemanais[0]?.semana_numero || ""));
+    }
+  }, [mediasSemanais, lmeSemana]);
+
+  // Função para obter cotação LME baseado no filtro selecionado
+  const getLmeCotacao = () => {
+    if (lmeTipoFiltro === "dia") {
+      const registro = historico.find((h: any) => h.data === lmeData);
+      return registro ? {
+        cobre_usd_t: registro.cobre_usd_t,
+        dolar_brl: registro.dolar_brl,
+        label: format(parseISO(lmeData), "dd/MM/yyyy", { locale: ptBR })
+      } : null;
+    } else if (lmeTipoFiltro === "semana") {
+      const media = mediasSemanais.find((m: any) => String(m.semana_numero) === lmeSemana);
+      if (media) {
+        // Calcular cobre USD/t a partir de cobre_brl_kg
+        const cobreUsdT = media.cobre_brl_kg && media.dolar_brl 
+          ? (media.cobre_brl_kg / media.dolar_brl) * 1000 
+          : null;
+        return {
+          cobre_usd_t: cobreUsdT,
+          dolar_brl: media.dolar_brl,
+          label: `Semana ${media.semana_numero}`
+        };
+      }
+      return null;
+    } else if (lmeTipoFiltro === "mes") {
+      const [ano, mes] = lmeMes.split("-").map(Number);
+      const inicioMes = new Date(ano, mes - 1, 1);
+      const fimMes = new Date(ano, mes, 0);
+      const registrosMes = historico.filter((h: any) => {
+        const dataRegistro = parseISO(h.data);
+        return isWithinInterval(dataRegistro, { start: inicioMes, end: fimMes });
+      });
+      if (registrosMes.length === 0) return null;
+      
+      const cobreMedia = calcularMedia(registrosMes, 'cobre_usd_t');
+      const dolarMedia = calcularMedia(registrosMes, 'dolar_brl');
+      return {
+        cobre_usd_t: cobreMedia,
+        dolar_brl: dolarMedia,
+        label: format(inicioMes, "MMMM yyyy", { locale: ptBR })
+      };
+    }
+    return null;
+  };
+
+  const lmeCotacao = getLmeCotacao();
 
   const uploadMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -393,6 +452,92 @@ export default function Indicadores() {
             <Button variant="outline" onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" />Imprimir</Button>
           </div>
         </div>
+
+        {/* Card de Cotação LME - Parâmetros do Mercado */}
+        <Card className="border-primary/20">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <DollarSign className="h-5 w-5 text-primary" />
+              Cotação LME
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Parâmetros do mercado {lmeCotacao?.label ? `(última: ${lmeCotacao.label})` : ""}
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Label className="text-sm w-20">Filtrar por:</Label>
+              <Select value={lmeTipoFiltro} onValueChange={(v: "dia" | "semana" | "mes") => setLmeTipoFiltro(v)}>
+                <SelectTrigger className="w-40">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="dia">Dia</SelectItem>
+                  <SelectItem value="semana">Média Semanal</SelectItem>
+                  <SelectItem value="mes">Média Mensal</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              {lmeTipoFiltro === "dia" && (
+                <Input 
+                  type="date" 
+                  value={lmeData} 
+                  onChange={(e) => setLmeData(e.target.value)}
+                  className="w-40"
+                />
+              )}
+              
+              {lmeTipoFiltro === "semana" && (
+                <Select value={lmeSemana} onValueChange={setLmeSemana}>
+                  <SelectTrigger className="w-40">
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {semanasDisponiveis.map((s) => (
+                      <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              
+              {lmeTipoFiltro === "mes" && (
+                <Input 
+                  type="month" 
+                  value={lmeMes} 
+                  onChange={(e) => setLmeMes(e.target.value)}
+                  className="w-40"
+                />
+              )}
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-muted-foreground">Cobre (US$/t)</Label>
+                <Input 
+                  type="text"
+                  value={lmeCotacao?.cobre_usd_t ? Math.round(lmeCotacao.cobre_usd_t).toLocaleString("pt-BR") : "-"}
+                  disabled
+                  className="bg-muted font-mono text-lg"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-muted-foreground">Dólar (R$/US$)</Label>
+                <Input 
+                  type="text"
+                  value={lmeCotacao?.dolar_brl ? Number(lmeCotacao.dolar_brl).toFixed(4).replace(".", ",") : "-"}
+                  disabled
+                  className="bg-muted font-mono text-lg"
+                />
+              </div>
+            </div>
+            
+            {!lmeCotacao && (
+              <p className="text-sm text-muted-foreground text-center py-2">
+                Nenhuma cotação encontrada para o período selecionado.
+              </p>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Cards de Variação - Cobre e Alumínio */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
