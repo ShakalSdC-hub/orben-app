@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,7 +28,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, Cog, DollarSign, Scale, AlertTriangle, Truck, Package, Loader2, Search, Trash2, Printer, ChevronRight, ChevronDown, Info, MoreHorizontal, Eye, Edit, CheckCircle2, FileSpreadsheet, FileText } from "lucide-react";
+import { Plus, Cog, DollarSign, Scale, AlertTriangle, Truck, Package, Loader2, Search, Trash2, Printer, ChevronRight, ChevronDown, Info, MoreHorizontal, Eye, Edit, CheckCircle2, FileSpreadsheet, FileText, Layers } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -58,8 +58,29 @@ interface SublotesSelecionados {
   id: string;
   codigo: string;
   peso_kg: number;
-  tipo_produto?: { nome: string } | null;
+  tipo_produto?: { id?: string; nome: string; perda_beneficiamento_pct?: number } | null;
   dono?: { nome: string } | null;
+  entrada_id?: string | null;
+}
+
+// Tipos para consolidação
+interface ProdutoConsolidado {
+  tipo_produto_id: string;
+  nome: string;
+  peso_kg: number;
+  perda_padrao_pct: number;
+  perda_cobrada_pct: number;
+  peso_saida_estimado: number;
+  sublotes: string[];
+}
+
+interface DocumentoEntrada {
+  entrada_id: string;
+  codigo_entrada: string;
+  valor_total: number;
+  taxa_financeira_pct: number;
+  taxa_financeira_valor: number;
+  sublotes_count: number;
 }
 
 export default function Beneficiamento() {
@@ -83,21 +104,20 @@ export default function Beneficiamento() {
   const [finalizeData, setFinalizeData] = useState({ peso_saida_real: 0, local_destino_id: "", tipo_produto_saida_id: "" });
   const { exportToExcel, formatBeneficiamentoReport, printReport } = useExportReport();
 
+  // Estado para perdas por produto (editáveis)
+  const [perdasPorProduto, setPerdasPorProduto] = useState<Record<string, number>>({});
+  // Estado para taxa financeira global
+  const [taxaFinanceiraGlobal, setTaxaFinanceiraGlobal] = useState(1.8);
+
   const [formData, setFormData] = useState({
     processo_id: "",
     tipo_beneficiamento: "interno",
     fornecedor_terceiro_id: "",
-    tipo_produto_saida_id: "",
     // Custos em R$/kg - frete ida usa peso entrada, frete volta usa peso após perda
     custo_frete_ida_kg: 0,
     custo_frete_volta_kg: 0,
     custo_mo_terceiro_kg: 0,
     custo_mo_ibrac_kg: 0,
-    // Taxa financeira em % - calculada sobre o valor total de entrada
-    taxa_financeira_pct: 1.8,
-    // Perdas - agora vem do tipo de produto
-    perda_real_pct: 3,
-    perda_cobrada_pct: 5,
     // Transporte
     transportadora_id: "",
     motorista: "",
@@ -128,9 +148,9 @@ export default function Beneficiamento() {
         .from("sublotes")
         .select(`
           *,
-          tipo_produto:tipos_produto(nome, perda_beneficiamento_pct),
+          tipo_produto:tipos_produto(id, nome, perda_beneficiamento_pct),
           dono:donos_material(nome),
-          entrada:entradas(parceiro:parceiros!entradas_parceiro_id_fkey(razao_social, nome_fantasia))
+          entrada:entradas(id, codigo, valor_total, parceiro:parceiros!entradas_parceiro_id_fkey(razao_social, nome_fantasia))
         `)
         .eq("status", "disponivel")
         .gt("peso_kg", 0)
@@ -139,6 +159,74 @@ export default function Beneficiamento() {
       return data;
     },
   });
+
+  // Consolidação automática por tipo de produto
+  const produtosConsolidados = useMemo<ProdutoConsolidado[]>(() => {
+    const map = new Map<string, ProdutoConsolidado>();
+    
+    for (const lote of selectedLotes) {
+      const subloteFull = sublotesDisponiveis.find((s: any) => s.id === lote.id);
+      const tipoProdutoId = subloteFull?.tipo_produto?.id || "sem_produto";
+      const nome = subloteFull?.tipo_produto?.nome || "Sem Produto";
+      const perdaPadrao = subloteFull?.tipo_produto?.perda_beneficiamento_pct || 3;
+      
+      if (!map.has(tipoProdutoId)) {
+        map.set(tipoProdutoId, {
+          tipo_produto_id: tipoProdutoId,
+          nome,
+          peso_kg: 0,
+          perda_padrao_pct: perdaPadrao,
+          perda_cobrada_pct: perdasPorProduto[tipoProdutoId] ?? perdaPadrao + 2, // Default: perda padrão + 2%
+          peso_saida_estimado: 0,
+          sublotes: [],
+        });
+      }
+      
+      const item = map.get(tipoProdutoId)!;
+      item.peso_kg += lote.peso_kg;
+      item.sublotes.push(lote.id);
+    }
+    
+    // Calcular peso de saída estimado para cada produto
+    for (const item of map.values()) {
+      const perdaCobrada = perdasPorProduto[item.tipo_produto_id] ?? item.perda_cobrada_pct;
+      item.perda_cobrada_pct = perdaCobrada;
+      item.peso_saida_estimado = item.peso_kg * (1 - perdaCobrada / 100);
+    }
+    
+    return Array.from(map.values());
+  }, [selectedLotes, sublotesDisponiveis, perdasPorProduto]);
+
+  // Consolidação automática por documento de entrada
+  const documentosEntrada = useMemo<DocumentoEntrada[]>(() => {
+    const map = new Map<string, DocumentoEntrada>();
+    
+    for (const lote of selectedLotes) {
+      const subloteFull = sublotesDisponiveis.find((s: any) => s.id === lote.id);
+      const entradaId = subloteFull?.entrada?.id;
+      
+      if (!entradaId) continue;
+      
+      if (!map.has(entradaId)) {
+        map.set(entradaId, {
+          entrada_id: entradaId,
+          codigo_entrada: subloteFull.entrada?.codigo || "N/A",
+          valor_total: subloteFull.entrada?.valor_total || 0,
+          taxa_financeira_pct: taxaFinanceiraGlobal,
+          taxa_financeira_valor: (subloteFull.entrada?.valor_total || 0) * (taxaFinanceiraGlobal / 100),
+          sublotes_count: 0,
+        });
+      }
+      
+      const item = map.get(entradaId)!;
+      item.sublotes_count += 1;
+      // Atualizar taxa financeira com valor global
+      item.taxa_financeira_pct = taxaFinanceiraGlobal;
+      item.taxa_financeira_valor = item.valor_total * (taxaFinanceiraGlobal / 100);
+    }
+    
+    return Array.from(map.values());
+  }, [selectedLotes, sublotesDisponiveis, taxaFinanceiraGlobal]);
 
   // Obter parceiros únicos dos lotes selecionados
   const parceirosDosMateriais = [...new Set(selectedLotes.map(l => {
@@ -241,9 +329,19 @@ export default function Beneficiamento() {
   const fornecedores = parceiros.filter((p) => p.is_fornecedor);
   const transportadoras = parceiros.filter((p) => p.is_transportadora);
 
-  // Cálculos - Perda baseada no produto selecionado
+  // Cálculos baseados nos produtos consolidados
   const pesoTotalEntrada = selectedLotes.reduce((acc, l) => acc + l.peso_kg, 0);
-  const pesoSaidaEstimado = pesoTotalEntrada * (1 - formData.perda_real_pct / 100);
+  
+  // Peso de saída estimado = soma dos pesos de saída por produto
+  const pesoSaidaEstimado = produtosConsolidados.reduce((acc, p) => acc + p.peso_saida_estimado, 0);
+  
+  // Perda média ponderada (para compatibilidade com campos antigos)
+  const perdaMediaReal = pesoTotalEntrada > 0 
+    ? produtosConsolidados.reduce((acc, p) => acc + (p.perda_padrao_pct * p.peso_kg), 0) / pesoTotalEntrada 
+    : 0;
+  const perdaMediaCobrada = pesoTotalEntrada > 0 
+    ? produtosConsolidados.reduce((acc, p) => acc + (p.perda_cobrada_pct * p.peso_kg), 0) / pesoTotalEntrada 
+    : 0;
   
   // Frete ida = peso entrada × R$/kg
   const custoFreteIda = formData.custo_frete_ida_kg * pesoTotalEntrada;
@@ -257,15 +355,14 @@ export default function Beneficiamento() {
   const custoTotal = custoFreteIda + custoFreteVolta + custoMoTerceiro + custoMoIbrac;
   const custoTotalKg = pesoTotalEntrada > 0 ? custoTotal / pesoTotalEntrada : 0;
   
-  // Valor total de entrada (soma dos valores das entradas relacionadas aos sublotes)
-  const valorTotalEntrada = selectedLotes.reduce((acc, l) => {
-    const subloteFull = sublotesDisponiveis.find((s: any) => s.id === l.id);
-    return acc + ((subloteFull?.custo_unitario_total || 0) * l.peso_kg);
-  }, 0);
+  // Valor total de entrada POR DOCUMENTO (sem duplicação)
+  const valorTotalDocumentos = documentosEntrada.reduce((acc, d) => acc + d.valor_total, 0);
   
-  // Taxa financeira sobre o valor total de entrada
-  const custoFinanceiro = valorTotalEntrada * (formData.taxa_financeira_pct / 100);
-  const lucroPerda = formData.perda_cobrada_pct - formData.perda_real_pct;
+  // Taxa financeira sobre documentos (cada documento cobra uma vez)
+  const custoFinanceiro = documentosEntrada.reduce((acc, d) => acc + d.taxa_financeira_valor, 0);
+  
+  // Lucro na perda (diferença entre perda cobrada e perda real média)
+  const lucroPerda = perdaMediaCobrada - perdaMediaReal;
 
   // Identificar sublotes pais (que têm filhos)
   const parentIds = new Set(
@@ -336,23 +433,23 @@ export default function Beneficiamento() {
   };
 
   // Validação dos campos obrigatórios de configuração
-  const isConfigValid = formData.processo_id && formData.tipo_produto_saida_id;
+  const isConfigValid = formData.processo_id && produtosConsolidados.length > 0;
 
   const createMutation = useMutation({
     mutationFn: async () => {
       if (selectedLotes.length === 0) throw new Error("Selecione ao menos um lote");
       if (!formData.processo_id) throw new Error("Selecione o processo de beneficiamento");
-      if (!formData.tipo_produto_saida_id) throw new Error("Selecione o produto de saída");
+      if (produtosConsolidados.length === 0) throw new Error("Nenhum produto consolidado");
+      
       const codigo = `BEN-${format(new Date(), "yyyyMMdd")}-${String(Math.floor(Math.random() * 9999)).padStart(4, "0")}`;
 
-      // Criar beneficiamento
+      // Criar beneficiamento com dados consolidados
       const { data: beneficiamento, error: benError } = await supabase
         .from("beneficiamentos")
         .insert({
           codigo,
           processo_id: formData.processo_id || null,
           tipo_beneficiamento: formData.tipo_beneficiamento,
-          // Só envia fornecedor_terceiro_id se for externo E tiver valor válido
           fornecedor_terceiro_id: formData.tipo_beneficiamento === "externo" && formData.fornecedor_terceiro_id 
             ? formData.fornecedor_terceiro_id 
             : null,
@@ -360,9 +457,9 @@ export default function Beneficiamento() {
           custo_frete_volta: custoFreteVolta,
           custo_mo_terceiro: custoMoTerceiro,
           custo_mo_ibrac: custoMoIbrac,
-          taxa_financeira_pct: formData.taxa_financeira_pct,
-          perda_real_pct: formData.perda_real_pct,
-          perda_cobrada_pct: formData.perda_cobrada_pct,
+          taxa_financeira_pct: taxaFinanceiraGlobal,
+          perda_real_pct: perdaMediaReal,
+          perda_cobrada_pct: perdaMediaCobrada,
           peso_entrada_kg: pesoTotalEntrada,
           peso_saida_kg: pesoSaidaEstimado,
           transportadora_id: formData.transportadora_id || null,
@@ -375,13 +472,44 @@ export default function Beneficiamento() {
 
       if (benError) throw benError;
 
+      // Inserir produtos consolidados
+      for (const produto of produtosConsolidados) {
+        if (produto.tipo_produto_id !== "sem_produto") {
+          const { error: prodError } = await supabase.from("beneficiamento_produtos").insert({
+            beneficiamento_id: beneficiamento.id,
+            tipo_produto_id: produto.tipo_produto_id,
+            peso_entrada_kg: produto.peso_kg,
+            perda_padrao_pct: produto.perda_padrao_pct,
+            perda_cobrada_pct: produto.perda_cobrada_pct,
+            peso_saida_estimado_kg: produto.peso_saida_estimado,
+          });
+          if (prodError) throw prodError;
+        }
+      }
+
+      // Inserir documentos de entrada (para custo financeiro)
+      for (const doc of documentosEntrada) {
+        const { error: docError } = await supabase.from("beneficiamento_entradas").insert({
+          beneficiamento_id: beneficiamento.id,
+          entrada_id: doc.entrada_id,
+          valor_documento: doc.valor_total,
+          taxa_financeira_pct: doc.taxa_financeira_pct,
+          taxa_financeira_valor: doc.taxa_financeira_valor,
+        });
+        if (docError) throw docError;
+      }
+
       // Inserir itens de entrada
       for (const lote of selectedLotes) {
+        const subloteFull = sublotesDisponiveis.find((s: any) => s.id === lote.id);
+        const tipoProdutoId = subloteFull?.tipo_produto?.id || null;
+        
         const { error: itemError } = await supabase.from("beneficiamento_itens_entrada").insert({
           beneficiamento_id: beneficiamento.id,
           sublote_id: lote.id,
           peso_kg: lote.peso_kg,
           custo_unitario: custoTotalKg,
+          tipo_produto_id: tipoProdutoId,
         });
         if (itemError) throw itemError;
 
@@ -400,18 +528,16 @@ export default function Beneficiamento() {
       queryClient.invalidateQueries({ queryKey: ["sublotes_disponiveis"] });
       setIsOpen(false);
       setSelectedLotes([]);
+      setPerdasPorProduto({});
+      setTaxaFinanceiraGlobal(1.8);
       setFormData({
         processo_id: "",
         tipo_beneficiamento: "interno",
         fornecedor_terceiro_id: "",
-        tipo_produto_saida_id: "",
         custo_frete_ida_kg: 0,
         custo_frete_volta_kg: 0,
         custo_mo_terceiro_kg: 0,
         custo_mo_ibrac_kg: 0,
-        taxa_financeira_pct: 1.8,
-        perda_real_pct: 3,
-        perda_cobrada_pct: 5,
         transportadora_id: "",
         motorista: "",
         placa_veiculo: "",
@@ -937,43 +1063,125 @@ export default function Beneficiamento() {
                     </div>
                   )}
 
-                  <div className="space-y-2">
-                    <Label>Produto de Saída (Transformação)</Label>
-                    <Select value={formData.tipo_produto_saida_id} onValueChange={(v) => setFormData({ ...formData, tipo_produto_saida_id: v })}>
-                      <SelectTrigger><SelectValue placeholder="Selecione o produto resultante..." /></SelectTrigger>
-                      <SelectContent>
-                        {tiposProduto.map((t) => (
-                          <SelectItem key={t.id} value={t.id}>{t.nome}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground">O material de entrada será transformado neste produto</p>
-                  </div>
-
-                  {/* Perdas */}
+                  {/* Resumo por Produto - Consolidação automática */}
                   <Card>
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-base flex items-center gap-2"><AlertTriangle className="h-4 w-4" />Perdas</CardTitle>
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <Layers className="h-4 w-4" />
+                        Consolidação por Produto
+                      </CardTitle>
+                      <CardDescription>Perda configurável por tipo de produto</CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-4">
+                    <CardContent>
+                      {produtosConsolidados.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          Selecione lotes na aba anterior para ver a consolidação
+                        </p>
+                      ) : (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Produto</TableHead>
+                              <TableHead className="text-right">Peso (kg)</TableHead>
+                              <TableHead className="text-right">Perda Padrão</TableHead>
+                              <TableHead className="text-right">Perda Cobrada</TableHead>
+                              <TableHead className="text-right">Peso Saída Est.</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {produtosConsolidados.map((p) => (
+                              <TableRow key={p.tipo_produto_id}>
+                                <TableCell className="font-medium">{p.nome}</TableCell>
+                                <TableCell className="text-right">{formatWeight(p.peso_kg)}</TableCell>
+                                <TableCell className="text-right text-muted-foreground">{p.perda_padrao_pct.toFixed(1)}%</TableCell>
+                                <TableCell className="text-right">
+                                  <Input
+                                    type="number"
+                                    step="0.1"
+                                    className="w-20 h-8 text-right"
+                                    value={perdasPorProduto[p.tipo_produto_id] ?? p.perda_cobrada_pct}
+                                    onChange={(e) => {
+                                      setPerdasPorProduto({
+                                        ...perdasPorProduto,
+                                        [p.tipo_produto_id]: parseFloat(e.target.value) || 0,
+                                      });
+                                    }}
+                                  />
+                                </TableCell>
+                                <TableCell className="text-right font-medium">{formatWeight(p.peso_saida_estimado)}</TableCell>
+                              </TableRow>
+                            ))}
+                            <TableRow className="bg-muted/50 font-bold">
+                              <TableCell>TOTAL</TableCell>
+                              <TableCell className="text-right">{formatWeight(pesoTotalEntrada)}</TableCell>
+                              <TableCell className="text-right">-</TableCell>
+                              <TableCell className="text-right">-</TableCell>
+                              <TableCell className="text-right">{formatWeight(pesoSaidaEstimado)}</TableCell>
+                            </TableRow>
+                          </TableBody>
+                        </Table>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Resumo por Documento de Entrada */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        Documentos de Entrada (Base Taxa Financeira)
+                      </CardTitle>
+                      <CardDescription>Taxa financeira calculada por documento, não por TKT</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      {documentosEntrada.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          Selecione lotes na aba anterior para ver os documentos
+                        </p>
+                      ) : (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Documento</TableHead>
+                              <TableHead className="text-right">Qtd TKTs</TableHead>
+                              <TableHead className="text-right">Valor Total</TableHead>
+                              <TableHead className="text-right">Taxa ({taxaFinanceiraGlobal}%)</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {documentosEntrada.map((d) => (
+                              <TableRow key={d.entrada_id}>
+                                <TableCell className="font-mono font-medium">{d.codigo_entrada}</TableCell>
+                                <TableCell className="text-right">{d.sublotes_count}</TableCell>
+                                <TableCell className="text-right">{formatCurrency(d.valor_total)}</TableCell>
+                                <TableCell className="text-right text-amber-600 font-medium">{formatCurrency(d.taxa_financeira_valor)}</TableCell>
+                              </TableRow>
+                            ))}
+                            <TableRow className="bg-muted/50 font-bold">
+                              <TableCell>TOTAL</TableCell>
+                              <TableCell className="text-right">{selectedLotes.length}</TableCell>
+                              <TableCell className="text-right">{formatCurrency(valorTotalDocumentos)}</TableCell>
+                              <TableCell className="text-right text-amber-600">{formatCurrency(custoFinanceiro)}</TableCell>
+                            </TableRow>
+                          </TableBody>
+                        </Table>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Lucro na Perda */}
+                  <Card className="bg-muted/30">
+                    <CardContent className="pt-4">
                       <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label>Perda Real (%)</Label>
-                          <Input type="number" step="0.01" value={formData.perda_real_pct} onChange={(e) => setFormData({ ...formData, perda_real_pct: parseFloat(e.target.value) || 0 })} />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Perda Cobrada do Cliente (%)</Label>
-                          <Input type="number" step="0.01" value={formData.perda_cobrada_pct} onChange={(e) => setFormData({ ...formData, perda_cobrada_pct: parseFloat(e.target.value) || 0 })} />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4 p-3 bg-muted rounded-lg">
                         <div>
                           <p className="text-sm text-muted-foreground">Peso Saída Estimado</p>
-                          <p className="font-bold">{formatWeight(pesoSaidaEstimado)}</p>
+                          <p className="font-bold text-lg">{formatWeight(pesoSaidaEstimado)}</p>
                         </div>
                         <div>
-                          <p className="text-sm text-muted-foreground">Lucro IBRAC na Perda</p>
-                          <p className={`font-bold ${lucroPerda > 0 ? "text-success" : "text-destructive"}`}>{lucroPerda.toFixed(2)}%</p>
+                          <p className="text-sm text-muted-foreground">Lucro Médio na Perda</p>
+                          <p className={`font-bold text-lg ${lucroPerda > 0 ? "text-success" : "text-destructive"}`}>
+                            {lucroPerda.toFixed(2)}%
+                          </p>
                         </div>
                       </div>
                     </CardContent>
@@ -1028,13 +1236,13 @@ export default function Beneficiamento() {
 
                   <Card>
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-base flex items-center gap-2"><DollarSign className="h-4 w-4" />Taxa Financeira</CardTitle>
+                      <CardTitle className="text-base flex items-center gap-2"><DollarSign className="h-4 w-4" />Taxa Financeira Global</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2">
                       <div className="space-y-2">
                         <Label>Taxa Financeira (%)</Label>
-                        <Input type="number" step="0.01" value={formData.taxa_financeira_pct} onChange={(e) => setFormData({ ...formData, taxa_financeira_pct: parseFloat(e.target.value) || 0 })} />
-                        <p className="text-xs text-muted-foreground">Sobre valor de entrada ({formatCurrency(valorTotalEntrada)}) = {formatCurrency(custoFinanceiro)}</p>
+                        <Input type="number" step="0.01" value={taxaFinanceiraGlobal} onChange={(e) => setTaxaFinanceiraGlobal(parseFloat(e.target.value) || 0)} />
+                        <p className="text-xs text-muted-foreground">Aplicada sobre cada documento de entrada ({formatCurrency(valorTotalDocumentos)}) = {formatCurrency(custoFinanceiro)}</p>
                       </div>
                     </CardContent>
                   </Card>
@@ -1062,7 +1270,7 @@ export default function Beneficiamento() {
                         <span>{formatCurrency(custoTotalKg)}</span>
                       </div>
                       <div className="border-t pt-2 flex justify-between text-sm">
-                        <span>+ Taxa Financeira ({formData.taxa_financeira_pct}%):</span>
+                        <span>+ Taxa Financeira ({taxaFinanceiraGlobal}% sobre documentos):</span>
                         <span>{formatCurrency(custoFinanceiro)}</span>
                       </div>
                       <div className="border-t pt-2 flex justify-between text-lg">

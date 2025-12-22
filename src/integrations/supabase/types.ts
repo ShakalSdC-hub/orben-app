@@ -116,6 +116,51 @@ export type Database = {
         }
         Relationships: []
       }
+      beneficiamento_entradas: {
+        Row: {
+          beneficiamento_id: string
+          created_at: string | null
+          entrada_id: string | null
+          id: string
+          taxa_financeira_pct: number | null
+          taxa_financeira_valor: number | null
+          valor_documento: number
+        }
+        Insert: {
+          beneficiamento_id: string
+          created_at?: string | null
+          entrada_id?: string | null
+          id?: string
+          taxa_financeira_pct?: number | null
+          taxa_financeira_valor?: number | null
+          valor_documento?: number
+        }
+        Update: {
+          beneficiamento_id?: string
+          created_at?: string | null
+          entrada_id?: string | null
+          id?: string
+          taxa_financeira_pct?: number | null
+          taxa_financeira_valor?: number | null
+          valor_documento?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "beneficiamento_entradas_beneficiamento_id_fkey"
+            columns: ["beneficiamento_id"]
+            isOneToOne: false
+            referencedRelation: "beneficiamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "beneficiamento_entradas_entrada_id_fkey"
+            columns: ["entrada_id"]
+            isOneToOne: false
+            referencedRelation: "entradas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       beneficiamento_itens_entrada: {
         Row: {
           beneficiamento_id: string | null
@@ -124,6 +169,7 @@ export type Database = {
           id: string
           peso_kg: number
           sublote_id: string | null
+          tipo_produto_id: string | null
         }
         Insert: {
           beneficiamento_id?: string | null
@@ -132,6 +178,7 @@ export type Database = {
           id?: string
           peso_kg: number
           sublote_id?: string | null
+          tipo_produto_id?: string | null
         }
         Update: {
           beneficiamento_id?: string | null
@@ -140,6 +187,7 @@ export type Database = {
           id?: string
           peso_kg?: number
           sublote_id?: string | null
+          tipo_produto_id?: string | null
         }
         Relationships: [
           {
@@ -154,6 +202,13 @@ export type Database = {
             columns: ["sublote_id"]
             isOneToOne: false
             referencedRelation: "sublotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "beneficiamento_itens_entrada_tipo_produto_id_fkey"
+            columns: ["tipo_produto_id"]
+            isOneToOne: false
+            referencedRelation: "tipos_produto"
             referencedColumns: ["id"]
           },
         ]
@@ -213,6 +268,54 @@ export type Database = {
           },
           {
             foreignKeyName: "beneficiamento_itens_saida_tipo_produto_id_fkey"
+            columns: ["tipo_produto_id"]
+            isOneToOne: false
+            referencedRelation: "tipos_produto"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      beneficiamento_produtos: {
+        Row: {
+          beneficiamento_id: string
+          created_at: string | null
+          id: string
+          perda_cobrada_pct: number | null
+          perda_padrao_pct: number | null
+          peso_entrada_kg: number
+          peso_saida_estimado_kg: number | null
+          tipo_produto_id: string | null
+        }
+        Insert: {
+          beneficiamento_id: string
+          created_at?: string | null
+          id?: string
+          perda_cobrada_pct?: number | null
+          perda_padrao_pct?: number | null
+          peso_entrada_kg?: number
+          peso_saida_estimado_kg?: number | null
+          tipo_produto_id?: string | null
+        }
+        Update: {
+          beneficiamento_id?: string
+          created_at?: string | null
+          id?: string
+          perda_cobrada_pct?: number | null
+          perda_padrao_pct?: number | null
+          peso_entrada_kg?: number
+          peso_saida_estimado_kg?: number | null
+          tipo_produto_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "beneficiamento_produtos_beneficiamento_id_fkey"
+            columns: ["beneficiamento_id"]
+            isOneToOne: false
+            referencedRelation: "beneficiamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "beneficiamento_produtos_tipo_produto_id_fkey"
             columns: ["tipo_produto_id"]
             isOneToOne: false
             referencedRelation: "tipos_produto"
