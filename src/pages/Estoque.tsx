@@ -923,11 +923,13 @@ export default function Estoque() {
         />
 
         {/* Rastreabilidade de Custo Dialog */}
-        <CustoRastreabilidade
-          sublote={selectedLoteRastreio}
-          isOpen={!!selectedLoteRastreio}
-          onClose={() => setSelectedLoteRastreio(null)}
-        />
+        {selectedLoteRastreio && (
+          <CustoRastreabilidade
+            sublote={selectedLoteRastreio}
+            isOpen={!!selectedLoteRastreio}
+            onClose={() => setSelectedLoteRastreio(null)}
+          />
+        )}
       </div>
     </MainLayout>
   );
