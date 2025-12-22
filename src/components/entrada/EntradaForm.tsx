@@ -201,6 +201,11 @@ export function EntradaForm({ onClose }: EntradaFormProps) {
     const valor = parseFloat(v.valor_unitario) || 0;
     return acc + (peso * valor);
   }, 0);
+  
+  // Diferença entre peso NF e peso físico total
+  const pesoNfKg = parseFloat(formData.peso_nf_kg) || 0;
+  const diferencaPeso = pesoNfKg > 0 ? pesoNfKg - totalPeso : 0;
+  const diferencaPesoPct = pesoNfKg > 0 ? ((diferencaPeso / pesoNfKg) * 100) : 0;
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
@@ -226,7 +231,6 @@ export function EntradaForm({ onClose }: EntradaFormProps) {
           peso_bruto_kg: totalPeso,
           peso_liquido_kg: totalPeso,
           peso_nf_kg: parseFloat(formData.peso_nf_kg) || null,
-          fornecedor_id: null,
           parceiro_id: formData.parceiro_id || null,
           dono_id: formData.dono_id || null,
           tipo_entrada_id: formData.tipo_entrada_id || null,
@@ -556,6 +560,22 @@ export function EntradaForm({ onClose }: EntradaFormProps) {
                     <TableCell className="text-right">{totalValor > 0 ? formatCurrency(totalValor) : "—"}</TableCell>
                     <TableCell></TableCell>
                   </TableRow>
+                  {pesoNfKg > 0 && (
+                    <TableRow className={`font-medium ${Math.abs(diferencaPeso) > 0.1 ? 'bg-warning/10' : 'bg-success/10'}`}>
+                      <TableCell colSpan={2}>
+                        Diferença NF vs Físico
+                      </TableCell>
+                      <TableCell className={`text-right ${diferencaPeso > 0 ? 'text-warning' : diferencaPeso < 0 ? 'text-destructive' : 'text-success'}`}>
+                        {diferencaPeso > 0 ? '+' : ''}{diferencaPeso.toLocaleString("pt-BR", { maximumFractionDigits: 2 })} kg
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">
+                        ({diferencaPesoPct > 0 ? '+' : ''}{diferencaPesoPct.toFixed(2)}%)
+                      </TableCell>
+                      <TableCell colSpan={2} className="text-xs text-muted-foreground">
+                        NF: {pesoNfKg.toLocaleString("pt-BR")} kg
+                      </TableCell>
+                    </TableRow>
+                  )}
                 </TableBody>
               </Table>
             </div>
