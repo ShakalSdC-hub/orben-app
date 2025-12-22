@@ -103,7 +103,7 @@ export default function Beneficiamento() {
   const [finalizeBeneficiamento, setFinalizeBeneficiamento] = useState<any | null>(null);
   const [editBeneficiamento, setEditBeneficiamento] = useState<any | null>(null);
   const [viewBeneficiamento, setViewBeneficiamento] = useState<any | null>(null);
-  const [finalizeData, setFinalizeData] = useState({ peso_saida_real: 0, local_destino_id: "", tipo_produto_saida_id: "" });
+  const [finalizeData, setFinalizeData] = useState({ peso_saida_real: 0, local_destino_id: "", tipo_produto_saida_id: "", lme_referencia_kg: 0 });
   const { exportToExcel, formatBeneficiamentoReport, printReport } = useExportReport();
 
   // Estado para perdas por produto - chave é o CÓDIGO do produto
@@ -327,6 +327,20 @@ export default function Beneficiamento() {
       const { data, error } = await supabase
         .from("saida_itens")
         .select("sublote_id");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Query para buscar histórico LME para seleção
+  const { data: historicoLme = [] } = useQuery({
+    queryKey: ["historico_lme_beneficiamento"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("historico_lme")
+        .select("*")
+        .order("data", { ascending: false })
+        .limit(30);
       if (error) throw error;
       return data;
     },
@@ -673,11 +687,12 @@ export default function Beneficiamento() {
 
   // Mutation para finalizar beneficiamento
   const finalizeMutation = useMutation({
-    mutationFn: async ({ beneficiamentoId, pesoSaida, localDestinoId, tipoProdutoSaidaId }: { 
+    mutationFn: async ({ beneficiamentoId, pesoSaida, localDestinoId, tipoProdutoSaidaId, lmeReferenciaKg }: { 
       beneficiamentoId: string; 
       pesoSaida: number;
       localDestinoId: string;
       tipoProdutoSaidaId: string;
+      lmeReferenciaKg: number;
     }) => {
       // Buscar itens de entrada para obter os sublotes e criar saída
       const { data: itensEntrada } = await supabase
@@ -781,7 +796,8 @@ export default function Beneficiamento() {
         .update({ 
           status: "finalizado", 
           data_fim: new Date().toISOString().split("T")[0],
-          peso_saida_kg: pesoSaida
+          peso_saida_kg: pesoSaida,
+          lme_referencia_kg: lmeReferenciaKg > 0 ? lmeReferenciaKg : null
         })
         .eq("id", beneficiamentoId);
 
@@ -793,7 +809,7 @@ export default function Beneficiamento() {
       queryClient.invalidateQueries({ queryKey: ["sublotes"] });
       toast({ title: "Beneficiamento finalizado com sucesso!", description: "Material retornado ao estoque." });
       setFinalizeBeneficiamento(null);
-      setFinalizeData({ peso_saida_real: 0, local_destino_id: "", tipo_produto_saida_id: "" });
+      setFinalizeData({ peso_saida_real: 0, local_destino_id: "", tipo_produto_saida_id: "", lme_referencia_kg: 0 });
     },
     onError: (error) => {
       toast({ title: "Erro ao finalizar", description: error.message, variant: "destructive" });
@@ -1541,7 +1557,8 @@ export default function Beneficiamento() {
                                     setFinalizeData({ 
                                       peso_saida_real: b.peso_saida_kg || b.peso_entrada_kg * 0.97,
                                       local_destino_id: localIbrac?.id || "",
-                                      tipo_produto_saida_id: tipoProdutoId
+                                      tipo_produto_saida_id: tipoProdutoId,
+                                      lme_referencia_kg: 0
                                     });
                                   }}
                                   className="text-success focus:text-success"
@@ -1725,6 +1742,31 @@ export default function Beneficiamento() {
                 </Select>
               </div>
 
+              <div className="space-y-2">
+                <Label>LME de Referência (R$/kg)</Label>
+                <Select 
+                  value={finalizeData.lme_referencia_kg > 0 ? String(finalizeData.lme_referencia_kg) : ""} 
+                  onValueChange={(v) => setFinalizeData({ ...finalizeData, lme_referencia_kg: parseFloat(v) || 0 })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione a LME de referência..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {historicoLme.map((lme) => (
+                      <SelectItem key={lme.id} value={String(lme.cobre_brl_kg || 0)}>
+                        {format(new Date(lme.data + "T00:00:00"), "dd/MM/yyyy", { locale: ptBR })} - {formatCurrency(lme.cobre_brl_kg || 0)}/kg
+                        {lme.is_media_semanal && " (Média Semanal)"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {finalizeData.lme_referencia_kg > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    LME selecionada: {formatCurrency(finalizeData.lme_referencia_kg)}/kg
+                  </p>
+                )}
+              </div>
+
               {/* Prévia do Cálculo de Custo */}
               {finalizeBeneficiamento?.id && finalizeData.peso_saida_real > 0 && (
                 <CustoCalculoPreview 
@@ -1744,6 +1786,7 @@ export default function Beneficiamento() {
                   pesoSaida: finalizeData.peso_saida_real,
                   localDestinoId: finalizeData.local_destino_id,
                   tipoProdutoSaidaId: finalizeData.tipo_produto_saida_id,
+                  lmeReferenciaKg: finalizeData.lme_referencia_kg,
                 })}
                 disabled={finalizeMutation.isPending || !finalizeData.local_destino_id || !finalizeData.tipo_produto_saida_id || finalizeData.peso_saida_real <= 0}
                 className="bg-success hover:bg-success/90 text-success-foreground"
