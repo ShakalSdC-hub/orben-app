@@ -337,6 +337,8 @@ export type Database = {
           fornecedor_terceiro_id: string | null
           id: string
           lme_referencia_kg: number | null
+          lucro_perda_kg: number | null
+          lucro_perda_valor: number | null
           motorista: string | null
           observacoes: string | null
           perda_cobrada_pct: number | null
@@ -364,6 +366,8 @@ export type Database = {
           fornecedor_terceiro_id?: string | null
           id?: string
           lme_referencia_kg?: number | null
+          lucro_perda_kg?: number | null
+          lucro_perda_valor?: number | null
           motorista?: string | null
           observacoes?: string | null
           perda_cobrada_pct?: number | null
@@ -391,6 +395,8 @@ export type Database = {
           fornecedor_terceiro_id?: string | null
           id?: string
           lme_referencia_kg?: number | null
+          lucro_perda_kg?: number | null
+          lucro_perda_valor?: number | null
           motorista?: string | null
           observacoes?: string | null
           perda_cobrada_pct?: number | null
@@ -514,6 +520,7 @@ export type Database = {
           documento: string | null
           email: string | null
           id: string
+          is_ibrac: boolean | null
           nome: string
           taxa_operacao_pct: number | null
           telefone: string | null
@@ -525,6 +532,7 @@ export type Database = {
           documento?: string | null
           email?: string | null
           id?: string
+          is_ibrac?: boolean | null
           nome: string
           taxa_operacao_pct?: number | null
           telefone?: string | null
@@ -536,6 +544,7 @@ export type Database = {
           documento?: string | null
           email?: string | null
           id?: string
+          is_ibrac?: boolean | null
           nome?: string
           taxa_operacao_pct?: number | null
           telefone?: string | null
@@ -1033,8 +1042,10 @@ export type Database = {
       }
       saidas: {
         Row: {
+          cenario_operacao: string | null
           cliente_id: string | null
           codigo: string
+          comissao_ibrac: number | null
           created_at: string
           created_by: string | null
           custos_cobrados: number | null
@@ -1045,6 +1056,7 @@ export type Database = {
           observacoes: string | null
           peso_total_kg: number
           placa_veiculo: string | null
+          resultado_liquido_dono: number | null
           status: string | null
           tipo_saida: string
           tipo_saida_id: string | null
@@ -1055,8 +1067,10 @@ export type Database = {
           valor_unitario: number | null
         }
         Insert: {
+          cenario_operacao?: string | null
           cliente_id?: string | null
           codigo: string
+          comissao_ibrac?: number | null
           created_at?: string
           created_by?: string | null
           custos_cobrados?: number | null
@@ -1067,6 +1081,7 @@ export type Database = {
           observacoes?: string | null
           peso_total_kg: number
           placa_veiculo?: string | null
+          resultado_liquido_dono?: number | null
           status?: string | null
           tipo_saida: string
           tipo_saida_id?: string | null
@@ -1077,8 +1092,10 @@ export type Database = {
           valor_unitario?: number | null
         }
         Update: {
+          cenario_operacao?: string | null
           cliente_id?: string | null
           codigo?: string
+          comissao_ibrac?: number | null
           created_at?: string
           created_by?: string | null
           custos_cobrados?: number | null
@@ -1089,6 +1106,7 @@ export type Database = {
           observacoes?: string | null
           peso_total_kg?: number
           placa_veiculo?: string | null
+          resultado_liquido_dono?: number | null
           status?: string | null
           tipo_saida?: string
           tipo_saida_id?: string | null
