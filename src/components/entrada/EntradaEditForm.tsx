@@ -26,7 +26,7 @@ export function EntradaEditForm({ entrada, onClose, readOnly = false }: EntradaE
   const [formData, setFormData] = useState({
     tipo_entrada_id: entrada.tipo_entrada_id || "",
     parceiro_id: entrada.parceiro_id || "",
-    dono_id: entrada.dono_id || "",
+    dono_id: entrada.dono_id || "ibrac",
     nota_fiscal: entrada.nota_fiscal || "",
     data_entrada: entrada.data_entrada || format(new Date(), "yyyy-MM-dd"),
     motorista: entrada.motorista || "",
@@ -94,7 +94,7 @@ export function EntradaEditForm({ entrada, onClose, readOnly = false }: EntradaE
         .update({
           tipo_entrada_id: formData.tipo_entrada_id || null,
           parceiro_id: formData.parceiro_id || null,
-          dono_id: formData.dono_id || null,
+          dono_id: formData.dono_id === "ibrac" ? null : formData.dono_id || null,
           nota_fiscal: formData.nota_fiscal || null,
           data_entrada: formData.data_entrada,
           motorista: formData.motorista || null,
@@ -112,7 +112,7 @@ export function EntradaEditForm({ entrada, onClose, readOnly = false }: EntradaE
       if (formData.dono_id !== entrada.dono_id) {
         await supabase
           .from("sublotes")
-          .update({ dono_id: formData.dono_id || null })
+          .update({ dono_id: formData.dono_id === "ibrac" ? null : formData.dono_id || null })
           .eq("entrada_id", entrada.id);
       }
     },
@@ -210,7 +210,7 @@ export function EntradaEditForm({ entrada, onClose, readOnly = false }: EntradaE
                   <SelectValue placeholder="IBRAC (Próprio)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">IBRAC (Próprio)</SelectItem>
+                  <SelectItem value="ibrac">IBRAC (Próprio)</SelectItem>
                   {donos?.map((d) => (
                     <SelectItem key={d.id} value={d.id}>{d.nome}</SelectItem>
                   ))}
