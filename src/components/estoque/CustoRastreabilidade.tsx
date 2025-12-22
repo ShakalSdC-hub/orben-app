@@ -1,13 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Receipt, Truck, Users, Percent, Calculator, Package, ArrowRight, History, Factory } from "lucide-react";
+import { Receipt, Truck, Users, Percent, Calculator, Package, History, Factory, FileSpreadsheet, Printer, Building2 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import * as XLSX from "xlsx";
 
 interface CustoRastreabilidadeProps {
   sublote: any;
@@ -43,7 +45,8 @@ export function CustoRastreabilidade({ sublote, isOpen, onClose }: CustoRastreab
             custo_mo_ibrac,
             custo_mo_terceiro,
             processo:processos(nome),
-            fornecedor_terceiro:parceiros!beneficiamentos_fornecedor_terceiro_id_fkey(razao_social)
+            fornecedor_terceiro:parceiros!beneficiamentos_fornecedor_terceiro_id_fkey(razao_social),
+            transportadora:parceiros!beneficiamentos_transportadora_id_fkey(razao_social)
           )
         `)
         .eq("sublote_gerado_id", sublote?.id)
@@ -64,7 +67,14 @@ export function CustoRastreabilidade({ sublote, isOpen, onClose }: CustoRastreab
           taxa_financeira_valor,
           taxa_financeira_pct,
           valor_documento,
-          entrada:entradas(codigo, data_entrada, valor_total, valor_unitario)
+          entrada:entradas(
+            codigo, 
+            data_entrada, 
+            valor_total, 
+            valor_unitario,
+            parceiro:parceiros!entradas_parceiro_id_fkey(razao_social),
+            dono:donos_material(nome)
+          )
         `)
         .eq("beneficiamento_id", beneficiamentoSaida?.beneficiamento_id);
       if (error) throw error;
@@ -82,7 +92,15 @@ export function CustoRastreabilidade({ sublote, isOpen, onClose }: CustoRastreab
         .select(`
           peso_kg,
           custo_unitario,
-          sublote:sublotes(codigo, custo_unitario_total),
+          sublote:sublotes(
+            codigo, 
+            custo_unitario_total,
+            dono:donos_material(nome),
+            entrada:entradas(
+              codigo,
+              parceiro:parceiros!entradas_parceiro_id_fkey(razao_social)
+            )
+          ),
           tipo_produto:tipos_produto(nome)
         `)
         .eq("beneficiamento_id", beneficiamentoSaida?.beneficiamento_id);
@@ -101,7 +119,8 @@ export function CustoRastreabilidade({ sublote, isOpen, onClose }: CustoRastreab
         .select(`
           *,
           parceiro:parceiros!entradas_parceiro_id_fkey(razao_social),
-          tipo_produto:tipos_produto(nome)
+          tipo_produto:tipos_produto(nome),
+          dono:donos_material(nome)
         `)
         .eq("id", sublote?.entrada_id)
         .maybeSingle();
@@ -124,6 +143,223 @@ export function CustoRastreabilidade({ sublote, isOpen, onClose }: CustoRastreab
   const custoTotalGeral = valorDocumentos + custosAdicionais;
 
   const isFromBeneficiamento = !!beneficiamentoSaida;
+
+  // Funções de exportação
+  const exportToExcel = () => {
+    const data = [
+      { "Campo": "Código do Lote", "Valor": sublote.codigo },
+      { "Campo": "Peso", "Valor": `${sublote.peso_kg} kg` },
+      { "Campo": "Produto", "Valor": sublote.tipo_produto?.nome || "-" },
+      { "Campo": "Dono", "Valor": sublote.dono?.nome || "IBRAC" },
+      { "Campo": "Custo Unitário", "Valor": sublote.custo_unitario_total || 0 },
+      { "Campo": "", "Valor": "" },
+    ];
+
+    if (isFromBeneficiamento && ben) {
+      data.push(
+        { "Campo": "--- ORIGEM: BENEFICIAMENTO ---", "Valor": "" },
+        { "Campo": "Código Beneficiamento", "Valor": ben.codigo },
+        { "Campo": "Processo", "Valor": ben.processo?.nome || "-" },
+        { "Campo": "Terceiro", "Valor": ben.fornecedor_terceiro?.razao_social || "IBRAC" },
+        { "Campo": "Período", "Valor": `${ben.data_inicio ? format(new Date(ben.data_inicio), "dd/MM/yyyy") : "-"} → ${ben.data_fim ? format(new Date(ben.data_fim), "dd/MM/yyyy") : "-"}` },
+        { "Campo": "", "Valor": "" },
+        { "Campo": "--- COMPOSIÇÃO DO CUSTO ---", "Valor": "" },
+        { "Campo": "Valor dos Documentos", "Valor": valorDocumentos },
+        { "Campo": "Frete Ida", "Valor": custoFreteIda },
+        { "Campo": "Frete Volta", "Valor": custoFreteVolta },
+        { "Campo": "MO IBRAC", "Valor": custoMoIbrac },
+        { "Campo": "MO Terceiro", "Valor": custoMoTerceiro },
+        { "Campo": "Custo Financeiro", "Valor": custoFinanceiro },
+        { "Campo": "Custos Adicionais", "Valor": custosAdicionais },
+        { "Campo": "CUSTO TOTAL", "Valor": custoTotalGeral },
+        { "Campo": "Peso de Saída", "Valor": `${ben.peso_saida_kg || 0} kg` },
+        { "Campo": "CUSTO UNITÁRIO FINAL", "Valor": sublote.custo_unitario_total || 0 }
+      );
+    } else if (entradaOriginal) {
+      data.push(
+        { "Campo": "--- ORIGEM: ENTRADA DIRETA ---", "Valor": "" },
+        { "Campo": "Código Entrada", "Valor": entradaOriginal.codigo },
+        { "Campo": "Data Entrada", "Valor": format(new Date(entradaOriginal.data_entrada), "dd/MM/yyyy") },
+        { "Campo": "Parceiro/Fornecedor", "Valor": entradaOriginal.parceiro?.razao_social || "-" },
+        { "Campo": "Dono", "Valor": entradaOriginal.dono?.nome || "IBRAC" },
+        { "Campo": "Valor Unitário", "Valor": entradaOriginal.valor_unitario || 0 },
+        { "Campo": "Valor Total Documento", "Valor": entradaOriginal.valor_total || 0 }
+      );
+    }
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Rastreabilidade");
+    XLSX.writeFile(workbook, `rastreabilidade_${sublote.codigo}_${format(new Date(), "yyyyMMdd")}.xlsx`);
+  };
+
+  const printReport = () => {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+
+    let sublotesHtml = "";
+    if (itensEntrada && itensEntrada.length > 0) {
+      sublotesHtml = `
+        <h3>Sublotes de Entrada Consumidos</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Produto</th>
+              <th>Dono</th>
+              <th>Peso</th>
+              <th>Custo Unit.</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itensEntrada.map((item: any) => `
+              <tr>
+                <td>${(item.sublote as any)?.codigo || "-"}</td>
+                <td>${(item.tipo_produto as any)?.nome || "-"}</td>
+                <td>${(item.sublote as any)?.dono?.nome || "IBRAC"}</td>
+                <td style="text-align: right">${formatWeight(item.peso_kg)}</td>
+                <td style="text-align: right">${formatCurrency((item.sublote as any)?.custo_unitario_total || 0)}/kg</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+    }
+
+    let documentosHtml = "";
+    if (benefEntradas && benefEntradas.length > 0) {
+      documentosHtml = `
+        <h3>Documentos de Entrada</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>Código</th>
+              <th>Parceiro</th>
+              <th>Dono</th>
+              <th>Valor</th>
+              <th>Taxa Financeira</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${benefEntradas.map((doc: any) => `
+              <tr>
+                <td>${(doc.entrada as any)?.codigo || "-"}</td>
+                <td>${(doc.entrada as any)?.parceiro?.razao_social || "-"}</td>
+                <td>${(doc.entrada as any)?.dono?.nome || "IBRAC"}</td>
+                <td style="text-align: right">${formatCurrency(doc.valor_documento || 0)}</td>
+                <td style="text-align: right">${formatCurrency(doc.taxa_financeira_valor || 0)}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+    }
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Rastreabilidade de Custo - ${sublote.codigo}</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; font-size: 12px; }
+          h1 { color: #333; border-bottom: 2px solid #B87333; padding-bottom: 10px; font-size: 18px; }
+          h2 { color: #B87333; font-size: 14px; margin-top: 20px; }
+          h3 { color: #666; font-size: 12px; margin-top: 15px; }
+          .info { color: #666; margin-bottom: 20px; font-size: 10px; }
+          table { border-collapse: collapse; width: 100%; margin-top: 10px; margin-bottom: 15px; }
+          th { background-color: #B87333; color: white; padding: 8px; text-align: left; font-size: 11px; }
+          td { border: 1px solid #ddd; padding: 6px; }
+          tr:nth-child(even) { background-color: #f9f9f9; }
+          .section { border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; border-radius: 8px; }
+          .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+          .label { color: #666; font-size: 10px; }
+          .value { font-weight: bold; }
+          .highlight { background: #FDF6E9; padding: 10px; border-radius: 5px; margin-top: 10px; }
+          .total { font-size: 14px; color: #B87333; }
+          @media print { body { margin: 0; } }
+        </style>
+      </head>
+      <body>
+        <h1>IBRAC - Rastreabilidade de Custo</h1>
+        <p class="info">Lote: ${sublote.codigo} | Gerado em: ${format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</p>
+        
+        <div class="section">
+          <h2>Informações do Lote</h2>
+          <div class="grid">
+            <div><span class="label">Código:</span><br/><span class="value">${sublote.codigo}</span></div>
+            <div><span class="label">Peso:</span><br/><span class="value">${formatWeight(sublote.peso_kg)}</span></div>
+            <div><span class="label">Produto:</span><br/><span class="value">${sublote.tipo_produto?.nome || "-"}</span></div>
+            <div><span class="label">Dono:</span><br/><span class="value">${sublote.dono?.nome || "IBRAC"}</span></div>
+          </div>
+          <div class="highlight">
+            <span class="label">Custo Unitário:</span><br/>
+            <span class="value total">${formatCurrency(sublote.custo_unitario_total || 0)}/kg</span>
+          </div>
+        </div>
+        
+        ${isFromBeneficiamento && ben ? `
+          <div class="section">
+            <h2>Origem - Beneficiamento</h2>
+            <div class="grid">
+              <div><span class="label">Código:</span><br/><span class="value">${ben.codigo}</span></div>
+              <div><span class="label">Processo:</span><br/><span class="value">${ben.processo?.nome || "-"}</span></div>
+              <div><span class="label">Período:</span><br/><span class="value">${ben.data_inicio ? format(new Date(ben.data_inicio), "dd/MM/yyyy") : "-"} → ${ben.data_fim ? format(new Date(ben.data_fim), "dd/MM/yyyy") : "-"}</span></div>
+              <div><span class="label">Terceiro:</span><br/><span class="value">${ben.fornecedor_terceiro?.razao_social || "IBRAC"}</span></div>
+            </div>
+          </div>
+          
+          ${sublotesHtml}
+          ${documentosHtml}
+          
+          <div class="section">
+            <h2>Composição do Custo</h2>
+            <table>
+              <tr><td>Valor dos Documentos</td><td style="text-align: right">${formatCurrency(valorDocumentos)}</td></tr>
+              <tr><td>Frete Ida</td><td style="text-align: right">${formatCurrency(custoFreteIda)}</td></tr>
+              <tr><td>Frete Volta</td><td style="text-align: right">${formatCurrency(custoFreteVolta)}</td></tr>
+              <tr><td>MO IBRAC</td><td style="text-align: right">${formatCurrency(custoMoIbrac)}</td></tr>
+              <tr><td>MO Terceiro</td><td style="text-align: right">${formatCurrency(custoMoTerceiro)}</td></tr>
+              <tr><td>Custo Financeiro</td><td style="text-align: right">${formatCurrency(custoFinanceiro)}</td></tr>
+              <tr style="border-top: 2px solid #B87333"><td><strong>Custos Adicionais</strong></td><td style="text-align: right"><strong>${formatCurrency(custosAdicionais)}</strong></td></tr>
+              <tr style="background: #FDF6E9"><td><strong>CUSTO TOTAL</strong></td><td style="text-align: right"><strong class="total">${formatCurrency(custoTotalGeral)}</strong></td></tr>
+            </table>
+            <div class="highlight">
+              <div class="grid">
+                <div><span class="label">Peso de Saída:</span><br/><span class="value">${formatWeight(ben.peso_saida_kg || 0)}</span></div>
+                <div><span class="label">Custo Unitário Final:</span><br/><span class="value total">${formatCurrency(sublote.custo_unitario_total || 0)}/kg</span></div>
+              </div>
+            </div>
+          </div>
+        ` : entradaOriginal ? `
+          <div class="section">
+            <h2>Origem - Entrada Direta</h2>
+            <div class="grid">
+              <div><span class="label">Documento:</span><br/><span class="value">${entradaOriginal.codigo}</span></div>
+              <div><span class="label">Data:</span><br/><span class="value">${format(new Date(entradaOriginal.data_entrada), "dd/MM/yyyy")}</span></div>
+              <div><span class="label">Parceiro/Fornecedor:</span><br/><span class="value">${entradaOriginal.parceiro?.razao_social || "-"}</span></div>
+              <div><span class="label">Dono:</span><br/><span class="value">${entradaOriginal.dono?.nome || "IBRAC"}</span></div>
+            </div>
+            <div class="highlight">
+              <div class="grid">
+                <div><span class="label">Valor Unitário:</span><br/><span class="value">${formatCurrency(entradaOriginal.valor_unitario || 0)}/kg</span></div>
+                <div><span class="label">Valor Total:</span><br/><span class="value total">${formatCurrency(entradaOriginal.valor_total || 0)}</span></div>
+              </div>
+            </div>
+          </div>
+        ` : `
+          <div class="section">
+            <p>Não há informações de rastreabilidade disponíveis para este lote.</p>
+          </div>
+        `}
+        
+        <script>window.onload = function() { window.print(); }</script>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -161,6 +397,17 @@ export function CustoRastreabilidade({ sublote, isOpen, onClose }: CustoRastreab
                 <span className="text-muted-foreground">Custo Unitário:</span>
                 <p className="font-bold text-primary">{formatCurrency(sublote.custo_unitario_total || 0)}/kg</p>
               </div>
+              <div>
+                <span className="text-muted-foreground">Dono:</span>
+                <p className="font-medium flex items-center gap-1">
+                  <Building2 className="h-3 w-3" />
+                  {sublote.dono?.nome || "IBRAC"}
+                </p>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Valor Total:</span>
+                <p className="font-medium">{formatCurrency((sublote.peso_kg || 0) * (sublote.custo_unitario_total || 0))}</p>
+              </div>
             </CardContent>
           </Card>
 
@@ -184,8 +431,12 @@ export function CustoRastreabilidade({ sublote, isOpen, onClose }: CustoRastreab
                     <p>{format(new Date(entradaOriginal.data_entrada), "dd/MM/yyyy", { locale: ptBR })}</p>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">Fornecedor:</span>
-                    <p>{entradaOriginal.parceiro?.razao_social || "-"}</p>
+                    <span className="text-muted-foreground">Parceiro/Fornecedor:</span>
+                    <p className="font-medium">{entradaOriginal.parceiro?.razao_social || "-"}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Dono:</span>
+                    <p className="font-medium">{entradaOriginal.dono?.nome || "IBRAC"}</p>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Valor Unitário:</span>
@@ -229,8 +480,14 @@ export function CustoRastreabilidade({ sublote, isOpen, onClose }: CustoRastreab
                     </div>
                     <div>
                       <span className="text-muted-foreground">Terceiro:</span>
-                      <p>{ben.fornecedor_terceiro?.razao_social || "IBRAC"}</p>
+                      <p className="font-medium">{ben.fornecedor_terceiro?.razao_social || "IBRAC"}</p>
                     </div>
+                    {ben.transportadora && (
+                      <div>
+                        <span className="text-muted-foreground">Transportadora:</span>
+                        <p>{ben.transportadora?.razao_social}</p>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -250,6 +507,7 @@ export function CustoRastreabilidade({ sublote, isOpen, onClose }: CustoRastreab
                         <TableRow>
                           <TableHead>Código</TableHead>
                           <TableHead>Produto</TableHead>
+                          <TableHead>Dono</TableHead>
                           <TableHead className="text-right">Peso</TableHead>
                           <TableHead className="text-right">Custo Unit.</TableHead>
                         </TableRow>
@@ -259,6 +517,7 @@ export function CustoRastreabilidade({ sublote, isOpen, onClose }: CustoRastreab
                           <TableRow key={i}>
                             <TableCell className="font-mono">{(item.sublote as any)?.codigo}</TableCell>
                             <TableCell>{(item.tipo_produto as any)?.nome}</TableCell>
+                            <TableCell>{(item.sublote as any)?.dono?.nome || "IBRAC"}</TableCell>
                             <TableCell className="text-right">{formatWeight(item.peso_kg)}</TableCell>
                             <TableCell className="text-right">
                               {formatCurrency((item.sublote as any)?.custo_unitario_total || 0)}/kg
@@ -288,7 +547,12 @@ export function CustoRastreabilidade({ sublote, isOpen, onClose }: CustoRastreab
                     </div>
                     {benefEntradas?.map((doc, i) => (
                       <div key={i} className="flex justify-between pl-5 text-xs">
-                        <span>{(doc.entrada as any)?.codigo}</span>
+                        <div>
+                          <span className="font-mono">{(doc.entrada as any)?.codigo}</span>
+                          <span className="text-muted-foreground ml-2">
+                            ({(doc.entrada as any)?.parceiro?.razao_social || "-"})
+                          </span>
+                        </div>
                         <span>{formatCurrency(doc.valor_documento || 0)}</span>
                       </div>
                     ))}
@@ -380,6 +644,17 @@ export function CustoRastreabilidade({ sublote, isOpen, onClose }: CustoRastreab
             </Card>
           )}
         </div>
+
+        <DialogFooter className="flex-row gap-2 sm:justify-end">
+          <Button variant="outline" size="sm" onClick={exportToExcel}>
+            <FileSpreadsheet className="h-4 w-4 mr-2" />
+            Excel
+          </Button>
+          <Button variant="outline" size="sm" onClick={printReport}>
+            <Printer className="h-4 w-4 mr-2" />
+            Imprimir / PDF
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
