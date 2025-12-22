@@ -17,6 +17,7 @@ import {
   DollarSign,
   Loader2,
   Calendar,
+  BarChart3,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -25,6 +26,7 @@ import { ptBR } from "date-fns/locale";
 import * as XLSX from "xlsx";
 import { toast } from "@/hooks/use-toast";
 import { GlobalFilters } from "@/components/filters/GlobalFilters";
+import { BeneficiamentoConsolidado } from "@/components/relatorios/BeneficiamentoConsolidado";
 
 export default function Relatorios() {
   const [dataInicio, setDataInicio] = useState(
@@ -301,8 +303,12 @@ export default function Relatorios() {
         </Card>
 
         {/* Tabs de Relatórios */}
-        <Tabs defaultValue="entradas" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-4">
+        <Tabs defaultValue="consolidado" className="space-y-4">
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="consolidado" className="flex items-center gap-2">
+              <BarChart3 className="h-4 w-4" />
+              Consolidado
+            </TabsTrigger>
             <TabsTrigger value="entradas" className="flex items-center gap-2">
               <FileInput className="h-4 w-4" />
               Entradas
@@ -320,6 +326,15 @@ export default function Relatorios() {
               Custos
             </TabsTrigger>
           </TabsList>
+
+          {/* BENEFICIAMENTO CONSOLIDADO */}
+          <TabsContent value="consolidado">
+            <BeneficiamentoConsolidado
+              dataInicio={dataInicio}
+              dataFim={dataFim}
+              donoFiltro={donoFiltro || undefined}
+            />
+          </TabsContent>
 
           {/* ENTRADAS */}
           <TabsContent value="entradas">
