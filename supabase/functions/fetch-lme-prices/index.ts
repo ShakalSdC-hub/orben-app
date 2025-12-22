@@ -98,12 +98,11 @@ serve(async (req) => {
     // Initialize Supabase client
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Check if record for today already exists
+    // Check if record for today already exists (sem filtro de is_media_semanal)
     const { data: existing, error: checkError } = await supabase
       .from("historico_lme")
-      .select("id, fonte")
+      .select("id, fonte, is_media_semanal")
       .eq("data", today)
-      .eq("is_media_semanal", false)
       .maybeSingle();
 
     if (checkError) {
@@ -128,6 +127,20 @@ serve(async (req) => {
       );
     }
 
+    // Não sobrescrever médias semanais
+    if (existing?.is_media_semanal === true) {
+      console.log("Registro de média semanal encontrado para hoje, ignorando");
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: "Média semanal já existe para esta data - dados preservados",
+          skipped: true,
+          data: existing,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const recordData = {
       data: today,
       cobre_usd_t: cobreUsdT,
@@ -137,6 +150,8 @@ serve(async (req) => {
       estanho_usd_t: estanhoUsdT,
       niquel_usd_t: niquelUsdT,
       dolar_brl: dolarBrl,
+      cobre_brl_kg: cobreBrlKg,
+      aluminio_brl_kg: aluminioBrlKg,
       is_media_semanal: false,
       fonte: "api",
     };
