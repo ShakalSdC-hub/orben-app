@@ -257,9 +257,20 @@ export default function Estoque() {
     };
   }).filter(t => t.value > 0) || [];
 
-  // Estoque IBRAC (sem dono ou dono null)
-  const estoqueIbrac = sublotes?.filter((s) => !s.dono_id && s.status === "disponivel") || [];
+  // Estoque IBRAC (sem dono OU dono com nome contendo IBRAC/PROPRIO)
+  const isDonoIbrac = (dono: any) => {
+    if (!dono?.nome) return false;
+    const nomeUpper = dono.nome.toUpperCase();
+    return nomeUpper.includes("IBRAC") || nomeUpper.includes("PROPRIO");
+  };
+  
+  const estoqueIbrac = sublotes?.filter((s) => 
+    s.status === "disponivel" && (!s.dono_id || isDonoIbrac(s.dono))
+  ) || [];
   const pesoIbrac = estoqueIbrac.reduce((acc, s) => acc + (s.peso_kg || 0), 0);
+  
+  // Filtrar estatísticas por dono para não mostrar IBRAC duplicado
+  const estatisticasPorDonoFiltrado = estatisticasPorDono.filter(d => !isDonoIbrac(d));
 
   const sublotesDisponiveis = sublotes?.filter(s => s.status === "disponivel") || [];
   const totalEstoque = sublotesDisponiveis.reduce((acc, s) => acc + (s.peso_kg || 0), 0);
@@ -452,7 +463,7 @@ export default function Estoque() {
               <p className="text-lg font-bold">{formatWeight(pesoIbrac)}</p>
               <p className="text-xs text-muted-foreground">{estoqueIbrac.length} lotes</p>
             </div>
-            {estatisticasPorDono.filter(d => d.pesoKg > 0).map((dono) => (
+            {estatisticasPorDonoFiltrado.filter(d => d.pesoKg > 0).map((dono) => (
               <div
                 key={dono.id}
                 onClick={() => setSelectedDono(selectedDono === dono.id ? null : dono.id)}
