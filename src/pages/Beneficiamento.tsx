@@ -360,20 +360,65 @@ export default function Beneficiamento() {
   // Mutation para deletar beneficiamento
   const deleteMutation = useMutation({
     mutationFn: async (beneficiamentoId: string) => {
-      // Buscar itens de entrada para restaurar status dos sublotes
+      // Buscar itens de entrada para restaurar status e peso dos sublotes
       const { data: itensEntrada } = await supabase
         .from("beneficiamento_itens_entrada")
-        .select("sublote_id")
+        .select("sublote_id, peso_kg")
         .eq("beneficiamento_id", beneficiamentoId);
 
-      // Restaurar status dos sublotes
+      // Buscar itens de saída para identificar sublotes gerados (precisam ser excluídos)
+      const { data: itensSaida } = await supabase
+        .from("beneficiamento_itens_saida")
+        .select("sublote_gerado_id")
+        .eq("beneficiamento_id", beneficiamentoId);
+
+      // Restaurar status e peso dos sublotes de entrada
       if (itensEntrada) {
         for (const item of itensEntrada) {
           if (item.sublote_id) {
+            // Restaurar status para disponível e peso original do beneficiamento
             await supabase
               .from("sublotes")
-              .update({ status: "disponivel" })
+              .update({ 
+                status: "disponivel",
+                peso_kg: item.peso_kg || 0
+              })
               .eq("id", item.sublote_id);
+          }
+        }
+      }
+
+      // Remover sublotes gerados na saída do beneficiamento
+      if (itensSaida) {
+        for (const item of itensSaida) {
+          if (item.sublote_gerado_id) {
+            // Primeiro verificar se há sublotes filhos apontando para este
+            const { data: filhos } = await supabase
+              .from("sublotes")
+              .select("id")
+              .eq("lote_pai_id", item.sublote_gerado_id);
+
+            if (filhos && filhos.length > 0) {
+              // Atualizar filhos para apontar ao pai do sublote gerado
+              const { data: subloteGerado } = await supabase
+                .from("sublotes")
+                .select("lote_pai_id")
+                .eq("id", item.sublote_gerado_id)
+                .single();
+
+              if (subloteGerado) {
+                await supabase
+                  .from("sublotes")
+                  .update({ lote_pai_id: subloteGerado.lote_pai_id })
+                  .eq("lote_pai_id", item.sublote_gerado_id);
+              }
+            }
+
+            // Agora deletar o sublote gerado
+            await supabase
+              .from("sublotes")
+              .delete()
+              .eq("id", item.sublote_gerado_id);
           }
         }
       }
@@ -400,6 +445,7 @@ export default function Beneficiamento() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["beneficiamentos"] });
       queryClient.invalidateQueries({ queryKey: ["sublotes_disponiveis"] });
+      queryClient.invalidateQueries({ queryKey: ["sublotes"] });
       toast({ title: "Beneficiamento excluído com sucesso!" });
       setDeleteBeneficiamento(null);
     },
