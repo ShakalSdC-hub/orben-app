@@ -40,8 +40,7 @@ export function LoteHistorico({ loteId, loteCodigo }: LoteHistoricoProps) {
             data_entrada,
             tipo_material,
             peso_liquido_kg,
-            fornecedor:fornecedores(razao_social),
-            parceiro:parceiros(razao_social)
+            parceiro:parceiros!entradas_parceiro_id_fkey(razao_social, nome_fantasia)
           )
         `)
         .eq("id", loteId)

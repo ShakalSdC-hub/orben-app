@@ -100,7 +100,6 @@ export default function Entrada() {
         .from("entradas")
         .select(`
           *,
-          fornecedor:fornecedores(razao_social),
           parceiro:parceiros!entradas_parceiro_id_fkey(razao_social, nome_fantasia),
           dono:donos_material(nome),
           tipo_entrada:tipos_entrada(nome),
@@ -170,11 +169,12 @@ export default function Entrada() {
     (e) => {
       const matchesSearch = 
         e.codigo.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        e.fornecedor?.razao_social?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        e.parceiro?.razao_social?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        e.parceiro?.nome_fantasia?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         e.dono?.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         e.nota_fiscal?.toLowerCase().includes(searchTerm.toLowerCase());
       
-      const matchesParceiro = !selectedParceiro || e.parceiro_id === selectedParceiro || e.fornecedor_id === selectedParceiro;
+      const matchesParceiro = !selectedParceiro || e.parceiro_id === selectedParceiro;
       const matchesDono = !selectedDono || 
         (selectedDono === "ibrac" ? !e.dono_id : e.dono_id === selectedDono);
       
@@ -358,7 +358,7 @@ export default function Entrada() {
                               {entrada.codigo}
                             </TableCell>
                             <TableCell>
-                              {entrada.parceiro?.razao_social || entrada.parceiro?.nome_fantasia || entrada.fornecedor?.razao_social || "-"}
+                              {entrada.parceiro?.razao_social || entrada.parceiro?.nome_fantasia || "-"}
                             </TableCell>
                             <TableCell>
                               {format(new Date(entrada.data_entrada), "dd/MM/yyyy")}
@@ -413,7 +413,7 @@ export default function Entrada() {
                                   )}
                                   <DropdownMenuItem onClick={() => setRomaneioEntrada({
                                     ...entrada,
-                                    parceiros: entrada.fornecedor ? { razao_social: (entrada.fornecedor as any).razao_social } : null,
+                                    parceiros: entrada.parceiro ? { razao_social: entrada.parceiro.razao_social || entrada.parceiro.nome_fantasia } : null,
                                     donos_material: entrada.dono,
                                     tipos_produto: entrada.tipo_produto,
                                     sublotes: volumesEntrada,

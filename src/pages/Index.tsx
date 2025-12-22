@@ -61,7 +61,7 @@ export default function Index() {
         .from("entradas")
         .select(`
           *,
-          fornecedor:fornecedores(razao_social),
+          parceiro:parceiros!entradas_parceiro_id_fkey(razao_social, nome_fantasia),
           dono:donos_material(nome)
         `)
         .order("data_entrada", { ascending: false })
@@ -314,7 +314,7 @@ export default function Index() {
                     <div>
                       <p className="font-medium">{entrada.codigo}</p>
                       <p className="text-sm text-muted-foreground">
-                        {entrada.fornecedor?.razao_social || "Sem fornecedor"}
+                        {entrada.parceiro?.razao_social || entrada.parceiro?.nome_fantasia || "Sem fornecedor"}
                       </p>
                     </div>
                   </div>

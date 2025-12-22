@@ -84,7 +84,7 @@ export default function Estoque() {
         .from("sublotes")
         .select(`
           *,
-          entrada:entradas(codigo, tipo_material, dono:donos_material(nome), fornecedor:fornecedores(razao_social)),
+          entrada:entradas(codigo, tipo_material, dono:donos_material(nome), parceiro:parceiros!entradas_parceiro_id_fkey(razao_social)),
           dono:donos_material(nome),
           tipo_produto:tipos_produto(nome),
           local_estoque:locais_estoque(nome, tipo)

@@ -112,7 +112,7 @@ export default function Financeiro() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("entradas")
-        .select(`*, fornecedor:fornecedores(razao_social), dono:donos_material(nome)`)
+        .select(`*, parceiro:parceiros!entradas_parceiro_id_fkey(razao_social, nome_fantasia), dono:donos_material(nome)`)
         .order("data_entrada", { ascending: false })
         .limit(100);
       if (error) throw error;
