@@ -87,13 +87,45 @@ export function EntradaForm({ onClose }: EntradaFormProps) {
   const fornecedores = parceiros?.filter((p) => p.is_fornecedor) || [];
   const transportadoras = parceiros?.filter((p) => p.is_transportadora) || [];
 
-  const generateVolumeCode = () => {
+  // Gera código TKT único baseado na data e próximo sequencial
+  const generateVolumeCode = async (): Promise<string> => {
     const date = format(new Date(), "ddMMyy");
-    const seq = String(volumes.length + 1).padStart(3, "0");
-    return `TKT-${date}-${seq}`;
+    const prefix = `TKT-${date}-`;
+    
+    // Buscar o maior sequencial existente para esta data
+    const { data: existingSublotes } = await supabase
+      .from("sublotes")
+      .select("codigo")
+      .like("codigo", `${prefix}%`)
+      .order("codigo", { ascending: false })
+      .limit(1);
+    
+    let nextSeq = 1;
+    if (existingSublotes && existingSublotes.length > 0) {
+      const lastCode = existingSublotes[0].codigo;
+      const lastSeqStr = lastCode.replace(prefix, "");
+      const lastSeq = parseInt(lastSeqStr, 10);
+      if (!isNaN(lastSeq)) {
+        nextSeq = lastSeq + 1;
+      }
+    }
+    
+    // Considerar volumes já adicionados localmente
+    const localCodesForToday = volumes.filter(v => v.codigo.startsWith(prefix));
+    if (localCodesForToday.length > 0) {
+      const localMaxSeq = Math.max(...localCodesForToday.map(v => {
+        const seqStr = v.codigo.replace(prefix, "");
+        return parseInt(seqStr, 10) || 0;
+      }));
+      nextSeq = Math.max(nextSeq, localMaxSeq + 1);
+    }
+    
+    return `${prefix}${String(nextSeq).padStart(3, "0")}`;
   };
 
-  const addVolume = () => {
+  const [isAddingVolume, setIsAddingVolume] = useState(false);
+  
+  const addVolume = async () => {
     if (!newVolume.peso_kg) {
       toast({ title: "Informe o peso do volume", variant: "destructive" });
       return;
@@ -102,15 +134,21 @@ export function EntradaForm({ onClose }: EntradaFormProps) {
       toast({ title: "Selecione o tipo de produto", variant: "destructive" });
       return;
     }
-    const codigo = newVolume.codigo || generateVolumeCode();
-    setVolumes([...volumes, { 
-      id: crypto.randomUUID(), 
-      codigo, 
-      peso_kg: newVolume.peso_kg, 
-      tipo_produto_id: newVolume.tipo_produto_id,
-      valor_unitario: newVolume.valor_unitario 
-    }]);
-    setNewVolume({ codigo: "", peso_kg: "", tipo_produto_id: newVolume.tipo_produto_id, valor_unitario: newVolume.valor_unitario });
+    
+    setIsAddingVolume(true);
+    try {
+      const codigo = newVolume.codigo || await generateVolumeCode();
+      setVolumes([...volumes, { 
+        id: crypto.randomUUID(), 
+        codigo, 
+        peso_kg: newVolume.peso_kg, 
+        tipo_produto_id: newVolume.tipo_produto_id,
+        valor_unitario: newVolume.valor_unitario 
+      }]);
+      setNewVolume({ codigo: "", peso_kg: "", tipo_produto_id: newVolume.tipo_produto_id, valor_unitario: newVolume.valor_unitario });
+    } finally {
+      setIsAddingVolume(false);
+    }
   };
 
   const removeVolume = (id: string) => {
@@ -430,8 +468,8 @@ export function EntradaForm({ onClose }: EntradaFormProps) {
                     onChange={(e) => setNewVolume({ ...newVolume, valor_unitario: e.target.value })}
                     placeholder="0,00"
                   />
-                  <Button onClick={addVolume} className="bg-primary shrink-0">
-                    <Plus className="h-4 w-4" />
+                  <Button onClick={addVolume} className="bg-primary shrink-0" disabled={isAddingVolume}>
+                    {isAddingVolume ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
                   </Button>
                 </div>
               </div>
