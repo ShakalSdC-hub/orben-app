@@ -294,7 +294,7 @@ export type Database = {
             foreignKeyName: "beneficiamentos_fornecedor_terceiro_id_fkey"
             columns: ["fornecedor_terceiro_id"]
             isOneToOne: false
-            referencedRelation: "fornecedores"
+            referencedRelation: "parceiros"
             referencedColumns: ["id"]
           },
           {
