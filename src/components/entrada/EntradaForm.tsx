@@ -125,6 +125,28 @@ export function EntradaForm({ onClose }: EntradaFormProps) {
 
   const [isAddingVolume, setIsAddingVolume] = useState(false);
   
+  // Verifica se código TKT já existe no banco ou nos volumes locais
+  const checkCodigoExists = async (codigo: string): Promise<boolean> => {
+    // Verifica nos volumes locais
+    if (volumes.some(v => v.codigo.toLowerCase() === codigo.toLowerCase())) {
+      return true;
+    }
+    
+    // Verifica no banco de dados
+    const { data, error } = await supabase
+      .from("sublotes")
+      .select("id")
+      .eq("codigo", codigo)
+      .limit(1);
+    
+    if (error) {
+      console.error("Erro ao verificar código:", error);
+      return false;
+    }
+    
+    return data && data.length > 0;
+  };
+  
   const addVolume = async () => {
     if (!newVolume.peso_kg) {
       toast({ title: "Informe o peso do volume", variant: "destructive" });
@@ -137,7 +159,25 @@ export function EntradaForm({ onClose }: EntradaFormProps) {
     
     setIsAddingVolume(true);
     try {
-      const codigo = newVolume.codigo || await generateVolumeCode();
+      let codigo = newVolume.codigo.trim();
+      
+      // Se código foi digitado manualmente, validar se já existe
+      if (codigo) {
+        const exists = await checkCodigoExists(codigo);
+        if (exists) {
+          toast({ 
+            title: "Código já existe", 
+            description: `O código "${codigo}" já está cadastrado. Use outro código.`,
+            variant: "destructive" 
+          });
+          setIsAddingVolume(false);
+          return;
+        }
+      } else {
+        // Gerar código automaticamente
+        codigo = await generateVolumeCode();
+      }
+      
       setVolumes([...volumes, { 
         id: crypto.randomUUID(), 
         codigo, 

@@ -71,7 +71,6 @@ export default function Relatorios() {
         .select(
           `
           *,
-          fornecedor:fornecedores(razao_social),
           parceiro:parceiros!entradas_parceiro_id_fkey(razao_social, nome_fantasia),
           dono:donos_material(nome),
           tipo_produto:tipos_produto(nome)
@@ -407,7 +406,7 @@ export default function Relatorios() {
                                 {format(new Date(e.data_entrada), "dd/MM/yy")}
                               </TableCell>
                               <TableCell className="font-mono">{e.codigo}</TableCell>
-                              <TableCell>{e.parceiro?.razao_social || e.parceiro?.nome_fantasia || e.fornecedor?.razao_social || "—"}</TableCell>
+                              <TableCell>{e.parceiro?.razao_social || e.parceiro?.nome_fantasia || "—"}</TableCell>
                               <TableCell>{e.dono?.nome || "IBRAC"}</TableCell>
                               <TableCell>{e.tipo_produto?.nome || e.tipo_material}</TableCell>
                               <TableCell className="text-right">

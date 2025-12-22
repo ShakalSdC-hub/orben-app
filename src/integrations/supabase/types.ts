@@ -521,13 +521,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "entradas_fornecedor_id_fkey"
-            columns: ["fornecedor_id"]
-            isOneToOne: false
-            referencedRelation: "fornecedores"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "entradas_parceiro_id_fkey"
             columns: ["parceiro_id"]
             isOneToOne: false
@@ -556,54 +549,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      fornecedores: {
-        Row: {
-          ativo: boolean | null
-          cep: string | null
-          cidade: string | null
-          cnpj: string | null
-          created_at: string
-          email: string | null
-          endereco: string | null
-          estado: string | null
-          id: string
-          nome_fantasia: string | null
-          razao_social: string
-          telefone: string | null
-          updated_at: string
-        }
-        Insert: {
-          ativo?: boolean | null
-          cep?: string | null
-          cidade?: string | null
-          cnpj?: string | null
-          created_at?: string
-          email?: string | null
-          endereco?: string | null
-          estado?: string | null
-          id?: string
-          nome_fantasia?: string | null
-          razao_social: string
-          telefone?: string | null
-          updated_at?: string
-        }
-        Update: {
-          ativo?: boolean | null
-          cep?: string | null
-          cidade?: string | null
-          cnpj?: string | null
-          created_at?: string
-          email?: string | null
-          endereco?: string | null
-          estado?: string | null
-          id?: string
-          nome_fantasia?: string | null
-          razao_social?: string
-          telefone?: string | null
-          updated_at?: string
-        }
-        Relationships: []
       }
       historico_lme: {
         Row: {
@@ -852,7 +797,7 @@ export type Database = {
             foreignKeyName: "precos_mo_terceiros_fornecedor_id_fkey"
             columns: ["fornecedor_id"]
             isOneToOne: false
-            referencedRelation: "fornecedores"
+            referencedRelation: "parceiros"
             referencedColumns: ["id"]
           },
           {
