@@ -79,20 +79,40 @@ export default function Indicadores() {
     },
   });
 
-  // Fetch médias semanais importadas
-  const { data: mediasSemanais = [] } = useQuery({
-    queryKey: ["medias_semanais_lme"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("historico_lme")
-        .select("*")
-        .eq("is_media_semanal", true)
-        .order("semana_numero", { ascending: false })
-        .limit(10);
-      if (error) throw error;
-      return data;
-    },
-  });
+  // Calcular médias semanais a partir dos dados diários
+  const calcularMediasSemanais = (registros: any[]) => {
+    const semanas: { [key: number]: any[] } = {};
+    registros.forEach((h: any) => {
+      const dataRegistro = parseISO(h.data);
+      const semana = getWeek(dataRegistro, { weekStartsOn: 1 });
+      const ano = dataRegistro.getFullYear();
+      const key = ano * 100 + semana; // Ex: 202451 para semana 51 de 2024
+      if (!semanas[key]) semanas[key] = [];
+      semanas[key].push(h);
+    });
+    
+    return Object.entries(semanas).map(([key, registros]) => {
+      const semana = Number(key) % 100;
+      const ano = Math.floor(Number(key) / 100);
+      const cobreBrlKg = registros.reduce((acc, h) => acc + (h.cobre_brl_kg || 0), 0) / registros.length;
+      const aluminioBrlKg = registros.reduce((acc, h) => acc + (h.aluminio_brl_kg || 0), 0) / registros.length;
+      const dolarBrl = registros.reduce((acc, h) => acc + (h.dolar_brl || 0), 0) / registros.length;
+      const cobreUsdT = registros.reduce((acc, h) => acc + (h.cobre_usd_t || 0), 0) / registros.length;
+      
+      return {
+        semana_numero: semana,
+        ano,
+        key: Number(key),
+        cobre_brl_kg: cobreBrlKg,
+        aluminio_brl_kg: aluminioBrlKg,
+        dolar_brl: dolarBrl,
+        cobre_usd_t: cobreUsdT,
+        registros_count: registros.length
+      };
+    }).sort((a, b) => b.key - a.key); // Mais recente primeiro
+  };
+
+  const mediasSemanais = calcularMediasSemanais(historico);
 
   // Mutation para forçar atualização via API
   const updateLmeMutation = useMutation({
@@ -104,7 +124,6 @@ export default function Indicadores() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["historico_lme"] });
-      queryClient.invalidateQueries({ queryKey: ["medias_semanais_lme"] });
       queryClient.invalidateQueries({ queryKey: ["ultima-lme"] });
       toast({ 
         title: "Cotações atualizadas!", 
@@ -122,15 +141,15 @@ export default function Indicadores() {
 
   // Gerar opções de semanas disponíveis
   const semanasDisponiveis = mediasSemanais.map((m: any) => ({
-    value: String(m.semana_numero),
-    label: `Semana ${m.semana_numero}`,
+    value: String(m.key),
+    label: `S${m.semana_numero} (${m.ano})`,
     data: m
   }));
 
   // Auto-selecionar a primeira semana disponível para o card de cotação
   useEffect(() => {
     if (mediasSemanais.length > 0 && !lmeSemana) {
-      setLmeSemana(String(mediasSemanais[0]?.semana_numero || ""));
+      setLmeSemana(String(mediasSemanais[0]?.key || ""));
     }
   }, [mediasSemanais, lmeSemana]);
 
@@ -153,17 +172,14 @@ export default function Indicadores() {
         label: format(parseISO(lmeData), "dd/MM/yyyy", { locale: ptBR })
       } : null;
     } else if (lmeTipoFiltro === "semana") {
-      const media = mediasSemanais.find((m: any) => String(m.semana_numero) === lmeSemana);
+      const media = mediasSemanais.find((m: any) => String(m.key) === lmeSemana);
       if (media) {
-        const cobreUsdT = media.cobre_brl_kg && media.dolar_brl 
-          ? (media.cobre_brl_kg / media.dolar_brl) * 1000 
-          : null;
         return {
-          cobre_usd_t: cobreUsdT,
+          cobre_usd_t: media.cobre_usd_t,
           dolar_brl: media.dolar_brl,
           cobre_brl_kg: media.cobre_brl_kg,
           aluminio_brl_kg: media.aluminio_brl_kg,
-          label: `Semana ${media.semana_numero}`
+          label: `Semana ${media.semana_numero} (${media.ano})`
         };
       }
       return null;
@@ -198,10 +214,14 @@ export default function Indicadores() {
   const hoje = historico[0];
   const ontem = historico[1];
   
-  // Usar médias semanais importadas (S-1 e S-2)
+  // Usar médias semanais calculadas (S-1 e S-2)
   const semanaAtual = getWeek(new Date(), { weekStartsOn: 1 });
-  const mediaSemanaS1 = mediasSemanais.find((m: any) => m.semana_numero === semanaAtual - 1);
-  const mediaSemanaS2 = mediasSemanais.find((m: any) => m.semana_numero === semanaAtual - 2);
+  const anoAtual = new Date().getFullYear();
+  const keyS1 = anoAtual * 100 + (semanaAtual - 1);
+  const keyS2 = anoAtual * 100 + (semanaAtual - 2);
+  
+  const mediaSemanaS1 = mediasSemanais.find((m: any) => m.key === keyS1);
+  const mediaSemanaS2 = mediasSemanais.find((m: any) => m.key === keyS2);
   
   const cobreMediaSemana = mediaSemanaS1?.cobre_brl_kg || 0;
   const aluminioMediaSemana = mediaSemanaS1?.aluminio_brl_kg || 0;
