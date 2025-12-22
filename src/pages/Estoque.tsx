@@ -77,7 +77,7 @@ export default function Estoque() {
   const [isTransferDonoOpen, setIsTransferDonoOpen] = useState(false);
   const [selectedLoteDono, setSelectedLoteDono] = useState<any | null>(null);
   const [selectedLoteRastreio, setSelectedLoteRastreio] = useState<any | null>(null);
-  const { exportToExcel, formatEstoqueReport, printReport } = useExportReport();
+  const { exportToExcel, formatEstoqueReport, formatRastreabilidadeReport, printReport } = useExportReport();
 
   // Fetch sublotes com relacionamentos
   const { data: sublotes, isLoading } = useQuery({
@@ -393,19 +393,21 @@ export default function Estoque() {
                   <FileText className="mr-2 h-4 w-4" />Exportar
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent>
+              <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => exportToExcel(formatEstoqueReport(filteredSublotes || []), { filename: "relatorio_estoque", sheetName: "Estoque" })}>
-                  <FileSpreadsheet className="mr-2 h-4 w-4" />Excel
+                  <FileSpreadsheet className="mr-2 h-4 w-4" />Excel - Estoque
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => printReport("Relatório de Estoque", formatEstoqueReport(filteredSublotes || []), ["Código", "Entrada", "Tipo Produto", "Dono", "Local", "Peso (kg)", "Custo Unitário", "Valor Total", "Status"])}>
-                  <Printer className="mr-2 h-4 w-4" />Imprimir PDF
+                <DropdownMenuItem onClick={() => exportToExcel(formatRastreabilidadeReport(filteredSublotes || []), { filename: "rastreabilidade_custos", sheetName: "Rastreabilidade" })}>
+                  <Calculator className="mr-2 h-4 w-4" />Excel - Rastreabilidade
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => printReport("Relatório de Estoque", formatEstoqueReport(filteredSublotes || []), ["Código", "Entrada", "Tipo Produto", "Dono", "Parceiro", "Local", "Peso (kg)", "Custo Unitário", "Valor Total", "Status"])}>
+                  <Printer className="mr-2 h-4 w-4" />Imprimir Estoque
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => printReport("Rastreabilidade de Custos", formatRastreabilidadeReport(filteredSublotes || []), ["Código Lote", "Produto", "Dono", "Parceiro/Fornecedor", "Entrada Origem", "Peso (kg)", "Custo Unitário (R$)", "Valor Total (R$)", "Origem Beneficiamento"])}>
+                  <Calculator className="mr-2 h-4 w-4" />Imprimir Rastreabilidade
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <Button variant="outline" size="sm">
-              <BarChart3 className="mr-2 h-4 w-4" />
-              Relatório
-            </Button>
           </div>
         </div>
 

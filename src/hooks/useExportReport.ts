@@ -85,10 +85,28 @@ export function useExportReport() {
       "Entrada": s.entrada?.codigo || "-",
       "Tipo Produto": s.tipo_produto?.nome || "-",
       "Dono": s.dono?.nome || "IBRAC",
+      "Parceiro": s.entrada?.parceiro?.razao_social || "-",
       "Local": s.local_estoque?.nome || "-",
       "Peso (kg)": s.peso_kg,
       "Custo Unitário": s.custo_unitario_total || 0,
       "Valor Total": (s.peso_kg * (s.custo_unitario_total || 0)),
+      "Status": s.status,
+    }));
+  }, []);
+
+  const formatRastreabilidadeReport = useCallback((sublotes: any[]) => {
+    return sublotes.map((s) => ({
+      "Código Lote": s.codigo,
+      "Produto": s.tipo_produto?.nome || "-",
+      "Dono": s.dono?.nome || "IBRAC",
+      "Parceiro/Fornecedor": s.entrada?.parceiro?.razao_social || "-",
+      "Entrada Origem": s.entrada?.codigo || "-",
+      "Local": s.local_estoque?.nome || "-",
+      "Peso (kg)": s.peso_kg,
+      "Custo Unitário (R$)": s.custo_unitario_total || 0,
+      "Valor Total (R$)": (s.peso_kg * (s.custo_unitario_total || 0)),
+      "Origem Beneficiamento": s.lote_pai_id ? "Sim" : "Entrada Direta",
+      "Data Criação": s.created_at ? format(new Date(s.created_at), "dd/MM/yyyy") : "-",
       "Status": s.status,
     }));
   }, []);
@@ -145,5 +163,6 @@ export function useExportReport() {
     formatSaidaReport,
     formatBeneficiamentoReport,
     formatEstoqueReport,
+    formatRastreabilidadeReport,
   };
 }
