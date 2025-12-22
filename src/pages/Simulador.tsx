@@ -94,20 +94,40 @@ export default function Simulador() {
     },
   });
 
-  // Buscar médias semanais
-  const { data: mediasSemanais = [] } = useQuery({
-    queryKey: ["medias_semanais_simulador"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("historico_lme")
-        .select("*")
-        .eq("is_media_semanal", true)
-        .order("semana_numero", { ascending: false })
-        .limit(10);
-      if (error) throw error;
-      return data;
-    },
-  });
+  // Calcular médias semanais a partir dos dados diários
+  const calcularMediasSemanais = (registros: any[]) => {
+    const semanas: { [key: number]: any[] } = {};
+    registros.forEach((h: any) => {
+      const dataRegistro = parseISO(h.data);
+      const semana = getWeek(dataRegistro, { weekStartsOn: 1 });
+      const ano = dataRegistro.getFullYear();
+      const key = ano * 100 + semana; // Ex: 202551 para semana 51 de 2025
+      if (!semanas[key]) semanas[key] = [];
+      semanas[key].push(h);
+    });
+    
+    return Object.entries(semanas).map(([key, regs]) => {
+      const semana = Number(key) % 100;
+      const ano = Math.floor(Number(key) / 100);
+      const cobreBrlKg = regs.reduce((acc, h) => acc + (h.cobre_brl_kg || 0), 0) / regs.length;
+      const aluminioBrlKg = regs.reduce((acc, h) => acc + (h.aluminio_brl_kg || 0), 0) / regs.length;
+      const dolarBrlMedia = regs.reduce((acc, h) => acc + (h.dolar_brl || 0), 0) / regs.length;
+      const cobreUsdTMedia = regs.reduce((acc, h) => acc + (h.cobre_usd_t || 0), 0) / regs.length;
+      
+      return {
+        semana_numero: semana,
+        ano,
+        key: Number(key),
+        cobre_brl_kg: cobreBrlKg,
+        aluminio_brl_kg: aluminioBrlKg,
+        dolar_brl: dolarBrlMedia,
+        cobre_usd_t: cobreUsdTMedia,
+        registros_count: regs.length
+      };
+    }).sort((a, b) => b.key - a.key); // Mais recente primeiro
+  };
+
+  const mediasSemanais = calcularMediasSemanais(historico);
 
   // Buscar histórico de simulações
   const { data: historicoSimulacoes } = useQuery({
@@ -125,15 +145,15 @@ export default function Simulador() {
 
   // Gerar opções de semanas disponíveis
   const semanasDisponiveis = mediasSemanais.map((m: any) => ({
-    value: String(m.semana_numero),
-    label: `Semana ${m.semana_numero}`,
+    value: String(m.key),
+    label: `S${m.semana_numero} (${m.ano})`,
     data: m
   }));
 
   // Auto-selecionar a primeira semana disponível
   useEffect(() => {
     if (mediasSemanais.length > 0 && !lmeSemana) {
-      setLmeSemana(String(mediasSemanais[0]?.semana_numero || ""));
+      setLmeSemana(String(mediasSemanais[0]?.key || ""));
     }
   }, [mediasSemanais, lmeSemana]);
 
@@ -150,21 +170,21 @@ export default function Simulador() {
       return null; // Usa valores manuais
     } else if (lmeTipoFiltro === "dia") {
       const registro = historico.find((h: any) => h.data === lmeData);
-      return registro ? {
-        cobre_usd_t: registro.cobre_usd_t,
-        dolar_brl: registro.dolar_brl,
-        label: format(parseISO(lmeData), "dd/MM/yyyy", { locale: ptBR })
-      } : null;
-    } else if (lmeTipoFiltro === "semana") {
-      const media = mediasSemanais.find((m: any) => String(m.semana_numero) === lmeSemana);
-      if (media) {
-        const cobreUsdT = media.cobre_brl_kg && media.dolar_brl 
-          ? (media.cobre_brl_kg / media.dolar_brl) * 1000 
-          : null;
+      if (registro) {
         return {
-          cobre_usd_t: cobreUsdT,
+          cobre_usd_t: registro.cobre_usd_t,
+          dolar_brl: registro.dolar_brl,
+          label: format(parseISO(lmeData), "dd/MM/yyyy", { locale: ptBR })
+        };
+      }
+      return null;
+    } else if (lmeTipoFiltro === "semana") {
+      const media = mediasSemanais.find((m: any) => String(m.key) === lmeSemana);
+      if (media) {
+        return {
+          cobre_usd_t: media.cobre_usd_t,
           dolar_brl: media.dolar_brl,
-          label: `Semana ${media.semana_numero}`
+          label: `Semana ${media.semana_numero} (${media.ano})`
         };
       }
       return null;

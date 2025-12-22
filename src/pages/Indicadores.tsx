@@ -64,7 +64,7 @@ export default function Indicadores() {
   // Verificar se usuário pode forçar atualização (admin ou dono)
   const canForceUpdate = role === "admin" || role === "dono";
 
-  // Fetch histórico diário (não média)
+  // Fetch histórico diário (não média) - buscar mais dados para histórico anual
   const { data: historico = [] } = useQuery({
     queryKey: ["historico_lme"],
     queryFn: async () => {
@@ -73,7 +73,7 @@ export default function Indicadores() {
         .select("*")
         .eq("is_media_semanal", false)
         .order("data", { ascending: false })
-        .limit(90);
+        .limit(400); // Aumentado para cobrir ~1 ano
       if (error) throw error;
       return data;
     },
@@ -447,43 +447,57 @@ export default function Indicadores() {
           </CardContent>
         </Card>
 
-        {/* Tabela de Médias Semanais */}
+        {/* Tabela de Médias Semanais Anuais */}
         {mediasSemanais.length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Calendar className="h-5 w-5 text-primary" />
-                Médias Semanais
+                Médias Semanais {new Date().getFullYear()}
               </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Histórico de médias calculadas por semana (S1 até a última semana fechada)
+              </p>
             </CardHeader>
             <CardContent>
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
                 <Table>
-                  <TableHeader>
+                  <TableHeader className="sticky top-0 bg-card z-10">
                     <TableRow>
                       <TableHead>Semana</TableHead>
+                      <TableHead className="text-right">Cobre (US$/t)</TableHead>
                       <TableHead className="text-right">Cobre (R$/kg)</TableHead>
                       <TableHead className="text-right">Alumínio (R$/kg)</TableHead>
                       <TableHead className="text-right">Dólar (R$/US$)</TableHead>
+                      <TableHead className="text-center">Registros</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {mediasSemanais.map((m: any) => (
-                      <TableRow key={m.id} className="bg-primary/5">
-                        <TableCell className="font-medium">
-                          Semana {m.semana_numero}
-                        </TableCell>
-                        <TableCell className="text-right font-mono font-semibold">
-                          {m.cobre_brl_kg ? formatCurrency(m.cobre_brl_kg) : "-"}
-                        </TableCell>
-                        <TableCell className="text-right font-mono font-semibold">
-                          {m.aluminio_brl_kg ? formatCurrency(m.aluminio_brl_kg) : "-"}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {m.dolar_brl ? `R$ ${Number(m.dolar_brl).toFixed(4)}` : "-"}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {mediasSemanais
+                      .filter((m: any) => m.ano === new Date().getFullYear())
+                      .sort((a: any, b: any) => b.semana_numero - a.semana_numero)
+                      .map((m: any) => (
+                        <TableRow key={m.key} className="bg-primary/5">
+                          <TableCell className="font-medium">
+                            M.S {m.semana_numero} ({m.ano})
+                          </TableCell>
+                          <TableCell className="text-right font-mono font-semibold text-primary">
+                            {m.cobre_usd_t ? `$ ${Math.round(m.cobre_usd_t).toLocaleString("pt-BR")}` : "-"}
+                          </TableCell>
+                          <TableCell className="text-right font-mono font-semibold">
+                            {m.cobre_brl_kg ? formatCurrency(m.cobre_brl_kg) : "-"}
+                          </TableCell>
+                          <TableCell className="text-right font-mono font-semibold">
+                            {m.aluminio_brl_kg ? formatCurrency(m.aluminio_brl_kg) : "-"}
+                          </TableCell>
+                          <TableCell className="text-right font-mono">
+                            {m.dolar_brl ? `R$ ${Number(m.dolar_brl).toFixed(4)}` : "-"}
+                          </TableCell>
+                          <TableCell className="text-center text-muted-foreground">
+                            {m.registros_count} dias
+                          </TableCell>
+                        </TableRow>
+                      ))}
                   </TableBody>
                 </Table>
               </div>
