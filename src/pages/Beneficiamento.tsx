@@ -192,6 +192,44 @@ export default function Beneficiamento() {
     },
   });
 
+  // Query para buscar sublotes gerados por beneficiamentos (para validar exclusão)
+  const { data: sublotesGerados = [] } = useQuery({
+    queryKey: ["sublotes_gerados_beneficiamento"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("beneficiamento_itens_saida")
+        .select("beneficiamento_id, sublote_gerado_id");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Query para buscar itens de saída (para verificar se sublotes gerados foram vendidos)
+  const { data: saidaItens = [] } = useQuery({
+    queryKey: ["saida_itens_validacao"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("saida_itens")
+        .select("sublote_id");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Função para verificar se um beneficiamento pode ser excluído
+  // Retorna true se há sublotes gerados que já foram usados em saídas
+  const isBeneficiamentoVinculado = (beneficiamentoId: string): boolean => {
+    const sublotesDesteBeneficiamento = sublotesGerados
+      .filter(sg => sg.beneficiamento_id === beneficiamentoId)
+      .map(sg => sg.sublote_gerado_id);
+    
+    const subloteIdsVendidos = new Set(saidaItens.map(si => si.sublote_id));
+    
+    return sublotesDesteBeneficiamento.some(subloteId => 
+      subloteId && subloteIdsVendidos.has(subloteId)
+    );
+  };
+
   const fornecedores = parceiros.filter((p) => p.is_fornecedor);
   const transportadoras = parceiros.filter((p) => p.is_transportadora);
 
@@ -1164,7 +1202,7 @@ export default function Beneficiamento() {
                               <Printer className="mr-2 h-4 w-4" />
                               Imprimir Romaneio
                             </DropdownMenuItem>
-                            {isAdmin && b.status !== "finalizado" && (
+                            {isAdmin && b.status !== "finalizado" && !isBeneficiamentoVinculado(b.id) && (
                               <>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem 
@@ -1173,6 +1211,24 @@ export default function Beneficiamento() {
                                 >
                                   <Trash2 className="mr-2 h-4 w-4" />
                                   Excluir
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                            {isAdmin && b.status === "finalizado" && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem disabled className="text-muted-foreground">
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Excluir (Finalizado)
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                            {isAdmin && b.status !== "finalizado" && isBeneficiamentoVinculado(b.id) && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem disabled className="text-muted-foreground">
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Excluir (Tem Saída)
                                 </DropdownMenuItem>
                               </>
                             )}
