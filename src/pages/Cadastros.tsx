@@ -170,6 +170,10 @@ function TiposProdutoTab() {
 
   const saveMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
+      // Validar código obrigatório
+      if (!data.codigo || data.codigo.trim() === "") {
+        throw new Error("O código do produto é obrigatório");
+      }
       if (editingId) {
         const { error } = await supabase.from("tipos_produto").update(data).eq("id", editingId);
         if (error) throw error;
@@ -183,7 +187,17 @@ function TiposProdutoTab() {
       handleClose();
       toast({ title: editingId ? "Tipo atualizado!" : "Tipo cadastrado!" });
     },
-    onError: () => toast({ title: "Erro ao salvar", variant: "destructive" }),
+    onError: (error: any) => {
+      // Tratar erro de código duplicado
+      const message = error?.message || "";
+      if (message.includes("Já existe um produto com o código")) {
+        toast({ title: "Código duplicado", description: message, variant: "destructive" });
+      } else if (message.includes("obrigatório")) {
+        toast({ title: "Campo obrigatório", description: message, variant: "destructive" });
+      } else {
+        toast({ title: "Erro ao salvar", variant: "destructive" });
+      }
+    },
   });
 
   const deleteMutation = useMutation({
@@ -227,8 +241,13 @@ function TiposProdutoTab() {
                   <Input value={formData.nome} onChange={(e) => setFormData({ ...formData, nome: e.target.value })} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Código</Label>
-                  <Input value={formData.codigo} onChange={(e) => setFormData({ ...formData, codigo: e.target.value })} />
+                  <Label>Código *</Label>
+                  <Input 
+                    value={formData.codigo} 
+                    onChange={(e) => setFormData({ ...formData, codigo: e.target.value })}
+                    placeholder="Ex: 2099006"
+                    required
+                  />
                 </div>
               </div>
               <div className="space-y-2">
