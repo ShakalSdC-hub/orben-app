@@ -1,1 +1,7 @@
 project_id = "ggglyltvaddwxeelthhk"
+
+[functions.ai-insights]
+verify_jwt = true
+
+[functions.fetch-lme-prices]
+verify_jwt = true

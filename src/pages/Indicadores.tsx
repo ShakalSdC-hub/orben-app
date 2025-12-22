@@ -5,16 +5,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { TrendingUp, TrendingDown, Minus, Upload, Calendar, Printer, Save, DollarSign, RefreshCw } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Calendar, Printer, DollarSign, RefreshCw, Loader2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { format, getWeek, startOfMonth, endOfMonth, subMonths, isWithinInterval, parseISO } from "date-fns";
-import { ExcelImport } from "@/components/lme/ExcelImport";
 import { ptBR } from "date-fns/locale";
+import { useAuth } from "@/contexts/AuthContext";
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
@@ -51,20 +50,19 @@ function VariationCard({ title, current, previous, unit = "R$/kg" }: { title: st
 
 export default function Indicadores() {
   const queryClient = useQueryClient();
-  const [isUploadOpen, setIsUploadOpen] = useState(false);
-  const [isCotacaoOpen, setIsCotacaoOpen] = useState(false);
-  const [cotacaoNome, setCotacaoNome] = useState("");
-  const [cotacaoTipo, setCotacaoTipo] = useState<"dia" | "semana" | "mes">("dia");
-  const [cotacaoData, setCotacaoData] = useState(format(new Date(), "yyyy-MM-dd"));
-  const [cotacaoSemana, setCotacaoSemana] = useState<string>("");
-  const [cotacaoMes, setCotacaoMes] = useState<string>(format(new Date(), "yyyy-MM"));
-  const [uploadData, setUploadData] = useState({ data: "", cobre_usd_t: "", aluminio_usd_t: "", dolar_brl: "", zinco_usd_t: "", chumbo_usd_t: "", estanho_usd_t: "", niquel_usd_t: "" });
+  const { role } = useAuth();
   
   // Estado para o card de Cotação LME
   const [lmeTipoFiltro, setLmeTipoFiltro] = useState<"dia" | "semana" | "mes">("semana");
   const [lmeSemana, setLmeSemana] = useState<string>("");
   const [lmeData, setLmeData] = useState(format(new Date(), "yyyy-MM-dd"));
   const [lmeMes, setLmeMes] = useState<string>(format(subMonths(new Date(), 1), "yyyy-MM"));
+  
+  // Filtro do mês para tabela de histórico
+  const [historicoMesFiltro, setHistoricoMesFiltro] = useState<string>(format(new Date(), "yyyy-MM"));
+
+  // Verificar se usuário pode forçar atualização (admin ou dono)
+  const canForceUpdate = role === "admin" || role === "dono";
 
   // Fetch histórico diário (não média)
   const { data: historico = [] } = useQuery({
@@ -75,7 +73,7 @@ export default function Indicadores() {
         .select("*")
         .eq("is_media_semanal", false)
         .order("data", { ascending: false })
-        .limit(60);
+        .limit(90);
       if (error) throw error;
       return data;
     },
@@ -96,6 +94,32 @@ export default function Indicadores() {
     },
   });
 
+  // Mutation para forçar atualização via API
+  const updateLmeMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("fetch-lme-prices");
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["historico_lme"] });
+      queryClient.invalidateQueries({ queryKey: ["medias_semanais_lme"] });
+      queryClient.invalidateQueries({ queryKey: ["ultima-lme"] });
+      toast({ 
+        title: "Cotações atualizadas!", 
+        description: data?.message || "Dados LME atualizados com sucesso." 
+      });
+    },
+    onError: (error) => {
+      toast({ 
+        title: "Erro ao atualizar cotações", 
+        description: error.message, 
+        variant: "destructive" 
+      });
+    },
+  });
+
   // Gerar opções de semanas disponíveis
   const semanasDisponiveis = mediasSemanais.map((m: any) => ({
     value: String(m.semana_numero),
@@ -110,6 +134,13 @@ export default function Indicadores() {
     }
   }, [mediasSemanais, lmeSemana]);
 
+  // Calcular média
+  const calcularMedia = (registros: any[], campo: string) => {
+    const validos = registros.filter((h: any) => h[campo] != null && h[campo] > 0);
+    if (validos.length === 0) return 0;
+    return validos.reduce((acc: number, h: any) => acc + h[campo], 0) / validos.length;
+  };
+
   // Função para obter cotação LME baseado no filtro selecionado
   const getLmeCotacao = () => {
     if (lmeTipoFiltro === "dia") {
@@ -117,18 +148,21 @@ export default function Indicadores() {
       return registro ? {
         cobre_usd_t: registro.cobre_usd_t,
         dolar_brl: registro.dolar_brl,
+        cobre_brl_kg: registro.cobre_brl_kg,
+        aluminio_brl_kg: registro.aluminio_brl_kg,
         label: format(parseISO(lmeData), "dd/MM/yyyy", { locale: ptBR })
       } : null;
     } else if (lmeTipoFiltro === "semana") {
       const media = mediasSemanais.find((m: any) => String(m.semana_numero) === lmeSemana);
       if (media) {
-        // Calcular cobre USD/t a partir de cobre_brl_kg
         const cobreUsdT = media.cobre_brl_kg && media.dolar_brl 
           ? (media.cobre_brl_kg / media.dolar_brl) * 1000 
           : null;
         return {
           cobre_usd_t: cobreUsdT,
           dolar_brl: media.dolar_brl,
+          cobre_brl_kg: media.cobre_brl_kg,
+          aluminio_brl_kg: media.aluminio_brl_kg,
           label: `Semana ${media.semana_numero}`
         };
       }
@@ -145,9 +179,13 @@ export default function Indicadores() {
       
       const cobreMedia = calcularMedia(registrosMes, 'cobre_usd_t');
       const dolarMedia = calcularMedia(registrosMes, 'dolar_brl');
+      const cobreBrlKg = calcularMedia(registrosMes, 'cobre_brl_kg');
+      const aluminioBrlKg = calcularMedia(registrosMes, 'aluminio_brl_kg');
       return {
         cobre_usd_t: cobreMedia,
         dolar_brl: dolarMedia,
+        cobre_brl_kg: cobreBrlKg,
+        aluminio_brl_kg: aluminioBrlKg,
         label: format(inicioMes, "MMMM yyyy", { locale: ptBR })
       };
     }
@@ -155,31 +193,6 @@ export default function Indicadores() {
   };
 
   const lmeCotacao = getLmeCotacao();
-
-  const uploadMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const { error } = await supabase.from("historico_lme").upsert({
-        data: data.data,
-        cobre_usd_t: parseFloat(data.cobre_usd_t) || null,
-        aluminio_usd_t: parseFloat(data.aluminio_usd_t) || null,
-        zinco_usd_t: parseFloat(data.zinco_usd_t) || null,
-        chumbo_usd_t: parseFloat(data.chumbo_usd_t) || null,
-        estanho_usd_t: parseFloat(data.estanho_usd_t) || null,
-        niquel_usd_t: parseFloat(data.niquel_usd_t) || null,
-        dolar_brl: parseFloat(data.dolar_brl) || null,
-        is_media_semanal: false,
-        fonte: "manual",
-      }, { onConflict: "data" });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["historico_lme"] });
-      setIsUploadOpen(false);
-      setUploadData({ data: "", cobre_usd_t: "", aluminio_usd_t: "", dolar_brl: "", zinco_usd_t: "", chumbo_usd_t: "", estanho_usd_t: "", niquel_usd_t: "" });
-      toast({ title: "Cotação cadastrada com sucesso!" });
-    },
-    onError: () => toast({ title: "Erro ao cadastrar cotação", variant: "destructive" }),
-  });
 
   // Calcular variações usando médias importadas
   const hoje = historico[0];
@@ -194,13 +207,6 @@ export default function Indicadores() {
   const aluminioMediaSemana = mediaSemanaS1?.aluminio_brl_kg || 0;
   const cobreMediaSemanaAnterior = mediaSemanaS2?.cobre_brl_kg || cobreMediaSemana;
   const aluminioMediaSemanaAnterior = mediaSemanaS2?.aluminio_brl_kg || aluminioMediaSemana;
-
-  // Calcular média mensal do mês anterior
-  const calcularMedia = (registros: any[], campo: string) => {
-    const validos = registros.filter((h: any) => h[campo] != null && h[campo] > 0);
-    if (validos.length === 0) return 0;
-    return validos.reduce((acc: number, h: any) => acc + h[campo], 0) / validos.length;
-  };
 
   const agora = new Date();
   const inicioMesAnterior = startOfMonth(subMonths(agora, 1));
@@ -230,53 +236,21 @@ export default function Indicadores() {
   const aluminioOntem = ontem?.aluminio_brl_kg || aluminioHoje;
 
   // Dados para o gráfico
-  const chartData = [...historico].reverse().map((h: any) => ({
+  const chartData = [...historico].reverse().slice(-30).map((h: any) => ({
     data: format(new Date(h.data), "dd/MM", { locale: ptBR }),
     cobre: h.cobre_brl_kg || 0,
     aluminio: h.aluminio_brl_kg || 0,
   }));
 
-  // Função para obter cotação baseado no tipo selecionado
-  const getCotacaoSelecionada = () => {
-    if (cotacaoTipo === "dia") {
-      return historico.find((h: any) => h.data === cotacaoData);
-    } else if (cotacaoTipo === "semana") {
-      return mediasSemanais.find((m: any) => String(m.semana_numero) === cotacaoSemana);
-    } else if (cotacaoTipo === "mes") {
-      const [ano, mes] = cotacaoMes.split("-").map(Number);
-      const inicioMes = new Date(ano, mes - 1, 1);
-      const fimMes = new Date(ano, mes, 0);
-      const registrosMes = historico.filter((h: any) => {
-        const dataRegistro = parseISO(h.data);
-        return isWithinInterval(dataRegistro, { start: inicioMes, end: fimMes });
-      });
-      if (registrosMes.length === 0) return null;
-      return {
-        cobre_brl_kg: calcularMedia(registrosMes, 'cobre_brl_kg'),
-        aluminio_brl_kg: calcularMedia(registrosMes, 'aluminio_brl_kg'),
-        dolar_brl: calcularMedia(registrosMes, 'dolar_brl'),
-      };
-    }
-    return null;
-  };
-
-  const cotacaoSelecionada = getCotacaoSelecionada();
-
-  const salvarCotacao = () => {
-    if (!cotacaoSelecionada) {
-      toast({ title: "Nenhuma cotação encontrada", variant: "destructive" });
-      return;
-    }
-    const nome = cotacaoNome || `Cotação ${cotacaoTipo === "dia" ? cotacaoData : cotacaoTipo === "semana" ? `Semana ${cotacaoSemana}` : cotacaoMes}`;
-    
-    // Aqui você pode salvar a cotação com nome - por enquanto apenas mostra toast
-    toast({ 
-      title: "Cotação salva!", 
-      description: `${nome}: Cobre ${formatCurrency(cotacaoSelecionada.cobre_brl_kg || 0)}/kg, Alumínio ${formatCurrency(cotacaoSelecionada.aluminio_brl_kg || 0)}/kg` 
-    });
-    setIsCotacaoOpen(false);
-    setCotacaoNome("");
-  };
+  // Filtrar histórico por mês selecionado
+  const [anoFiltro, mesFiltro] = historicoMesFiltro.split("-").map(Number);
+  const inicioMesFiltro = new Date(anoFiltro, mesFiltro - 1, 1);
+  const fimMesFiltro = new Date(anoFiltro, mesFiltro, 0);
+  
+  const historicoFiltrado = historico.filter((h: any) => {
+    const dataRegistro = parseISO(h.data);
+    return isWithinInterval(dataRegistro, { start: inicioMesFiltro, end: fimMesFiltro });
+  });
 
   return (
     <MainLayout>
@@ -287,169 +261,26 @@ export default function Indicadores() {
             <p className="text-muted-foreground">Acompanhe as cotações de Cobre e Alumínio em tempo real</p>
           </div>
           <div className="flex gap-2 flex-wrap">
-            <ExcelImport />
-            
-            {/* Cadastrar Cotação Dialog */}
-            <Dialog open={isCotacaoOpen} onOpenChange={setIsCotacaoOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline"><Calendar className="h-4 w-4 mr-2" />Cadastrar Cotação</Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-lg">
-                <DialogHeader><DialogTitle>Cadastrar Cotação LME</DialogTitle></DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label>Tipo de Cotação</Label>
-                    <Select value={cotacaoTipo} onValueChange={(v: "dia" | "semana" | "mes") => setCotacaoTipo(v)}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="dia">Dia Específico</SelectItem>
-                        <SelectItem value="semana">Média Semanal</SelectItem>
-                        <SelectItem value="mes">Média Mensal</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {cotacaoTipo === "dia" && (
-                    <div className="space-y-2">
-                      <Label>Data</Label>
-                      <Input 
-                        type="date" 
-                        value={cotacaoData} 
-                        onChange={(e) => setCotacaoData(e.target.value)} 
-                      />
-                    </div>
-                  )}
-
-                  {cotacaoTipo === "semana" && (
-                    <div className="space-y-2">
-                      <Label>Semana</Label>
-                      <Select value={cotacaoSemana} onValueChange={setCotacaoSemana}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione a semana" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {semanasDisponiveis.map((s) => (
-                            <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-
-                  {cotacaoTipo === "mes" && (
-                    <div className="space-y-2">
-                      <Label>Mês</Label>
-                      <Input 
-                        type="month" 
-                        value={cotacaoMes} 
-                        onChange={(e) => setCotacaoMes(e.target.value)} 
-                      />
-                    </div>
-                  )}
-
-                  {/* Preview da cotação */}
-                  {cotacaoSelecionada && (
-                    <Card className="bg-muted/50">
-                      <CardContent className="pt-4">
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                          <div>
-                            <p className="text-muted-foreground">Cobre (R$/kg)</p>
-                            <p className="text-lg font-semibold">{formatCurrency(cotacaoSelecionada.cobre_brl_kg || 0)}</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground">Alumínio (R$/kg)</p>
-                            <p className="text-lg font-semibold">{formatCurrency(cotacaoSelecionada.aluminio_brl_kg || 0)}</p>
-                          </div>
-                          {cotacaoSelecionada.dolar_brl && (
-                            <div className="col-span-2">
-                              <p className="text-muted-foreground">Dólar (R$/US$)</p>
-                              <p className="text-lg font-semibold">R$ {Number(cotacaoSelecionada.dolar_brl).toFixed(4)}</p>
-                            </div>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                  {!cotacaoSelecionada && (cotacaoTipo !== "semana" || cotacaoSemana) && (
-                    <p className="text-sm text-muted-foreground text-center py-4">
-                      Nenhuma cotação encontrada para o período selecionado.
-                    </p>
-                  )}
-
-                  <div className="space-y-2">
-                    <Label>Nome da Cotação (opcional)</Label>
-                    <Input 
-                      placeholder={`Ex: Cotação ${cotacaoTipo === "dia" ? cotacaoData : cotacaoTipo === "semana" ? `Semana ${cotacaoSemana}` : cotacaoMes}`}
-                      value={cotacaoNome} 
-                      onChange={(e) => setCotacaoNome(e.target.value)} 
-                    />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsCotacaoOpen(false)}>Cancelar</Button>
-                  <Button onClick={salvarCotacao} disabled={!cotacaoSelecionada}>
-                    <Save className="h-4 w-4 mr-2" />
-                    Salvar Cotação
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-
-            <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline"><Upload className="h-4 w-4 mr-2" />Manual</Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-lg">
-                <DialogHeader><DialogTitle>Cadastrar Cotação Manual</DialogTitle></DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="space-y-2">
-                    <Label>Data</Label>
-                    <Input type="date" value={uploadData.data} onChange={(e) => setUploadData({ ...uploadData, data: e.target.value })} />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Cobre (US$/t)</Label>
-                      <Input type="number" step="0.01" value={uploadData.cobre_usd_t} onChange={(e) => setUploadData({ ...uploadData, cobre_usd_t: e.target.value })} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Alumínio (US$/t)</Label>
-                      <Input type="number" step="0.01" value={uploadData.aluminio_usd_t} onChange={(e) => setUploadData({ ...uploadData, aluminio_usd_t: e.target.value })} />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Zinco (US$/t)</Label>
-                      <Input type="number" step="0.01" value={uploadData.zinco_usd_t} onChange={(e) => setUploadData({ ...uploadData, zinco_usd_t: e.target.value })} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Chumbo (US$/t)</Label>
-                      <Input type="number" step="0.01" value={uploadData.chumbo_usd_t} onChange={(e) => setUploadData({ ...uploadData, chumbo_usd_t: e.target.value })} />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Estanho (US$/t)</Label>
-                      <Input type="number" step="0.01" value={uploadData.estanho_usd_t} onChange={(e) => setUploadData({ ...uploadData, estanho_usd_t: e.target.value })} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Níquel (US$/t)</Label>
-                      <Input type="number" step="0.01" value={uploadData.niquel_usd_t} onChange={(e) => setUploadData({ ...uploadData, niquel_usd_t: e.target.value })} />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Dólar (R$/US$)</Label>
-                    <Input type="number" step="0.0001" value={uploadData.dolar_brl} onChange={(e) => setUploadData({ ...uploadData, dolar_brl: e.target.value })} />
-                  </div>
-                  <Button className="w-full" onClick={() => uploadMutation.mutate(uploadData)} disabled={uploadMutation.isPending}>
-                    {uploadMutation.isPending ? "Salvando..." : "Salvar Cotação"}
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
-            <Button variant="outline" onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" />Imprimir</Button>
+            {/* Botão de forçar atualização - apenas admin/dono */}
+            {canForceUpdate && (
+              <Button 
+                variant="default" 
+                onClick={() => updateLmeMutation.mutate()}
+                disabled={updateLmeMutation.isPending}
+                className="bg-primary"
+              >
+                {updateLmeMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                )}
+                Atualizar LME
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => window.print()}>
+              <Printer className="h-4 w-4 mr-2" />
+              Imprimir
+            </Button>
           </div>
         </div>
 
@@ -461,11 +292,11 @@ export default function Indicadores() {
               Cotação LME
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              Parâmetros do mercado {lmeCotacao?.label ? `(última: ${lmeCotacao.label})` : ""}
+              Parâmetros do mercado {lmeCotacao?.label ? `(${lmeCotacao.label})` : ""}
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Label className="text-sm w-20">Filtrar por:</Label>
               <Select value={lmeTipoFiltro} onValueChange={(v: "dia" | "semana" | "mes") => setLmeTipoFiltro(v)}>
                 <SelectTrigger className="w-40">
@@ -510,7 +341,7 @@ export default function Indicadores() {
               )}
             </div>
             
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="space-y-2">
                 <Label className="text-muted-foreground">Cobre (US$/t)</Label>
                 <Input 
@@ -525,6 +356,24 @@ export default function Indicadores() {
                 <Input 
                   type="text"
                   value={lmeCotacao?.dolar_brl ? Number(lmeCotacao.dolar_brl).toFixed(4).replace(".", ",") : "-"}
+                  disabled
+                  className="bg-muted font-mono text-lg"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-muted-foreground">Cobre (R$/kg)</Label>
+                <Input 
+                  type="text"
+                  value={lmeCotacao?.cobre_brl_kg ? formatCurrency(lmeCotacao.cobre_brl_kg) : "-"}
+                  disabled
+                  className="bg-muted font-mono text-lg"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-muted-foreground">Alumínio (R$/kg)</Label>
+                <Input 
+                  type="text"
+                  value={lmeCotacao?.aluminio_brl_kg ? formatCurrency(lmeCotacao.aluminio_brl_kg) : "-"}
                   disabled
                   className="bg-muted font-mono text-lg"
                 />
@@ -584,7 +433,7 @@ export default function Indicadores() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Calendar className="h-5 w-5 text-primary" />
-                Médias Semanais Importadas
+                Médias Semanais
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -622,13 +471,24 @@ export default function Indicadores() {
           </Card>
         )}
 
-        {/* Tabela de Dados Diários */}
+        {/* Tabela de Dados Diários com Cobre em USD/t */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5 text-primary" />
-              Histórico de Cotações Diárias
-            </CardTitle>
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-primary" />
+                Histórico de Cotações Diárias
+              </CardTitle>
+              <div className="flex items-center gap-2">
+                <Label className="text-sm">Mês:</Label>
+                <Input 
+                  type="month" 
+                  value={historicoMesFiltro} 
+                  onChange={(e) => setHistoricoMesFiltro(e.target.value)}
+                  className="w-40"
+                />
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -636,23 +496,28 @@ export default function Indicadores() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Data</TableHead>
+                    <TableHead className="text-right">Cobre (US$/t)</TableHead>
                     <TableHead className="text-right">Cobre (R$/kg)</TableHead>
                     <TableHead className="text-right">Alumínio (R$/kg)</TableHead>
                     <TableHead className="text-right">Dólar (R$/US$)</TableHead>
+                    <TableHead className="text-center">Fonte</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {historico.length === 0 ? (
+                  {historicoFiltrado.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center text-muted-foreground">
-                        Nenhuma cotação cadastrada. Clique em "Importar Excel" para adicionar.
+                      <TableCell colSpan={6} className="text-center text-muted-foreground">
+                        Nenhuma cotação encontrada para o mês selecionado.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    historico.slice(0, 20).map((h: any) => (
+                    historicoFiltrado.map((h: any) => (
                       <TableRow key={h.id}>
                         <TableCell className="font-medium">
                           {format(new Date(h.data), "dd/MM/yyyy", { locale: ptBR })}
+                        </TableCell>
+                        <TableCell className="text-right font-mono font-semibold text-primary">
+                          {h.cobre_usd_t ? `$ ${Number(h.cobre_usd_t).toLocaleString("pt-BR")}` : "-"}
                         </TableCell>
                         <TableCell className="text-right font-mono">
                           {h.cobre_brl_kg ? formatCurrency(h.cobre_brl_kg) : "-"}
@@ -662,6 +527,15 @@ export default function Indicadores() {
                         </TableCell>
                         <TableCell className="text-right font-mono">
                           {h.dolar_brl ? `R$ ${Number(h.dolar_brl).toFixed(4)}` : "-"}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${
+                            h.fonte === "api" ? "bg-success/10 text-success" : 
+                            h.fonte === "excel" ? "bg-primary/10 text-primary" : 
+                            "bg-muted text-muted-foreground"
+                          }`}>
+                            {h.fonte === "api" ? "API" : h.fonte === "excel" ? "Excel" : "Manual"}
+                          </span>
                         </TableCell>
                       </TableRow>
                     ))
