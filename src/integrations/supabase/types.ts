@@ -336,6 +336,7 @@ export type Database = {
           data_inicio: string | null
           fornecedor_terceiro_id: string | null
           id: string
+          lme_referencia_kg: number | null
           motorista: string | null
           observacoes: string | null
           perda_cobrada_pct: number | null
@@ -362,6 +363,7 @@ export type Database = {
           data_inicio?: string | null
           fornecedor_terceiro_id?: string | null
           id?: string
+          lme_referencia_kg?: number | null
           motorista?: string | null
           observacoes?: string | null
           perda_cobrada_pct?: number | null
@@ -388,6 +390,7 @@ export type Database = {
           data_inicio?: string | null
           fornecedor_terceiro_id?: string | null
           id?: string
+          lme_referencia_kg?: number | null
           motorista?: string | null
           observacoes?: string | null
           perda_cobrada_pct?: number | null

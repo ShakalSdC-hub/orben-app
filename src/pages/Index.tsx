@@ -23,6 +23,7 @@ import { ptBR } from "date-fns/locale";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { GlobalFilters } from "@/components/filters/GlobalFilters";
 import { LMECharts } from "@/components/dashboard/LMECharts";
+import { FinancialKPIs } from "@/components/dashboard/FinancialKPIs";
 
 export default function Index() {
   const [selectedDono, setSelectedDono] = useState<string | null>(null);
@@ -263,6 +264,9 @@ export default function Index() {
             </CardContent>
           </Card>
         )}
+
+        {/* KPIs Financeiros - Economia vs LME */}
+        <FinancialKPIs selectedDono={selectedDono} />
 
         {/* Gráficos LME */}
         <LMECharts lmeData={ultimaLme || []} isLoading={loadingLme} />
