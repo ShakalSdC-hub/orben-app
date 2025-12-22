@@ -11,7 +11,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { format, getWeek, startOfMonth, endOfMonth, subMonths, isWithinInterval, parseISO } from "date-fns";
+import { format, getISOWeek, startOfMonth, endOfMonth, subMonths, isWithinInterval, parseISO, getISOWeekYear } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -79,25 +79,25 @@ export default function Indicadores() {
     },
   });
 
-  // Calcular médias semanais a partir dos dados diários
+  // Calcular médias semanais a partir dos dados diários (usando semana ISO - segunda a domingo)
   const calcularMediasSemanais = (registros: any[]) => {
     const semanas: { [key: number]: any[] } = {};
     registros.forEach((h: any) => {
       const dataRegistro = parseISO(h.data);
-      const semana = getWeek(dataRegistro, { weekStartsOn: 1 });
-      const ano = dataRegistro.getFullYear();
-      const key = ano * 100 + semana; // Ex: 202451 para semana 51 de 2024
+      const semana = getISOWeek(dataRegistro); // Semana ISO (começa segunda)
+      const ano = getISOWeekYear(dataRegistro); // Ano ISO correto
+      const key = ano * 100 + semana; // Ex: 202551 para semana 51 de 2025
       if (!semanas[key]) semanas[key] = [];
       semanas[key].push(h);
     });
     
-    return Object.entries(semanas).map(([key, registros]) => {
+    return Object.entries(semanas).map(([key, regs]) => {
       const semana = Number(key) % 100;
       const ano = Math.floor(Number(key) / 100);
-      const cobreBrlKg = registros.reduce((acc, h) => acc + (h.cobre_brl_kg || 0), 0) / registros.length;
-      const aluminioBrlKg = registros.reduce((acc, h) => acc + (h.aluminio_brl_kg || 0), 0) / registros.length;
-      const dolarBrl = registros.reduce((acc, h) => acc + (h.dolar_brl || 0), 0) / registros.length;
-      const cobreUsdT = registros.reduce((acc, h) => acc + (h.cobre_usd_t || 0), 0) / registros.length;
+      const cobreBrlKg = regs.reduce((acc, h) => acc + (h.cobre_brl_kg || 0), 0) / regs.length;
+      const aluminioBrlKg = regs.reduce((acc, h) => acc + (h.aluminio_brl_kg || 0), 0) / regs.length;
+      const dolarBrl = regs.reduce((acc, h) => acc + (h.dolar_brl || 0), 0) / regs.length;
+      const cobreUsdT = regs.reduce((acc, h) => acc + (h.cobre_usd_t || 0), 0) / regs.length;
       
       return {
         semana_numero: semana,
@@ -107,7 +107,7 @@ export default function Indicadores() {
         aluminio_brl_kg: aluminioBrlKg,
         dolar_brl: dolarBrl,
         cobre_usd_t: cobreUsdT,
-        registros_count: registros.length
+        registros_count: regs.length
       };
     }).sort((a, b) => b.key - a.key); // Mais recente primeiro
   };
@@ -215,8 +215,8 @@ export default function Indicadores() {
   const ontem = historico[1];
   
   // Usar médias semanais calculadas (S-1 e S-2)
-  const semanaAtual = getWeek(new Date(), { weekStartsOn: 1 });
-  const anoAtual = new Date().getFullYear();
+  const semanaAtual = getISOWeek(new Date());
+  const anoAtual = getISOWeekYear(new Date());
   const keyS1 = anoAtual * 100 + (semanaAtual - 1);
   const keyS2 = anoAtual * 100 + (semanaAtual - 2);
   
