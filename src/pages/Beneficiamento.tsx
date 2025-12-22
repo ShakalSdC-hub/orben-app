@@ -322,7 +322,10 @@ export default function Beneficiamento() {
           codigo,
           processo_id: formData.processo_id || null,
           tipo_beneficiamento: formData.tipo_beneficiamento,
-          fornecedor_terceiro_id: formData.fornecedor_terceiro_id || null,
+          // Só envia fornecedor_terceiro_id se for externo E tiver valor válido
+          fornecedor_terceiro_id: formData.tipo_beneficiamento === "externo" && formData.fornecedor_terceiro_id 
+            ? formData.fornecedor_terceiro_id 
+            : null,
           custo_frete_ida: formData.custo_frete_ida_kg * pesoTotalEntrada,
           custo_frete_volta: formData.custo_frete_volta_kg * pesoTotalEntrada,
           custo_mo_terceiro: formData.custo_mo_terceiro_kg * pesoTotalEntrada,
