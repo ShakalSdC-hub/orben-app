@@ -118,8 +118,6 @@ serve(async (req) => {
       estanho_usd_t: estanhoUsdT,
       niquel_usd_t: niquelUsdT,
       dolar_brl: dolarBrl,
-      cobre_brl_kg: cobreBrlKg,
-      aluminio_brl_kg: aluminioBrlKg,
       is_media_semanal: false,
       fonte: "api",
     };
