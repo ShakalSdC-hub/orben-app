@@ -96,7 +96,7 @@ serve(async (req) => {
     // Check if record for today already exists
     const { data: existing, error: checkError } = await supabase
       .from("historico_lme")
-      .select("id")
+      .select("id, fonte")
       .eq("data", today)
       .eq("is_media_semanal", false)
       .maybeSingle();
@@ -106,6 +106,20 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ error: "Erro ao verificar registro existente" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // IMPORTANTE: Não sobrescrever dados importados manualmente
+    if (existing?.fonte === "manual") {
+      console.log("Registro manual encontrado para hoje, ignorando atualização via API");
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: "Registro manual já existe para hoje - dados preservados",
+          skipped: true,
+          data: existing,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
