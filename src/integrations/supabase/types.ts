@@ -23,6 +23,7 @@ export type Database = {
           dono_id: string | null
           id: string
           observacoes: string | null
+          parceiro_id: string | null
           referencia_id: string | null
           referencia_tipo: string | null
           status: string | null
@@ -38,6 +39,7 @@ export type Database = {
           dono_id?: string | null
           id?: string
           observacoes?: string | null
+          parceiro_id?: string | null
           referencia_id?: string | null
           referencia_tipo?: string | null
           status?: string | null
@@ -53,6 +55,7 @@ export type Database = {
           dono_id?: string | null
           id?: string
           observacoes?: string | null
+          parceiro_id?: string | null
           referencia_id?: string | null
           referencia_tipo?: string | null
           status?: string | null
@@ -66,6 +69,13 @@ export type Database = {
             columns: ["dono_id"]
             isOneToOne: false
             referencedRelation: "donos_material"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "acertos_financeiros_parceiro_id_fkey"
+            columns: ["parceiro_id"]
+            isOneToOne: false
+            referencedRelation: "parceiros"
             referencedColumns: ["id"]
           },
         ]
@@ -435,7 +445,6 @@ export type Database = {
           created_by: string | null
           data_entrada: string
           dono_id: string | null
-          fornecedor_id: string | null
           id: string
           motorista: string | null
           nota_fiscal: string | null
@@ -463,7 +472,6 @@ export type Database = {
           created_by?: string | null
           data_entrada?: string
           dono_id?: string | null
-          fornecedor_id?: string | null
           id?: string
           motorista?: string | null
           nota_fiscal?: string | null
@@ -491,7 +499,6 @@ export type Database = {
           created_by?: string | null
           data_entrada?: string
           dono_id?: string | null
-          fornecedor_id?: string | null
           id?: string
           motorista?: string | null
           nota_fiscal?: string | null

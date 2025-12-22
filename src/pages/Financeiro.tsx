@@ -61,7 +61,7 @@ export default function Financeiro() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("acertos_financeiros")
-        .select(`*, donos_material(nome)`)
+        .select(`*, donos_material(nome), parceiros(razao_social, nome_fantasia)`)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
@@ -601,7 +601,7 @@ export default function Financeiro() {
                                 </TableCell>
                               )}
                               <TableCell className="font-mono">{e.codigo}</TableCell>
-                              <TableCell>{e.fornecedor?.razao_social || e.dono?.nome || "-"}</TableCell>
+                              <TableCell>{e.parceiro?.razao_social || e.parceiro?.nome_fantasia || "-"}</TableCell>
                               <TableCell>{format(new Date(e.data_entrada), "dd/MM/yyyy", { locale: ptBR })}</TableCell>
                               <TableCell className="text-right font-bold text-destructive">
                                 {formatCurrency(e.valor_total || 0)}
@@ -621,9 +621,9 @@ export default function Financeiro() {
                 <div>
                   <CardTitle className="flex items-center gap-2">
                     <Users className="h-5 w-5" />
-                    Acertos por Dono do Material
+                    Acertos Financeiros
                   </CardTitle>
-                  <CardDescription>Controle de cobranças e repasses por proprietário</CardDescription>
+                  <CardDescription>Controle de cobranças e repasses por Parceiro/Dono</CardDescription>
                 </div>
                 {canConciliar && selectedAcertos.length > 0 && (
                   <Button 
@@ -641,7 +641,7 @@ export default function Financeiro() {
                   <TableHeader>
                     <TableRow>
                       {canConciliar && <TableHead className="w-10"></TableHead>}
-                      <TableHead>Dono</TableHead>
+                      <TableHead>Parceiro/Dono</TableHead>
                       <TableHead>Tipo</TableHead>
                       <TableHead>Data Acerto</TableHead>
                       <TableHead className="text-right">Valor</TableHead>
@@ -667,7 +667,9 @@ export default function Financeiro() {
                             </TableCell>
                           )}
                           {canConciliar && a.status !== "pendente" && <TableCell></TableCell>}
-                          <TableCell className="font-medium">{a.donos_material?.nome || "-"}</TableCell>
+                          <TableCell className="font-medium">
+                            {a.parceiros?.razao_social || a.parceiros?.nome_fantasia || a.donos_material?.nome || "-"}
+                          </TableCell>
                           <TableCell>
                             <Badge variant="outline" className="capitalize">{a.tipo}</Badge>
                           </TableCell>

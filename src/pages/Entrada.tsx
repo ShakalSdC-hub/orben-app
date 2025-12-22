@@ -317,7 +317,9 @@ export default function Entrada() {
                   <TableHead className="font-semibold">Parceiro</TableHead>
                   <TableHead className="font-semibold">Data</TableHead>
                   <TableHead className="font-semibold">NF</TableHead>
-                  <TableHead className="font-semibold text-right">Peso Total</TableHead>
+                  <TableHead className="font-semibold text-right">Peso Físico</TableHead>
+                  <TableHead className="font-semibold text-right">Peso NF</TableHead>
+                  <TableHead className="font-semibold text-right">Diferença</TableHead>
                   <TableHead className="font-semibold">Volumes</TableHead>
                   <TableHead className="font-semibold">Dono</TableHead>
                   <TableHead className="font-semibold">Status</TableHead>
@@ -327,7 +329,7 @@ export default function Entrada() {
               <TableBody>
                 {filteredEntradas?.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={12} className="text-center text-muted-foreground py-8">
                       Nenhuma entrada encontrada
                     </TableCell>
                   </TableRow>
@@ -336,6 +338,12 @@ export default function Entrada() {
                     const volumesEntrada = getSublotesForEntrada(entrada.id);
                     const isExpanded = expandedRows.has(entrada.id);
                     const status = statusConfig[entrada.status || "pendente"] || statusConfig.pendente;
+                    
+                    // Calcular diferença entre peso NF e peso físico
+                    const pesoNf = entrada.peso_nf_kg || 0;
+                    const pesoFisico = entrada.peso_liquido_kg || 0;
+                    const diferenca = pesoNf > 0 ? pesoNf - pesoFisico : 0;
+                    const diferencaPct = pesoNf > 0 ? ((diferenca / pesoNf) * 100) : 0;
 
                     return (
                       <Collapsible key={entrada.id} open={isExpanded} onOpenChange={() => toggleRow(entrada.id)} asChild>
@@ -367,7 +375,17 @@ export default function Entrada() {
                               {entrada.nota_fiscal || "-"}
                             </TableCell>
                             <TableCell className="text-right font-medium">
-                              {formatWeight(entrada.peso_liquido_kg)}
+                              {formatWeight(pesoFisico)}
+                            </TableCell>
+                            <TableCell className="text-right text-muted-foreground">
+                              {pesoNf > 0 ? formatWeight(pesoNf) : "-"}
+                            </TableCell>
+                            <TableCell className={`text-right font-medium ${diferenca > 0 ? 'text-warning' : diferenca < 0 ? 'text-destructive' : 'text-success'}`}>
+                              {pesoNf > 0 ? (
+                                <span title={`${diferencaPct.toFixed(2)}%`}>
+                                  {diferenca > 0 ? '+' : ''}{diferenca.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}kg
+                                </span>
+                              ) : "-"}
                             </TableCell>
                             <TableCell>
                               <Badge variant="secondary">

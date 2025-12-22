@@ -107,7 +107,7 @@ export default function Estoque() {
             codigo,
             tipo_beneficiamento,
             status,
-            fornecedor_terceiro:fornecedores(razao_social)
+            fornecedor_terceiro:parceiros!beneficiamentos_fornecedor_terceiro_id_fkey(razao_social)
           )
         `)
         .eq("beneficiamento.status", "em_andamento");
