@@ -37,7 +37,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { format, addDays, parseISO, getWeek, isWithinInterval, startOfMonth, endOfMonth } from "date-fns";
+import { format, addDays, parseISO, getISOWeek, getISOWeekYear, isWithinInterval, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 interface Parcela {
@@ -94,13 +94,13 @@ export default function Simulador() {
     },
   });
 
-  // Calcular médias semanais a partir dos dados diários
+  // Calcular médias semanais a partir dos dados diários (usando semana ISO - segunda a domingo)
   const calcularMediasSemanais = (registros: any[]) => {
     const semanas: { [key: number]: any[] } = {};
     registros.forEach((h: any) => {
       const dataRegistro = parseISO(h.data);
-      const semana = getWeek(dataRegistro, { weekStartsOn: 1 });
-      const ano = dataRegistro.getFullYear();
+      const semana = getISOWeek(dataRegistro); // Semana ISO (começa segunda)
+      const ano = getISOWeekYear(dataRegistro); // Ano ISO correto
       const key = ano * 100 + semana; // Ex: 202551 para semana 51 de 2025
       if (!semanas[key]) semanas[key] = [];
       semanas[key].push(h);
