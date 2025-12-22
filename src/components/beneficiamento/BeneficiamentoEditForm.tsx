@@ -184,11 +184,12 @@ export function BeneficiamentoEditForm({ beneficiamento, onClose, readOnly = fal
                 disabled={readOnly}
               >
                 <SelectTrigger className={readOnly ? "bg-muted" : ""}>
-                  <SelectValue />
+                  <SelectValue placeholder="Selecione..." />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="interno">Interno</SelectItem>
                   <SelectItem value="terceiro">Terceiro</SelectItem>
+                  <SelectItem value="externo">Externo</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -385,31 +386,45 @@ export function BeneficiamentoEditForm({ beneficiamento, onClose, readOnly = fal
                   <TableHead>Código</TableHead>
                   <TableHead>Tipo Produto</TableHead>
                   <TableHead>Dono</TableHead>
-                  <TableHead className="text-right">Peso (kg)</TableHead>
+                  <TableHead className="text-right">Peso Entrada</TableHead>
+                  <TableHead className="text-right">Saldo Atual</TableHead>
                   <TableHead className="text-right">Custo/kg</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {itensEntrada?.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                       Nenhum item registrado
                     </TableCell>
                   </TableRow>
                 ) : (
-                  itensEntrada?.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell className="font-mono text-primary">{item.sublote?.codigo}</TableCell>
-                      <TableCell>{item.sublote?.tipo_produto?.nome || "—"}</TableCell>
-                      <TableCell>{item.sublote?.dono?.nome || "IBRAC"}</TableCell>
-                      <TableCell className="text-right font-medium">
-                        {item.peso_kg.toLocaleString("pt-BR")} kg
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {item.custo_unitario ? formatCurrency(item.custo_unitario) : "—"}
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  itensEntrada?.map((item) => {
+                    const pesoEntradaItem = item.peso_kg; // peso registrado na entrada do beneficiamento
+                    const saldoAtual = item.sublote?.peso_kg || 0; // peso atual do sublote (pode ser 0 se consumido)
+                    
+                    return (
+                      <TableRow key={item.id}>
+                        <TableCell className="font-mono text-primary">{item.sublote?.codigo}</TableCell>
+                        <TableCell>{item.sublote?.tipo_produto?.nome || "—"}</TableCell>
+                        <TableCell>{item.sublote?.dono?.nome || "IBRAC"}</TableCell>
+                        <TableCell className="text-right font-medium">
+                          {pesoEntradaItem.toLocaleString("pt-BR")} kg
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <span className={saldoAtual === 0 ? "text-muted-foreground" : ""}>
+                            {saldoAtual.toLocaleString("pt-BR")} kg
+                          </span>
+                          {saldoAtual === 0 && (
+                            <span className="ml-1 text-xs text-success">(consumido)</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {item.custo_unitario ? formatCurrency(item.custo_unitario) : "—"}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
                 )}
               </TableBody>
             </Table>

@@ -467,32 +467,50 @@ export default function Entrada() {
                           {volumesEntrada.length > 0 && (
                             <CollapsibleContent asChild>
                               <TableRow className="bg-muted/20 hover:bg-muted/30">
-                                <TableCell colSpan={10} className="p-0">
+                                <TableCell colSpan={12} className="p-0">
                                   <div className="px-12 py-3">
                                     <Table>
                                       <TableHeader>
                                         <TableRow className="border-none">
                                           <TableHead className="text-xs font-medium text-muted-foreground">Volume/Ticket</TableHead>
-                                          <TableHead className="text-xs font-medium text-muted-foreground text-right">Peso</TableHead>
+                                          <TableHead className="text-xs font-medium text-muted-foreground text-right">Peso Recebido</TableHead>
+                                          <TableHead className="text-xs font-medium text-muted-foreground text-right">Saldo Atual</TableHead>
                                           <TableHead className="text-xs font-medium text-muted-foreground">Status</TableHead>
                                         </TableRow>
                                       </TableHeader>
                                       <TableBody>
-                                        {volumesEntrada.map((sublote) => (
-                                          <TableRow key={sublote.id} className="border-none">
-                                            <TableCell className="font-mono text-sm text-primary py-1">
-                                              {sublote.codigo}
-                                            </TableCell>
-                                            <TableCell className="text-right font-medium py-1">
-                                              {formatWeight(sublote.peso_kg)}
-                                            </TableCell>
-                                            <TableCell className="py-1">
-                                              <Badge variant="outline" className="text-xs">
-                                                {sublote.status}
-                                              </Badge>
-                                            </TableCell>
-                                          </TableRow>
-                                        ))}
+                                        {volumesEntrada.map((sublote) => {
+                                          // Peso recebido original é o peso_liquido_kg da entrada dividido pelos volumes
+                                          // ou podemos usar o peso_kg se foi mantido
+                                          const pesoRecebido = sublote.peso_kg; // Usaremos o peso registrado
+                                          const saldoAtual = sublote.peso_kg;
+                                          const isConsumido = sublote.status === 'processado' || sublote.status === 'vendido';
+                                          
+                                          return (
+                                            <TableRow key={sublote.id} className="border-none">
+                                              <TableCell className="font-mono text-sm text-primary py-1">
+                                                {sublote.codigo}
+                                              </TableCell>
+                                              <TableCell className="text-right font-medium py-1">
+                                                {formatWeight(pesoRecebido)}
+                                              </TableCell>
+                                              <TableCell className="text-right py-1">
+                                                {isConsumido ? (
+                                                  <span className="text-muted-foreground">
+                                                    0 kg <span className="text-xs text-success">(consumido)</span>
+                                                  </span>
+                                                ) : (
+                                                  <span className="font-medium">{formatWeight(saldoAtual)}</span>
+                                                )}
+                                              </TableCell>
+                                              <TableCell className="py-1">
+                                                <Badge variant="outline" className="text-xs">
+                                                  {sublote.status}
+                                                </Badge>
+                                              </TableCell>
+                                            </TableRow>
+                                          );
+                                        })}
                                       </TableBody>
                                     </Table>
                                   </div>
