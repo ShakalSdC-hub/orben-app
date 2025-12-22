@@ -335,10 +335,14 @@ export default function Beneficiamento() {
     }
   };
 
+  // Validação dos campos obrigatórios de configuração
+  const isConfigValid = formData.processo_id && formData.tipo_produto_saida_id;
+
   const createMutation = useMutation({
     mutationFn: async () => {
       if (selectedLotes.length === 0) throw new Error("Selecione ao menos um lote");
-
+      if (!formData.processo_id) throw new Error("Selecione o processo de beneficiamento");
+      if (!formData.tipo_produto_saida_id) throw new Error("Selecione o produto de saída");
       const codigo = `BEN-${format(new Date(), "yyyyMMdd")}-${String(Math.floor(Math.random() * 9999)).padStart(4, "0")}`;
 
       // Criar beneficiamento
@@ -1133,14 +1137,27 @@ export default function Beneficiamento() {
 
               <DialogFooter className="gap-2">
                 <Button variant="outline" onClick={handleClose}>Cancelar</Button>
-                <Button
-                  onClick={() => createMutation.mutate()}
-                  disabled={createMutation.isPending || selectedLotes.length === 0}
-                  className="bg-gradient-copper hover:opacity-90"
-                >
-                  {createMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                  Criar Beneficiamento
-                </Button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span>
+                        <Button
+                          onClick={() => createMutation.mutate()}
+                          disabled={createMutation.isPending || selectedLotes.length === 0 || !isConfigValid}
+                          className="bg-gradient-copper hover:opacity-90"
+                        >
+                          {createMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                          Criar Beneficiamento
+                        </Button>
+                      </span>
+                    </TooltipTrigger>
+                    {!isConfigValid && (
+                      <TooltipContent>
+                        <p>Preencha o Processo e Produto de Saída na aba Configuração</p>
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
+                </TooltipProvider>
               </DialogFooter>
             </DialogContent>
           </Dialog>
