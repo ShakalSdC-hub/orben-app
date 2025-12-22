@@ -73,46 +73,47 @@ export default function Indicadores() {
         .select("*")
         .eq("is_media_semanal", false)
         .order("data", { ascending: false })
-        .limit(400); // Aumentado para cobrir ~1 ano
+        .limit(400);
       if (error) throw error;
       return data;
     },
   });
 
-  // Calcular médias semanais a partir dos dados diários (usando semana ISO - segunda a domingo)
-  const calcularMediasSemanais = (registros: any[]) => {
-    const semanas: { [key: number]: any[] } = {};
-    registros.forEach((h: any) => {
-      const dataRegistro = parseISO(h.data);
-      const semana = getISOWeek(dataRegistro); // Semana ISO (começa segunda)
-      const ano = getISOWeekYear(dataRegistro); // Ano ISO correto
-      const key = ano * 100 + semana; // Ex: 202551 para semana 51 de 2025
-      if (!semanas[key]) semanas[key] = [];
-      semanas[key].push(h);
-    });
-    
-    return Object.entries(semanas).map(([key, regs]) => {
-      const semana = Number(key) % 100;
-      const ano = Math.floor(Number(key) / 100);
-      const cobreBrlKg = regs.reduce((acc, h) => acc + (h.cobre_brl_kg || 0), 0) / regs.length;
-      const aluminioBrlKg = regs.reduce((acc, h) => acc + (h.aluminio_brl_kg || 0), 0) / regs.length;
-      const dolarBrl = regs.reduce((acc, h) => acc + (h.dolar_brl || 0), 0) / regs.length;
-      const cobreUsdT = regs.reduce((acc, h) => acc + (h.cobre_usd_t || 0), 0) / regs.length;
-      
-      return {
-        semana_numero: semana,
-        ano,
-        key: Number(key),
-        cobre_brl_kg: cobreBrlKg,
-        aluminio_brl_kg: aluminioBrlKg,
-        dolar_brl: dolarBrl,
-        cobre_usd_t: cobreUsdT,
-        registros_count: regs.length
-      };
-    }).sort((a, b) => b.key - a.key); // Mais recente primeiro
-  };
+  // Fetch médias semanais OFICIAIS do banco de dados (is_media_semanal = true)
+  const { data: mediasSemanaisOficiais = [] } = useQuery({
+    queryKey: ["historico_lme_medias"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("historico_lme")
+        .select("*")
+        .eq("is_media_semanal", true)
+        .order("data", { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return data;
+    },
+  });
 
-  const mediasSemanais = calcularMediasSemanais(historico);
+  // Transformar médias oficiais para o formato esperado pelo componente
+  const mediasSemanais = mediasSemanaisOficiais.map((m: any) => {
+    const dataRegistro = parseISO(m.data);
+    const semana = m.semana_numero || getISOWeek(dataRegistro);
+    const ano = getISOWeekYear(dataRegistro);
+    const key = ano * 100 + semana;
+    
+    return {
+      semana_numero: semana,
+      ano,
+      key,
+      cobre_brl_kg: m.cobre_brl_kg,
+      aluminio_brl_kg: m.aluminio_brl_kg,
+      dolar_brl: m.dolar_brl,
+      cobre_usd_t: m.cobre_usd_t,
+      registros_count: 5, // Médias oficiais são baseadas em 5 dias úteis
+      data_original: m.data,
+      fonte: m.fonte
+    };
+  }).sort((a: any, b: any) => b.key - a.key);
 
   // Mutation para forçar atualização via API
   const updateLmeMutation = useMutation({
@@ -139,10 +140,10 @@ export default function Indicadores() {
     },
   });
 
-  // Gerar opções de semanas disponíveis
+  // Gerar opções de semanas disponíveis (usando médias oficiais)
   const semanasDisponiveis = mediasSemanais.map((m: any) => ({
     value: String(m.key),
-    label: `S${m.semana_numero} (${m.ano})`,
+    label: `M.S ${m.semana_numero} (${m.ano})`,
     data: m
   }));
 
@@ -172,6 +173,7 @@ export default function Indicadores() {
         label: format(parseISO(lmeData), "dd/MM/yyyy", { locale: ptBR })
       } : null;
     } else if (lmeTipoFiltro === "semana") {
+      // Usar médias semanais OFICIAIS importadas do banco
       const media = mediasSemanais.find((m: any) => String(m.key) === lmeSemana);
       if (media) {
         return {
@@ -179,7 +181,7 @@ export default function Indicadores() {
           dolar_brl: media.dolar_brl,
           cobre_brl_kg: media.cobre_brl_kg,
           aluminio_brl_kg: media.aluminio_brl_kg,
-          label: `Semana ${media.semana_numero} (${media.ano})`
+          label: `M.S ${media.semana_numero} (${media.ano})`
         };
       }
       return null;
@@ -210,18 +212,14 @@ export default function Indicadores() {
 
   const lmeCotacao = getLmeCotacao();
 
-  // Calcular variações usando médias importadas
+  // Calcular variações usando médias OFICIAIS importadas
   const hoje = historico[0];
   const ontem = historico[1];
   
-  // Usar médias semanais calculadas (S-1 e S-2)
-  const semanaAtual = getISOWeek(new Date());
-  const anoAtual = getISOWeekYear(new Date());
-  const keyS1 = anoAtual * 100 + (semanaAtual - 1);
-  const keyS2 = anoAtual * 100 + (semanaAtual - 2);
-  
-  const mediaSemanaS1 = mediasSemanais.find((m: any) => m.key === keyS1);
-  const mediaSemanaS2 = mediasSemanais.find((m: any) => m.key === keyS2);
+  // Usar as duas últimas médias semanais oficiais (S-1 e S-2)
+  // mediasSemanais já está ordenado por key decrescente (mais recente primeiro)
+  const mediaSemanaS1 = mediasSemanais[0]; // Média mais recente
+  const mediaSemanaS2 = mediasSemanais[1]; // Segunda média mais recente
   
   const cobreMediaSemana = mediaSemanaS1?.cobre_brl_kg || 0;
   const aluminioMediaSemana = mediaSemanaS1?.aluminio_brl_kg || 0;
@@ -447,16 +445,16 @@ export default function Indicadores() {
           </CardContent>
         </Card>
 
-        {/* Tabela de Médias Semanais Anuais */}
+        {/* Tabela de Médias Semanais Anuais - usando dados oficiais */}
         {mediasSemanais.length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Calendar className="h-5 w-5 text-primary" />
-                Médias Semanais {new Date().getFullYear()}
+                Médias Semanais Oficiais {new Date().getFullYear()}
               </CardTitle>
               <p className="text-sm text-muted-foreground">
-                Histórico de médias calculadas por semana (S1 até a última semana fechada)
+                Histórico de médias semanais oficiais (fonte: Shock Metais)
               </p>
             </CardHeader>
             <CardContent>
@@ -469,7 +467,7 @@ export default function Indicadores() {
                       <TableHead className="text-right">Cobre (R$/kg)</TableHead>
                       <TableHead className="text-right">Alumínio (R$/kg)</TableHead>
                       <TableHead className="text-right">Dólar (R$/US$)</TableHead>
-                      <TableHead className="text-center">Registros</TableHead>
+                      <TableHead className="text-center">Fonte</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -493,8 +491,12 @@ export default function Indicadores() {
                           <TableCell className="text-right font-mono">
                             {m.dolar_brl ? `R$ ${Number(m.dolar_brl).toFixed(4)}` : "-"}
                           </TableCell>
-                          <TableCell className="text-center text-muted-foreground">
-                            {m.registros_count} dias
+                          <TableCell className="text-center">
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${
+                              m.fonte === "manual" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                            }`}>
+                              {m.fonte === "manual" ? "Oficial" : m.fonte || "Oficial"}
+                            </span>
                           </TableCell>
                         </TableRow>
                       ))}
