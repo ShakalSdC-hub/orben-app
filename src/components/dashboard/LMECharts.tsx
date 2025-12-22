@@ -1,6 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, TrendingDown } from "lucide-react";
+import { TrendingUp, TrendingDown, Loader2 } from "lucide-react";
 import {
   Area,
   AreaChart,
@@ -20,9 +20,10 @@ import { ptBR } from "date-fns/locale";
 
 interface LMEChartsProps {
   lmeData: any[];
+  isLoading?: boolean;
 }
 
-export function LMECharts({ lmeData }: LMEChartsProps) {
+export function LMECharts({ lmeData, isLoading = false }: LMEChartsProps) {
   const chartData = lmeData?.slice().reverse().map((lme) => ({
     data: format(new Date(lme.data), "dd/MM"),
     dataFull: format(new Date(lme.data), "dd/MM/yyyy"),
@@ -64,6 +65,20 @@ export function LMECharts({ lmeData }: LMEChartsProps) {
   const variacaoDolar = lmeAtual && lmeAnterior && lmeAnterior.dolar_brl
     ? ((lmeAtual.dolar_brl - lmeAnterior.dolar_brl) / lmeAnterior.dolar_brl) * 100
     : 0;
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Cotações LME</CardTitle>
+          <CardDescription>Carregando dados...</CardDescription>
+        </CardHeader>
+        <CardContent className="flex items-center justify-center h-[200px]">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (!lmeData || lmeData.length === 0) {
     return (

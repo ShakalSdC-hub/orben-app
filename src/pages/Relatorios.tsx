@@ -155,7 +155,7 @@ export default function Relatorios() {
           `
           *,
           processo:processos(nome),
-          fornecedor_terceiro:fornecedores(razao_social)
+          fornecedor_terceiro:parceiros!beneficiamentos_fornecedor_terceiro_id_fkey(razao_social, nome_fantasia)
         `
         )
         .gte("data_inicio", dataInicio)
