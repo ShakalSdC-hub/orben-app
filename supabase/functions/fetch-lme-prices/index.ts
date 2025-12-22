@@ -53,15 +53,20 @@ serve(async (req) => {
 
     // Extract metal prices from the API response
     // The API returns prices in USD per metric ton
+    // IMPORTANTE: Usar os preços LME oficiais (lme_copper, lme_aluminum, etc.)
+    // em vez dos preços spot (copper, aluminum, etc.) para alinhar com a Shock Metais
     const metals = data.metals || {};
     
-    // Metal names in the API: copper, aluminum, zinc, lead, tin, nickel
-    const cobreUsdT = metals.copper || null;
-    const aluminioUsdT = metals.aluminum || null;
-    const zincoUsdT = metals.zinc || null;
-    const chumboUsdT = metals.lead || null;
-    const estanhoUsdT = metals.tin || null;
-    const niquelUsdT = metals.nickel || null;
+    // Usar lme_copper em vez de copper para valores oficiais LME
+    // Fallback para o valor spot caso o LME não esteja disponível
+    const cobreUsdT = metals.lme_copper || metals.copper || null;
+    const aluminioUsdT = metals.lme_aluminum || metals.aluminum || null;
+    const zincoUsdT = metals.lme_zinc || metals.zinc || null;
+    const chumboUsdT = metals.lme_lead || metals.lead || null;
+    const estanhoUsdT = metals.tin || null; // Não existe lme_tin na API
+    const niquelUsdT = metals.lme_nickel || metals.nickel || null;
+    
+    console.log("Using LME prices - Cobre:", cobreUsdT, "Alumínio:", aluminioUsdT, "Zinco:", zincoUsdT);
 
     // Get USD/BRL exchange rate
     // We need to fetch this separately or use a default
