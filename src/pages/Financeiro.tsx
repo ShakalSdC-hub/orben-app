@@ -22,6 +22,7 @@ import {
 } from "recharts";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { BeneficiamentoCustoReview } from "@/components/financeiro/BeneficiamentoCustoReview";
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
@@ -365,9 +366,10 @@ export default function Financeiro() {
         </div>
 
         <Tabs defaultValue="fluxo" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:grid-cols-none lg:flex">
+          <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:grid-cols-none lg:flex">
             <TabsTrigger value="fluxo">Fluxo de Caixa</TabsTrigger>
             <TabsTrigger value="contas">Contas</TabsTrigger>
+            <TabsTrigger value="custos">Custos</TabsTrigger>
             <TabsTrigger value="margens">Margens</TabsTrigger>
             <TabsTrigger value="fiscal">Fiscal</TabsTrigger>
           </TabsList>
@@ -687,6 +689,14 @@ export default function Financeiro() {
                 </Table>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Revisão de Custos */}
+          <TabsContent value="custos" className="mt-6">
+            <BeneficiamentoCustoReview 
+              beneficiamentos={beneficiamentos} 
+              canEdit={canConciliar} 
+            />
           </TabsContent>
 
           {/* Margens por Operação */}
