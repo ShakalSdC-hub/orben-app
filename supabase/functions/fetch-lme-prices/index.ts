@@ -68,29 +68,28 @@ serve(async (req) => {
     
     console.log("Using LME prices - Cobre:", cobreUsdT, "Alumínio:", aluminioUsdT, "Zinco:", zincoUsdT);
 
-    // Get USD/BRL exchange rate
-    // We need to fetch this separately or use a default
-    // For now, let's try to get it from another source or use data.currencies if available
+    // Get USD/BRL exchange rate (USD -> BRL)
     let dolarBrl = 5.40; // Default fallback
-    
+
     // Try to fetch USD/BRL rate
     try {
       const currencyUrl = `https://api.metals.dev/v1/latest?api_key=${METALS_API_KEY}&currency=BRL&unit=mt`;
       const currencyResponse = await fetch(currencyUrl);
       if (currencyResponse.ok) {
         const currencyData = await currencyResponse.json();
-        // Calculate exchange rate by comparing copper prices
-        if (currencyData.metals?.copper && cobreUsdT) {
-          dolarBrl = currencyData.metals.copper / cobreUsdT;
+
+        // Calculate exchange rate by comparing the SAME metal series (prefer LME)
+        const cobreBrlT = currencyData.metals?.lme_copper || currencyData.metals?.copper;
+        if (cobreBrlT && cobreUsdT) {
+          dolarBrl = cobreBrlT / cobreUsdT;
+        } else if (currencyData.currencies?.BRL) {
+          // currencies.BRL parece ser USD por 1 BRL, então USD/BRL = 1 / BRL
+          dolarBrl = 1 / Number(currencyData.currencies.BRL);
         }
       }
     } catch (e) {
       console.log("Could not fetch BRL rate, using default:", e);
     }
-
-    // Calculate BRL/kg values
-    const cobreBrlKg = cobreUsdT && dolarBrl ? (cobreUsdT * dolarBrl) / 1000 : null;
-    const aluminioBrlKg = aluminioUsdT && dolarBrl ? (aluminioUsdT * dolarBrl) / 1000 : null;
 
     // Get today's date in YYYY-MM-DD format
     const today = new Date().toISOString().split("T")[0];
@@ -98,11 +97,12 @@ serve(async (req) => {
     // Initialize Supabase client
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Check if record for today already exists (sem filtro de is_media_semanal)
+    // Check if daily record for today already exists
     const { data: existing, error: checkError } = await supabase
       .from("historico_lme")
-      .select("id, fonte, is_media_semanal")
+      .select("id, fonte")
       .eq("data", today)
+      .eq("is_media_semanal", false)
       .maybeSingle();
 
     if (checkError) {
@@ -127,20 +127,6 @@ serve(async (req) => {
       );
     }
 
-    // Não sobrescrever médias semanais
-    if (existing?.is_media_semanal === true) {
-      console.log("Registro de média semanal encontrado para hoje, ignorando");
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: "Média semanal já existe para esta data - dados preservados",
-          skipped: true,
-          data: existing,
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     const recordData = {
       data: today,
       cobre_usd_t: cobreUsdT,
@@ -150,8 +136,6 @@ serve(async (req) => {
       estanho_usd_t: estanhoUsdT,
       niquel_usd_t: niquelUsdT,
       dolar_brl: dolarBrl,
-      cobre_brl_kg: cobreBrlKg,
-      aluminio_brl_kg: aluminioBrlKg,
       is_media_semanal: false,
       fonte: "api",
     };
