@@ -88,14 +88,14 @@ export default function Beneficiamento() {
     tipo_beneficiamento: "interno",
     fornecedor_terceiro_id: "",
     tipo_produto_saida_id: "",
-    // Custos em R$/kg
+    // Custos em R$/kg - frete ida usa peso entrada, frete volta usa peso após perda
     custo_frete_ida_kg: 0,
     custo_frete_volta_kg: 0,
     custo_mo_terceiro_kg: 0,
     custo_mo_ibrac_kg: 0,
-    // Taxa financeira em %
+    // Taxa financeira em % - calculada sobre o valor total de entrada
     taxa_financeira_pct: 1.8,
-    // Perdas
+    // Perdas - agora vem do tipo de produto
     perda_real_pct: 3,
     perda_cobrada_pct: 5,
     // Transporte
@@ -112,7 +112,8 @@ export default function Beneficiamento() {
         .from("beneficiamentos")
         .select(`
           *,
-          processos(nome)
+          processos(nome),
+          fornecedor_terceiro:parceiros!beneficiamentos_fornecedor_terceiro_id_fkey(razao_social, nome_fantasia)
         `)
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -127,8 +128,9 @@ export default function Beneficiamento() {
         .from("sublotes")
         .select(`
           *,
-          tipo_produto:tipos_produto(nome),
-          dono:donos_material(nome)
+          tipo_produto:tipos_produto(nome, perda_beneficiamento_pct),
+          dono:donos_material(nome),
+          entrada:entradas(parceiro:parceiros!entradas_parceiro_id_fkey(razao_social, nome_fantasia))
         `)
         .eq("status", "disponivel")
         .gt("peso_kg", 0)
@@ -137,6 +139,12 @@ export default function Beneficiamento() {
       return data;
     },
   });
+
+  // Obter parceiros únicos dos lotes selecionados
+  const parceirosDosMateriais = [...new Set(selectedLotes.map(l => {
+    const subloteFull = sublotesDisponiveis.find((s: any) => s.id === l.id);
+    return subloteFull?.entrada?.parceiro?.razao_social || subloteFull?.entrada?.parceiro?.nome_fantasia;
+  }).filter(Boolean))].join(", ");
 
   // Função para verificar se um sublote é relacionado (pai/filho) a algum já selecionado
   // Permite múltiplos filhos do mesmo pai, mas não permite pai+filho ao mesmo tempo
@@ -168,7 +176,7 @@ export default function Beneficiamento() {
   const { data: tiposProduto = [] } = useQuery({
     queryKey: ["tipos_produto"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("tipos_produto").select("*").eq("ativo", true).order("nome");
+      const { data, error } = await supabase.from("tipos_produto").select("*, perda_beneficiamento_pct").eq("ativo", true).order("nome");
       if (error) throw error;
       return data;
     },
@@ -233,12 +241,30 @@ export default function Beneficiamento() {
   const fornecedores = parceiros.filter((p) => p.is_fornecedor);
   const transportadoras = parceiros.filter((p) => p.is_transportadora);
 
-  // Cálculos
+  // Cálculos - Perda baseada no produto selecionado
   const pesoTotalEntrada = selectedLotes.reduce((acc, l) => acc + l.peso_kg, 0);
-  const custoTotalKg = formData.custo_frete_ida_kg + formData.custo_frete_volta_kg + formData.custo_mo_terceiro_kg + formData.custo_mo_ibrac_kg;
-  const custoTotal = custoTotalKg * pesoTotalEntrada;
-  const custoFinanceiro = custoTotal * (formData.taxa_financeira_pct / 100);
   const pesoSaidaEstimado = pesoTotalEntrada * (1 - formData.perda_real_pct / 100);
+  
+  // Frete ida = peso entrada × R$/kg
+  const custoFreteIda = formData.custo_frete_ida_kg * pesoTotalEntrada;
+  // Frete volta = peso após perda × R$/kg
+  const custoFreteVolta = formData.custo_frete_volta_kg * pesoSaidaEstimado;
+  // MO = peso entrada × R$/kg
+  const custoMoTerceiro = formData.custo_mo_terceiro_kg * pesoTotalEntrada;
+  const custoMoIbrac = formData.custo_mo_ibrac_kg * pesoTotalEntrada;
+  
+  // Custo total de processamento
+  const custoTotal = custoFreteIda + custoFreteVolta + custoMoTerceiro + custoMoIbrac;
+  const custoTotalKg = pesoTotalEntrada > 0 ? custoTotal / pesoTotalEntrada : 0;
+  
+  // Valor total de entrada (soma dos valores das entradas relacionadas aos sublotes)
+  const valorTotalEntrada = selectedLotes.reduce((acc, l) => {
+    const subloteFull = sublotesDisponiveis.find((s: any) => s.id === l.id);
+    return acc + ((subloteFull?.custo_unitario_total || 0) * l.peso_kg);
+  }, 0);
+  
+  // Taxa financeira sobre o valor total de entrada
+  const custoFinanceiro = valorTotalEntrada * (formData.taxa_financeira_pct / 100);
   const lucroPerda = formData.perda_cobrada_pct - formData.perda_real_pct;
 
   // Identificar sublotes pais (que têm filhos)
@@ -326,10 +352,10 @@ export default function Beneficiamento() {
           fornecedor_terceiro_id: formData.tipo_beneficiamento === "externo" && formData.fornecedor_terceiro_id 
             ? formData.fornecedor_terceiro_id 
             : null,
-          custo_frete_ida: formData.custo_frete_ida_kg * pesoTotalEntrada,
-          custo_frete_volta: formData.custo_frete_volta_kg * pesoTotalEntrada,
-          custo_mo_terceiro: formData.custo_mo_terceiro_kg * pesoTotalEntrada,
-          custo_mo_ibrac: formData.custo_mo_ibrac_kg * pesoTotalEntrada,
+          custo_frete_ida: custoFreteIda,
+          custo_frete_volta: custoFreteVolta,
+          custo_mo_terceiro: custoMoTerceiro,
+          custo_mo_ibrac: custoMoIbrac,
           taxa_financeira_pct: formData.taxa_financeira_pct,
           perda_real_pct: formData.perda_real_pct,
           perda_cobrada_pct: formData.perda_cobrada_pct,
@@ -958,49 +984,86 @@ export default function Beneficiamento() {
                 <TabsContent value="custos" className="space-y-4 pt-4">
                   <Card>
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-base flex items-center gap-2"><DollarSign className="h-4 w-4" />Custos (R$/kg)</CardTitle>
+                      <CardTitle className="text-base flex items-center gap-2"><DollarSign className="h-4 w-4" />Custos de Frete (R$/kg)</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label>Frete Ida (R$/kg)</Label>
                           <Input type="number" step="0.01" value={formData.custo_frete_ida_kg} onChange={(e) => setFormData({ ...formData, custo_frete_ida_kg: parseFloat(e.target.value) || 0 })} />
+                          <p className="text-xs text-muted-foreground">Base: {formatWeight(pesoTotalEntrada)} = {formatCurrency(custoFreteIda)}</p>
                         </div>
                         <div className="space-y-2">
                           <Label>Frete Volta (R$/kg)</Label>
                           <Input type="number" step="0.01" value={formData.custo_frete_volta_kg} onChange={(e) => setFormData({ ...formData, custo_frete_volta_kg: parseFloat(e.target.value) || 0 })} />
+                          <p className="text-xs text-muted-foreground">Base: {formatWeight(pesoSaidaEstimado)} (após perda) = {formatCurrency(custoFreteVolta)}</p>
                         </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label>MO Terceiro (R$/kg)</Label>
-                          <Input type="number" step="0.01" value={formData.custo_mo_terceiro_kg} onChange={(e) => setFormData({ ...formData, custo_mo_terceiro_kg: parseFloat(e.target.value) || 0 })} />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>MO IBRAC (R$/kg)</Label>
-                          <Input type="number" step="0.01" value={formData.custo_mo_ibrac_kg} onChange={(e) => setFormData({ ...formData, custo_mo_ibrac_kg: parseFloat(e.target.value) || 0 })} />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Taxa Financeira (%)</Label>
-                        <Input type="number" step="0.01" value={formData.taxa_financeira_pct} onChange={(e) => setFormData({ ...formData, taxa_financeira_pct: parseFloat(e.target.value) || 0 })} />
                       </div>
                     </CardContent>
                   </Card>
 
-                  <Card className="bg-muted/30">
-                    <CardContent className="pt-4 space-y-2">
-                      <div className="flex justify-between">
-                        <span>Custo por kg:</span>
-                        <span className="font-bold">{formatCurrency(custoTotalKg)}</span>
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2"><Cog className="h-4 w-4" />Mão de Obra (R$/kg)</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label>MO Terceiro (R$/kg)</Label>
+                          <Input type="number" step="0.01" value={formData.custo_mo_terceiro_kg} onChange={(e) => setFormData({ ...formData, custo_mo_terceiro_kg: parseFloat(e.target.value) || 0 })} />
+                          <p className="text-xs text-muted-foreground">= {formatCurrency(custoMoTerceiro)}</p>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>MO IBRAC (R$/kg)</Label>
+                          <Input type="number" step="0.01" value={formData.custo_mo_ibrac_kg} onChange={(e) => setFormData({ ...formData, custo_mo_ibrac_kg: parseFloat(e.target.value) || 0 })} />
+                          <p className="text-xs text-muted-foreground">= {formatCurrency(custoMoIbrac)}</p>
+                        </div>
                       </div>
-                      <div className="flex justify-between">
-                        <span>Custo Total ({formatWeight(pesoTotalEntrada)}):</span>
-                        <span className="font-bold text-primary">{formatCurrency(custoTotal)}</span>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2"><DollarSign className="h-4 w-4" />Taxa Financeira</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      <div className="space-y-2">
+                        <Label>Taxa Financeira (%)</Label>
+                        <Input type="number" step="0.01" value={formData.taxa_financeira_pct} onChange={(e) => setFormData({ ...formData, taxa_financeira_pct: parseFloat(e.target.value) || 0 })} />
+                        <p className="text-xs text-muted-foreground">Sobre valor de entrada ({formatCurrency(valorTotalEntrada)}) = {formatCurrency(custoFinanceiro)}</p>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-muted/30 border-primary">
+                    <CardContent className="pt-4 space-y-3">
+                      <div className="flex justify-between text-sm">
+                        <span>Frete Ida ({formatWeight(pesoTotalEntrada)}):</span>
+                        <span className="font-medium">{formatCurrency(custoFreteIda)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span>Frete Volta ({formatWeight(pesoSaidaEstimado)}):</span>
+                        <span className="font-medium">{formatCurrency(custoFreteVolta)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span>MO Total:</span>
+                        <span className="font-medium">{formatCurrency(custoMoTerceiro + custoMoIbrac)}</span>
+                      </div>
+                      <div className="border-t pt-2 flex justify-between">
+                        <span>Custo Operacional:</span>
+                        <span className="font-bold">{formatCurrency(custoTotal)}</span>
                       </div>
                       <div className="flex justify-between text-sm text-muted-foreground">
-                        <span>+ Taxa Financeira:</span>
+                        <span>R$/kg (sobre peso entrada):</span>
+                        <span>{formatCurrency(custoTotalKg)}</span>
+                      </div>
+                      <div className="border-t pt-2 flex justify-between text-sm">
+                        <span>+ Taxa Financeira ({formData.taxa_financeira_pct}%):</span>
                         <span>{formatCurrency(custoFinanceiro)}</span>
+                      </div>
+                      <div className="border-t pt-2 flex justify-between text-lg">
+                        <span className="font-semibold">Custo Total:</span>
+                        <span className="font-bold text-primary">{formatCurrency(custoTotal + custoFinanceiro)}</span>
                       </div>
                     </CardContent>
                   </Card>
@@ -1118,6 +1181,7 @@ export default function Beneficiamento() {
                   <TableHead>Código</TableHead>
                   <TableHead>Processo</TableHead>
                   <TableHead>Tipo</TableHead>
+                  <TableHead>Parceiro</TableHead>
                   <TableHead>Data Início</TableHead>
                   <TableHead className="text-right">Peso Entrada</TableHead>
                   <TableHead className="text-right">Peso Saída</TableHead>
@@ -1127,11 +1191,11 @@ export default function Beneficiamento() {
               </TableHeader>
               <TableBody>
                 {isLoading ? (
-                  <TableRow><TableCell colSpan={8} className="text-center">Carregando...</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={9} className="text-center">Carregando...</TableCell></TableRow>
                 ) : beneficiamentos.filter((b: any) => 
                   b.codigo?.toLowerCase().includes(searchBeneficiamento.toLowerCase())
                 ).length === 0 ? (
-                  <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">Nenhum beneficiamento cadastrado</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground">Nenhum beneficiamento cadastrado</TableCell></TableRow>
                 ) : (
                   beneficiamentos.filter((b: any) => 
                     b.codigo?.toLowerCase().includes(searchBeneficiamento.toLowerCase())
@@ -1143,6 +1207,9 @@ export default function Beneficiamento() {
                         <Badge variant={b.tipo_beneficiamento === "interno" ? "default" : "outline"}>
                           {b.tipo_beneficiamento === "interno" ? "Interno" : "Externo"}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {b.fornecedor_terceiro?.razao_social || b.fornecedor_terceiro?.nome_fantasia || "-"}
                       </TableCell>
                       <TableCell>{format(new Date(b.data_inicio), "dd/MM/yyyy", { locale: ptBR })}</TableCell>
                       <TableCell className="text-right">{formatWeight(b.peso_entrada_kg || 0)}</TableCell>

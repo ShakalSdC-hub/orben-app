@@ -1209,6 +1209,7 @@ export type Database = {
           id: string
           ncm: string | null
           nome: string
+          perda_beneficiamento_pct: number | null
           pis_cofins_pct: number | null
           updated_at: string
         }
@@ -1221,6 +1222,7 @@ export type Database = {
           id?: string
           ncm?: string | null
           nome: string
+          perda_beneficiamento_pct?: number | null
           pis_cofins_pct?: number | null
           updated_at?: string
         }
@@ -1233,6 +1235,7 @@ export type Database = {
           id?: string
           ncm?: string | null
           nome?: string
+          perda_beneficiamento_pct?: number | null
           pis_cofins_pct?: number | null
           updated_at?: string
         }
