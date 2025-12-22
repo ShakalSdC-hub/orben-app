@@ -54,6 +54,7 @@ export default function Financeiro() {
   const [selectedEntradas, setSelectedEntradas] = useState<string[]>([]);
   const [selectedSaidas, setSelectedSaidas] = useState<string[]>([]);
   const [selectedAcertos, setSelectedAcertos] = useState<string[]>([]);
+  
   // Acertos financeiros
   const { data: acertos = [], isLoading: loadingAcertos } = useQuery({
     queryKey: ["acertos_financeiros"],
@@ -68,7 +69,7 @@ export default function Financeiro() {
   });
 
   // Config fiscal
-  const { data: configFiscal = [] } = useQuery({
+  const { data: configFiscal = [], isLoading: loadingConfig } = useQuery({
     queryKey: ["config_fiscal"],
     queryFn: async () => {
       const { data, error } = await supabase.from("config_fiscal").select("*");
@@ -78,7 +79,7 @@ export default function Financeiro() {
   });
 
   // Beneficiamentos finalizados
-  const { data: beneficiamentos = [] } = useQuery({
+  const { data: beneficiamentos = [], isLoading: loadingBeneficiamentos } = useQuery({
     queryKey: ["beneficiamentos_financeiro"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -92,7 +93,7 @@ export default function Financeiro() {
   });
 
   // Saídas (vendas)
-  const { data: saidas = [] } = useQuery({
+  const { data: saidas = [], isLoading: loadingSaidas } = useQuery({
     queryKey: ["saidas_financeiro"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -106,7 +107,7 @@ export default function Financeiro() {
   });
 
   // Entradas (compras)
-  const { data: entradas = [] } = useQuery({
+  const { data: entradas = [], isLoading: loadingEntradas } = useQuery({
     queryKey: ["entradas_financeiro"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -118,6 +119,11 @@ export default function Financeiro() {
       return data;
     },
   });
+
+  // Estado de carregamento combinado
+  const isLoading = loadingAcertos || loadingConfig || loadingBeneficiamentos || loadingSaidas || loadingEntradas;
+
+  // Calcular totais
 
   // Calcular totais
   const creditoAcumulado = configFiscal.find((c: any) => c.nome === "credito_acumulado_ibrac")?.valor || 0;
@@ -437,25 +443,35 @@ export default function Financeiro() {
               </CardHeader>
               <CardContent>
                 <div className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={fluxoComAcumulado}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                      <XAxis dataKey="data" className="text-xs" />
-                      <YAxis yAxisId="left" tickFormatter={(v) => `R$${(v/1000).toFixed(0)}k`} className="text-xs" />
-                      <YAxis yAxisId="right" orientation="right" tickFormatter={(v) => `R$${(v/1000).toFixed(0)}k`} className="text-xs" />
-                      <Tooltip 
-                        formatter={(value: number, name: string) => [formatCurrency(value), 
-                          name === "entradas" ? "Entradas" : 
-                          name === "saidas" ? "Saídas" : "Saldo Acumulado"
-                        ]}
-                        contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
-                      />
-                      <Legend />
-                      <Bar yAxisId="left" dataKey="entradas" fill={CHART_COLORS.success} name="Entradas" radius={[4, 4, 0, 0]} />
-                      <Bar yAxisId="left" dataKey="saidas" fill={CHART_COLORS.danger} name="Saídas" radius={[4, 4, 0, 0]} />
-                      <Line yAxisId="right" type="monotone" dataKey="acumulado" stroke={CHART_COLORS.primary} strokeWidth={2} name="Saldo Acumulado" dot={false} />
-                    </ComposedChart>
-                  </ResponsiveContainer>
+                  {isLoading ? (
+                    <div className="h-full flex items-center justify-center">
+                      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : fluxoComAcumulado.length > 0 ? (
+                    <ResponsiveContainer key={`fluxo-${fluxoComAcumulado.length}`} width="100%" height="100%">
+                      <ComposedChart data={fluxoComAcumulado}>
+                        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                        <XAxis dataKey="data" className="text-xs" />
+                        <YAxis yAxisId="left" tickFormatter={(v) => `R$${(v/1000).toFixed(0)}k`} className="text-xs" />
+                        <YAxis yAxisId="right" orientation="right" tickFormatter={(v) => `R$${(v/1000).toFixed(0)}k`} className="text-xs" />
+                        <Tooltip 
+                          formatter={(value: number, name: string) => [formatCurrency(value), 
+                            name === "entradas" ? "Entradas" : 
+                            name === "saidas" ? "Saídas" : "Saldo Acumulado"
+                          ]}
+                          contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
+                        />
+                        <Legend />
+                        <Bar yAxisId="left" dataKey="entradas" fill={CHART_COLORS.success} name="Entradas" radius={[4, 4, 0, 0]} />
+                        <Bar yAxisId="left" dataKey="saidas" fill={CHART_COLORS.danger} name="Saídas" radius={[4, 4, 0, 0]} />
+                        <Line yAxisId="right" type="monotone" dataKey="acumulado" stroke={CHART_COLORS.primary} strokeWidth={2} name="Saldo Acumulado" dot={false} />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="h-full flex items-center justify-center">
+                      <p className="text-muted-foreground">Sem dados para exibir</p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
