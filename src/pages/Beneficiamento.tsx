@@ -66,6 +66,7 @@ interface SublotesSelecionados {
 // Tipos para consolidação
 interface ProdutoConsolidado {
   tipo_produto_id: string;
+  codigo: string; // Chave de consolidação
   nome: string;
   peso_kg: number;
   perda_padrao_pct: number;
@@ -104,8 +105,8 @@ export default function Beneficiamento() {
   const [finalizeData, setFinalizeData] = useState({ peso_saida_real: 0, local_destino_id: "", tipo_produto_saida_id: "" });
   const { exportToExcel, formatBeneficiamentoReport, printReport } = useExportReport();
 
-  // Estado para perdas por produto (editáveis)
-  const [perdasPorProduto, setPerdasPorProduto] = useState<Record<string, number>>({});
+  // Estado para perdas por produto - chave é o CÓDIGO do produto
+  const [perdasPorProduto, setPerdasPorProduto] = useState<Record<string, { padrao: number; cobrada: number }>>({});
   // Estado para taxa financeira global
   const [taxaFinanceiraGlobal, setTaxaFinanceiraGlobal] = useState(1.8);
 
@@ -148,7 +149,7 @@ export default function Beneficiamento() {
         .from("sublotes")
         .select(`
           *,
-          tipo_produto:tipos_produto(id, nome, perda_beneficiamento_pct),
+          tipo_produto:tipos_produto(id, codigo, nome, perda_beneficiamento_pct),
           dono:donos_material(nome),
           entrada:entradas(id, codigo, valor_total, parceiro:parceiros!entradas_parceiro_id_fkey(razao_social, nome_fantasia))
         `)
@@ -160,38 +161,56 @@ export default function Beneficiamento() {
     },
   });
 
-  // Consolidação automática por tipo de produto
+  // Consolidação automática por CÓDIGO do produto (expandindo lotes mãe para filhos)
   const produtosConsolidados = useMemo<ProdutoConsolidado[]>(() => {
     const map = new Map<string, ProdutoConsolidado>();
     
     for (const lote of selectedLotes) {
       const subloteFull = sublotesDisponiveis.find((s: any) => s.id === lote.id);
-      const tipoProdutoId = subloteFull?.tipo_produto?.id || "sem_produto";
-      const nome = subloteFull?.tipo_produto?.nome || "Sem Produto";
-      const perdaPadrao = subloteFull?.tipo_produto?.perda_beneficiamento_pct || 3;
       
-      if (!map.has(tipoProdutoId)) {
-        map.set(tipoProdutoId, {
-          tipo_produto_id: tipoProdutoId,
-          nome,
-          peso_kg: 0,
-          perda_padrao_pct: perdaPadrao,
-          perda_cobrada_pct: perdasPorProduto[tipoProdutoId] ?? perdaPadrao + 2, // Default: perda padrão + 2%
-          peso_saida_estimado: 0,
-          sublotes: [],
-        });
+      // Verificar se o lote tem filhos (é um lote mãe)
+      const filhos = sublotesDisponiveis.filter((s: any) => s.lote_pai_id === lote.id);
+      
+      // Se tem filhos, usar os filhos para consolidação; senão, usar o próprio lote
+      const itensParaConsolidar = filhos.length > 0 ? filhos : [subloteFull];
+      
+      for (const item of itensParaConsolidar) {
+        if (!item) continue;
+        
+        const codigoProduto = item.tipo_produto?.codigo || "SEM_CODIGO";
+        const tipoProdutoId = item.tipo_produto?.id || "sem_produto";
+        const nome = item.tipo_produto?.nome || "Sem Produto";
+        
+        if (!map.has(codigoProduto)) {
+          // Buscar valores editáveis ou iniciar zerados
+          const perdasEditadas = perdasPorProduto[codigoProduto];
+          
+          map.set(codigoProduto, {
+            tipo_produto_id: tipoProdutoId,
+            codigo: codigoProduto,
+            nome,
+            peso_kg: 0,
+            perda_padrao_pct: perdasEditadas?.padrao ?? 0, // Usuário preenche
+            perda_cobrada_pct: perdasEditadas?.cobrada ?? 0, // Usuário preenche
+            peso_saida_estimado: 0,
+            sublotes: [],
+          });
+        }
+        
+        const consolidated = map.get(codigoProduto)!;
+        // Se é filho, usar peso do filho; se é o próprio lote, usar peso do lote selecionado
+        const pesoItem = filhos.length > 0 ? item.peso_kg : lote.peso_kg;
+        consolidated.peso_kg += pesoItem;
+        consolidated.sublotes.push(item.id);
       }
-      
-      const item = map.get(tipoProdutoId)!;
-      item.peso_kg += lote.peso_kg;
-      item.sublotes.push(lote.id);
     }
     
     // Calcular peso de saída estimado para cada produto
     for (const item of map.values()) {
-      const perdaCobrada = perdasPorProduto[item.tipo_produto_id] ?? item.perda_cobrada_pct;
-      item.perda_cobrada_pct = perdaCobrada;
-      item.peso_saida_estimado = item.peso_kg * (1 - perdaCobrada / 100);
+      const perdasEditadas = perdasPorProduto[item.codigo];
+      item.perda_padrao_pct = perdasEditadas?.padrao ?? item.perda_padrao_pct;
+      item.perda_cobrada_pct = perdasEditadas?.cobrada ?? item.perda_cobrada_pct;
+      item.peso_saida_estimado = item.peso_kg * (1 - item.perda_cobrada_pct / 100);
     }
     
     return Array.from(map.values());
@@ -1081,29 +1100,52 @@ export default function Beneficiamento() {
                         <Table>
                           <TableHeader>
                             <TableRow>
+                              <TableHead>Código</TableHead>
                               <TableHead>Produto</TableHead>
                               <TableHead className="text-right">Peso (kg)</TableHead>
-                              <TableHead className="text-right">Perda Padrão</TableHead>
-                              <TableHead className="text-right">Perda Cobrada</TableHead>
+                              <TableHead className="text-right">Perda Padrão (%)</TableHead>
+                              <TableHead className="text-right">Perda Cobrada (%)</TableHead>
                               <TableHead className="text-right">Peso Saída Est.</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {produtosConsolidados.map((p) => (
-                              <TableRow key={p.tipo_produto_id}>
+                              <TableRow key={p.codigo}>
+                                <TableCell className="font-mono text-xs">{p.codigo}</TableCell>
                                 <TableCell className="font-medium">{p.nome}</TableCell>
                                 <TableCell className="text-right">{formatWeight(p.peso_kg)}</TableCell>
-                                <TableCell className="text-right text-muted-foreground">{p.perda_padrao_pct.toFixed(1)}%</TableCell>
                                 <TableCell className="text-right">
                                   <Input
                                     type="number"
                                     step="0.1"
                                     className="w-20 h-8 text-right"
-                                    value={perdasPorProduto[p.tipo_produto_id] ?? p.perda_cobrada_pct}
+                                    placeholder="0"
+                                    value={p.perda_padrao_pct || ""}
                                     onChange={(e) => {
                                       setPerdasPorProduto({
                                         ...perdasPorProduto,
-                                        [p.tipo_produto_id]: parseFloat(e.target.value) || 0,
+                                        [p.codigo]: {
+                                          padrao: parseFloat(e.target.value) || 0,
+                                          cobrada: perdasPorProduto[p.codigo]?.cobrada ?? 0,
+                                        },
+                                      });
+                                    }}
+                                  />
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <Input
+                                    type="number"
+                                    step="0.1"
+                                    className="w-20 h-8 text-right"
+                                    placeholder="0"
+                                    value={p.perda_cobrada_pct || ""}
+                                    onChange={(e) => {
+                                      setPerdasPorProduto({
+                                        ...perdasPorProduto,
+                                        [p.codigo]: {
+                                          padrao: perdasPorProduto[p.codigo]?.padrao ?? 0,
+                                          cobrada: parseFloat(e.target.value) || 0,
+                                        },
                                       });
                                     }}
                                   />
@@ -1112,7 +1154,7 @@ export default function Beneficiamento() {
                               </TableRow>
                             ))}
                             <TableRow className="bg-muted/50 font-bold">
-                              <TableCell>TOTAL</TableCell>
+                              <TableCell colSpan={2}>TOTAL</TableCell>
                               <TableCell className="text-right">{formatWeight(pesoTotalEntrada)}</TableCell>
                               <TableCell className="text-right">-</TableCell>
                               <TableCell className="text-right">-</TableCell>
