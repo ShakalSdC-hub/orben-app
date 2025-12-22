@@ -7,6 +7,7 @@ import { Slider } from "@/components/ui/slider";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -21,8 +22,6 @@ import {
   TrendingDown,
   Zap,
   DollarSign,
-  Truck,
-  Factory,
   Scale,
   RefreshCw,
   Save,
@@ -38,8 +37,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { format, addDays } from "date-fns";
-import { ExcelImport } from "@/components/lme/ExcelImport";
+import { format, addDays, parseISO, getWeek, isWithinInterval, startOfMonth, endOfMonth } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 interface Parcela {
   numero: number;
@@ -53,6 +52,12 @@ export default function Simulador() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+
+  // Filtro de cotação LME
+  const [lmeTipoFiltro, setLmeTipoFiltro] = useState<"dia" | "semana" | "mes" | "manual">("semana");
+  const [lmeSemana, setLmeSemana] = useState<string>("");
+  const [lmeData, setLmeData] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [lmeMes, setLmeMes] = useState<string>(format(new Date(), "yyyy-MM"));
 
   // Common inputs
   const [cobreUsdT, setCobreUsdT] = useState(11500);
@@ -69,21 +74,36 @@ export default function Simulador() {
   ]);
 
   // Sucata inputs
-  const [pctLmeSucata, setPctLmeSucata] = useState(97); // % do LME para sucata mista
+  const [pctLmeSucata, setPctLmeSucata] = useState(97);
   const [custoCompraKg, setCustoCompraKg] = useState(66.09);
   const [custoMO, setCustoMO] = useState(3.40);
   const [pesoKg, setPesoKg] = useState(10000);
 
-  // Buscar última cotação LME
-  const { data: ultimaLme } = useQuery({
-    queryKey: ["ultima-lme"],
+  // Buscar histórico diário
+  const { data: historico = [] } = useQuery({
+    queryKey: ["historico_lme_simulador"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("historico_lme")
         .select("*")
+        .eq("is_media_semanal", false)
         .order("data", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .limit(90);
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Buscar médias semanais
+  const { data: mediasSemanais = [] } = useQuery({
+    queryKey: ["medias_semanais_simulador"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("historico_lme")
+        .select("*")
+        .eq("is_media_semanal", true)
+        .order("semana_numero", { ascending: false })
+        .limit(10);
       if (error) throw error;
       return data;
     },
@@ -103,13 +123,81 @@ export default function Simulador() {
     },
   });
 
-  // Preencher com última cotação
+  // Gerar opções de semanas disponíveis
+  const semanasDisponiveis = mediasSemanais.map((m: any) => ({
+    value: String(m.semana_numero),
+    label: `Semana ${m.semana_numero}`,
+    data: m
+  }));
+
+  // Auto-selecionar a primeira semana disponível
   useEffect(() => {
-    if (ultimaLme) {
-      if (ultimaLme.cobre_usd_t) setCobreUsdT(ultimaLme.cobre_usd_t);
-      if (ultimaLme.dolar_brl) setDolarBrl(ultimaLme.dolar_brl);
+    if (mediasSemanais.length > 0 && !lmeSemana) {
+      setLmeSemana(String(mediasSemanais[0]?.semana_numero || ""));
     }
-  }, [ultimaLme]);
+  }, [mediasSemanais, lmeSemana]);
+
+  // Calcular média
+  const calcularMedia = (registros: any[], campo: string) => {
+    const validos = registros.filter((h: any) => h[campo] != null && h[campo] > 0);
+    if (validos.length === 0) return 0;
+    return validos.reduce((acc: number, h: any) => acc + h[campo], 0) / validos.length;
+  };
+
+  // Função para obter cotação LME baseado no filtro selecionado
+  const getLmeCotacao = () => {
+    if (lmeTipoFiltro === "manual") {
+      return null; // Usa valores manuais
+    } else if (lmeTipoFiltro === "dia") {
+      const registro = historico.find((h: any) => h.data === lmeData);
+      return registro ? {
+        cobre_usd_t: registro.cobre_usd_t,
+        dolar_brl: registro.dolar_brl,
+        label: format(parseISO(lmeData), "dd/MM/yyyy", { locale: ptBR })
+      } : null;
+    } else if (lmeTipoFiltro === "semana") {
+      const media = mediasSemanais.find((m: any) => String(m.semana_numero) === lmeSemana);
+      if (media) {
+        const cobreUsdT = media.cobre_brl_kg && media.dolar_brl 
+          ? (media.cobre_brl_kg / media.dolar_brl) * 1000 
+          : null;
+        return {
+          cobre_usd_t: cobreUsdT,
+          dolar_brl: media.dolar_brl,
+          label: `Semana ${media.semana_numero}`
+        };
+      }
+      return null;
+    } else if (lmeTipoFiltro === "mes") {
+      const [ano, mes] = lmeMes.split("-").map(Number);
+      const inicioMes = new Date(ano, mes - 1, 1);
+      const fimMes = new Date(ano, mes, 0);
+      const registrosMes = historico.filter((h: any) => {
+        const dataRegistro = parseISO(h.data);
+        return isWithinInterval(dataRegistro, { start: inicioMes, end: fimMes });
+      });
+      if (registrosMes.length === 0) return null;
+      
+      const cobreMedia = calcularMedia(registrosMes, 'cobre_usd_t');
+      const dolarMedia = calcularMedia(registrosMes, 'dolar_brl');
+      return {
+        cobre_usd_t: cobreMedia,
+        dolar_brl: dolarMedia,
+        label: format(inicioMes, "MMMM yyyy", { locale: ptBR })
+      };
+    }
+    return null;
+  };
+
+  const lmeCotacao = getLmeCotacao();
+
+  // Atualizar valores quando cotação mudar (se não for manual)
+  useEffect(() => {
+    if (lmeTipoFiltro !== "manual" && lmeCotacao) {
+      if (lmeCotacao.cobre_usd_t) setCobreUsdT(Math.round(lmeCotacao.cobre_usd_t));
+      if (lmeCotacao.dolar_brl) setDolarBrl(Number(lmeCotacao.dolar_brl));
+    }
+  }, [lmeCotacao, lmeTipoFiltro]);
 
   // Atualizar datas de vencimento das parcelas
   useEffect(() => {
@@ -135,8 +223,8 @@ export default function Simulador() {
   const totalParcelas = parcelasComValor.reduce((acc, p) => acc + p.valor, 0);
 
   // === CÁLCULOS SUCATA ===
-  const totalMediaBrl = (cobreUsdT * dolarBrl); // Total por tonelada em BRL
-  const precoFinalKg = (totalMediaBrl / 1000) * (pctLmeSucata / 100); // Preço final R$/kg
+  const totalMediaBrl = (cobreUsdT * dolarBrl);
+  const precoFinalKg = (totalMediaBrl / 1000) * (pctLmeSucata / 100);
   const valorVendaSucata = precoFinalKg * pesoKg;
   const valorCompra = custoCompraKg * pesoKg;
   const valorMO = custoMO * pesoKg;
@@ -219,7 +307,10 @@ export default function Simulador() {
             </p>
           </div>
           <div className="flex gap-2">
-            <ExcelImport />
+            <Button variant="outline" size="sm" onClick={() => window.print()}>
+              <Printer className="mr-2 h-4 w-4" />
+              Imprimir
+            </Button>
             <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
               <RefreshCw className="mr-2 h-4 w-4" />
               Resetar
@@ -260,14 +351,59 @@ export default function Simulador() {
                     </CardTitle>
                     <CardDescription>
                       Parâmetros do mercado
-                      {ultimaLme && (
-                        <span className="text-xs ml-2">
-                          (última: {format(new Date(ultimaLme.data), "dd/MM/yyyy")})
-                        </span>
+                      {lmeCotacao && lmeTipoFiltro !== "manual" && (
+                        <span className="text-xs ml-2">({lmeCotacao.label})</span>
                       )}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
+                    {/* Filtro de cotação */}
+                    <div className="flex flex-wrap items-center gap-2 p-3 bg-muted/50 rounded-lg">
+                      <Label className="text-sm">Usar cotação:</Label>
+                      <Select value={lmeTipoFiltro} onValueChange={(v: "dia" | "semana" | "mes" | "manual") => setLmeTipoFiltro(v)}>
+                        <SelectTrigger className="w-40">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="semana">Média Semanal</SelectItem>
+                          <SelectItem value="dia">Dia Específico</SelectItem>
+                          <SelectItem value="mes">Média Mensal</SelectItem>
+                          <SelectItem value="manual">Manual</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      
+                      {lmeTipoFiltro === "dia" && (
+                        <Input 
+                          type="date" 
+                          value={lmeData} 
+                          onChange={(e) => setLmeData(e.target.value)}
+                          className="w-40"
+                        />
+                      )}
+                      
+                      {lmeTipoFiltro === "semana" && (
+                        <Select value={lmeSemana} onValueChange={setLmeSemana}>
+                          <SelectTrigger className="w-40">
+                            <SelectValue placeholder="Selecione..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {semanasDisponiveis.map((s) => (
+                              <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                      
+                      {lmeTipoFiltro === "mes" && (
+                        <Input 
+                          type="month" 
+                          value={lmeMes} 
+                          onChange={(e) => setLmeMes(e.target.value)}
+                          className="w-40"
+                        />
+                      )}
+                    </div>
+
                     <div className="grid gap-6 md:grid-cols-2">
                       <div className="space-y-2">
                         <Label>Cobre (US$/t)</Label>
@@ -275,6 +411,8 @@ export default function Simulador() {
                           type="number"
                           value={cobreUsdT}
                           onChange={(e) => setCobreUsdT(Number(e.target.value))}
+                          disabled={lmeTipoFiltro !== "manual"}
+                          className={lmeTipoFiltro !== "manual" ? "bg-muted" : ""}
                         />
                       </div>
                       <div className="space-y-2">
@@ -284,6 +422,8 @@ export default function Simulador() {
                           step="0.01"
                           value={dolarBrl}
                           onChange={(e) => setDolarBrl(Number(e.target.value))}
+                          disabled={lmeTipoFiltro !== "manual"}
+                          className={lmeTipoFiltro !== "manual" ? "bg-muted" : ""}
                         />
                       </div>
                     </div>
@@ -442,12 +582,59 @@ export default function Simulador() {
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                      <DollarSign className="h-5 w-5 text-copper" />
+                      <DollarSign className="h-5 w-5 text-primary" />
                       Média Semana LME
                     </CardTitle>
                     <CardDescription>Base para cálculo do preço da sucata</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
+                    {/* Filtro de cotação */}
+                    <div className="flex flex-wrap items-center gap-2 p-3 bg-muted/50 rounded-lg">
+                      <Label className="text-sm">Usar cotação:</Label>
+                      <Select value={lmeTipoFiltro} onValueChange={(v: "dia" | "semana" | "mes" | "manual") => setLmeTipoFiltro(v)}>
+                        <SelectTrigger className="w-40">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="semana">Média Semanal</SelectItem>
+                          <SelectItem value="dia">Dia Específico</SelectItem>
+                          <SelectItem value="mes">Média Mensal</SelectItem>
+                          <SelectItem value="manual">Manual</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      
+                      {lmeTipoFiltro === "dia" && (
+                        <Input 
+                          type="date" 
+                          value={lmeData} 
+                          onChange={(e) => setLmeData(e.target.value)}
+                          className="w-40"
+                        />
+                      )}
+                      
+                      {lmeTipoFiltro === "semana" && (
+                        <Select value={lmeSemana} onValueChange={setLmeSemana}>
+                          <SelectTrigger className="w-40">
+                            <SelectValue placeholder="Selecione..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {semanasDisponiveis.map((s) => (
+                              <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                      
+                      {lmeTipoFiltro === "mes" && (
+                        <Input 
+                          type="month" 
+                          value={lmeMes} 
+                          onChange={(e) => setLmeMes(e.target.value)}
+                          className="w-40"
+                        />
+                      )}
+                    </div>
+
                     <div className="grid gap-6 md:grid-cols-3">
                       <div className="space-y-2">
                         <Label>Cobre (US$/t)</Label>
@@ -455,6 +642,8 @@ export default function Simulador() {
                           type="number"
                           value={cobreUsdT}
                           onChange={(e) => setCobreUsdT(Number(e.target.value))}
+                          disabled={lmeTipoFiltro !== "manual"}
+                          className={lmeTipoFiltro !== "manual" ? "bg-muted" : ""}
                         />
                       </div>
                       <div className="space-y-2">
@@ -464,6 +653,8 @@ export default function Simulador() {
                           step="0.01"
                           value={dolarBrl}
                           onChange={(e) => setDolarBrl(Number(e.target.value))}
+                          disabled={lmeTipoFiltro !== "manual"}
+                          className={lmeTipoFiltro !== "manual" ? "bg-muted" : ""}
                         />
                       </div>
                       <div className="space-y-2">
@@ -495,7 +686,7 @@ export default function Simulador() {
                         <Input
                           value={formatCurrency(precoFinalKg)}
                           disabled
-                          className="bg-muted font-bold text-copper"
+                          className="bg-muted font-bold text-primary"
                         />
                       </div>
                     </div>
@@ -506,7 +697,7 @@ export default function Simulador() {
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                      <Scale className="h-5 w-5 text-copper" />
+                      <Scale className="h-5 w-5 text-primary" />
                       Simulação Operação
                     </CardTitle>
                     <CardDescription>Compare venda da sucata vs compra + industrialização</CardDescription>
@@ -585,7 +776,7 @@ export default function Simulador() {
                           </TableRow>
                           <TableRow className="bg-muted/50">
                             <TableCell colSpan={3} className="font-bold">Preço do KG (Industrialização)</TableCell>
-                            <TableCell className="text-right font-bold text-copper text-lg">
+                            <TableCell className="text-right font-bold text-primary text-lg">
                               {formatCurrency(precoIndustrializado)}
                             </TableCell>
                           </TableRow>
@@ -649,9 +840,9 @@ export default function Simulador() {
                         </p>
                       </div>
                       <div className="text-center text-2xl font-bold text-muted-foreground">vs</div>
-                      <div className="rounded-lg bg-copper/5 p-3">
+                      <div className="rounded-lg bg-primary/5 p-3">
                         <p className="text-xs text-muted-foreground mb-1">Custo Industrializado</p>
-                        <p className="text-2xl font-bold text-copper">
+                        <p className="text-2xl font-bold text-primary">
                           {formatCurrency(precoIndustrializado)}/kg
                         </p>
                       </div>
