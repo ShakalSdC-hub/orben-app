@@ -25,6 +25,7 @@ import {
   MoveRight,
   History,
   UserRoundCog,
+  Calculator,
 } from "lucide-react";
 import { FileSpreadsheet, FileText, Printer } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -37,6 +38,7 @@ import { ptBR } from "date-fns/locale";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
 import { TransferenciaDono } from "@/components/estoque/TransferenciaDono";
 import { LoteHistorico } from "@/components/estoque/LoteHistorico";
+import { CustoRastreabilidade } from "@/components/estoque/CustoRastreabilidade";
 import { useExportReport } from "@/hooks/useExportReport";
 import {
   DropdownMenu,
@@ -74,6 +76,7 @@ export default function Estoque() {
   const [transferData, setTransferData] = useState({ local_destino_id: "", motivo: "" });
   const [isTransferDonoOpen, setIsTransferDonoOpen] = useState(false);
   const [selectedLoteDono, setSelectedLoteDono] = useState<any | null>(null);
+  const [selectedLoteRastreio, setSelectedLoteRastreio] = useState<any | null>(null);
   const { exportToExcel, formatEstoqueReport, printReport } = useExportReport();
 
   // Fetch sublotes com relacionamentos
@@ -587,11 +590,21 @@ export default function Estoque() {
                     </div>
 
                     {lote.custo_unitario_total && lote.custo_unitario_total > 0 && (
-                      <div className="mt-3 pt-3 border-t">
-                        <p className="text-xs text-muted-foreground">Custo Unitário</p>
-                        <p className="font-semibold text-copper">
-                          R$ {lote.custo_unitario_total.toFixed(2)}/kg
-                        </p>
+                      <div className="mt-3 pt-3 border-t flex items-center justify-between">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Custo Unitário</p>
+                          <p className="font-semibold text-copper">
+                            R$ {lote.custo_unitario_total.toFixed(2)}/kg
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSelectedLoteRastreio(lote)}
+                          title="Ver composição do custo"
+                        >
+                          <Calculator className="h-4 w-4" />
+                        </Button>
                       </div>
                     )}
 
@@ -905,6 +918,13 @@ export default function Estoque() {
           sublote={selectedLoteDono}
           open={isTransferDonoOpen}
           onOpenChange={setIsTransferDonoOpen}
+        />
+
+        {/* Rastreabilidade de Custo Dialog */}
+        <CustoRastreabilidade
+          sublote={selectedLoteRastreio}
+          isOpen={!!selectedLoteRastreio}
+          onClose={() => setSelectedLoteRastreio(null)}
         />
       </div>
     </MainLayout>

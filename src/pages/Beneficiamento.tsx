@@ -38,6 +38,7 @@ import { ptBR } from "date-fns/locale";
 import { BeneficiamentoRomaneioPrint } from "@/components/romaneio/BeneficiamentoRomaneioPrint";
 import { GlobalFilters } from "@/components/filters/GlobalFilters";
 import { BeneficiamentoEditForm } from "@/components/beneficiamento/BeneficiamentoEditForm";
+import { CustoCalculoPreview } from "@/components/beneficiamento/CustoCalculoPreview";
 import { useExportReport } from "@/hooks/useExportReport";
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -1723,6 +1724,14 @@ export default function Beneficiamento() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {/* Prévia do Cálculo de Custo */}
+              {finalizeBeneficiamento?.id && finalizeData.peso_saida_real > 0 && (
+                <CustoCalculoPreview 
+                  beneficiamentoId={finalizeBeneficiamento.id} 
+                  pesoSaidaReal={finalizeData.peso_saida_real} 
+                />
+              )}
             </div>
 
             <DialogFooter>
