@@ -698,10 +698,23 @@ export default function Beneficiamento() {
       if (!beneficiamento) throw new Error("Beneficiamento não encontrado");
 
       const pesoEntrada = beneficiamento.peso_entrada_kg || 0;
+      
+      // Buscar custo financeiro dos documentos de entrada
+      const { data: benefEntradas } = await supabase
+        .from("beneficiamento_entradas")
+        .select("taxa_financeira_valor")
+        .eq("beneficiamento_id", beneficiamentoId);
+
+      const custoFinanceiro = benefEntradas?.reduce(
+        (acc, doc) => acc + (doc.taxa_financeira_valor || 0), 0
+      ) || 0;
+
+      // Custo total inclui: frete ida/volta + MO IBRAC/terceiro + custo financeiro
       const custoTotal = (beneficiamento.custo_frete_ida || 0) + 
                          (beneficiamento.custo_frete_volta || 0) + 
                          (beneficiamento.custo_mo_ibrac || 0) + 
-                         (beneficiamento.custo_mo_terceiro || 0);
+                         (beneficiamento.custo_mo_terceiro || 0) +
+                         custoFinanceiro;
       const custoAdicionalPorKg = pesoSaida > 0 ? custoTotal / pesoSaida : 0;
 
       // Criar sublote de saída para cada sublote de entrada (proporcional ao peso)
