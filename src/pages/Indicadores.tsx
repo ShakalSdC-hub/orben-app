@@ -65,7 +65,7 @@ export default function Indicadores() {
   const canForceUpdate = role === "admin" || role === "dono";
 
   // Fetch histórico diário (não média) - buscar mais dados para histórico anual
-  const { data: historico = [] } = useQuery({
+  const { data: historico = [], isLoading: isLoadingHistorico } = useQuery({
     queryKey: ["historico_lme"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -80,7 +80,7 @@ export default function Indicadores() {
   });
 
   // Fetch médias semanais OFICIAIS do banco de dados (is_media_semanal = true)
-  const { data: mediasSemanaisOficiais = [] } = useQuery({
+  const { data: mediasSemanaisOficiais = [], isLoading: isLoadingMedias } = useQuery({
     queryKey: ["historico_lme_medias"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -93,6 +93,9 @@ export default function Indicadores() {
       return data;
     },
   });
+
+  // Estado de carregamento combinado
+  const isLoading = isLoadingHistorico || isLoadingMedias;
 
   // Transformar médias oficiais para o formato esperado pelo componente
   const mediasSemanais = mediasSemanaisOficiais.map((m: any) => {
@@ -426,21 +429,31 @@ export default function Indicadores() {
           </CardHeader>
           <CardContent>
             <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis dataKey="data" className="text-xs" />
-                  <YAxis className="text-xs" tickFormatter={(v) => `R$ ${v.toFixed(2)}`} />
-                  <Tooltip 
-                    formatter={(value: number) => formatCurrency(value)}
-                    labelFormatter={(label) => `Data: ${label}`}
-                    contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
-                  />
-                  <Legend />
-                  <Line type="monotone" dataKey="cobre" name="Cobre" stroke="hsl(28, 70%, 45%)" strokeWidth={2} dot={false} />
-                  <Line type="monotone" dataKey="aluminio" name="Alumínio" stroke="hsl(220, 70%, 50%)" strokeWidth={2} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
+              {isLoading ? (
+                <div className="h-full flex items-center justify-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : chartData.length > 0 ? (
+                <ResponsiveContainer key={`chart-${chartData.length}`} width="100%" height="100%">
+                  <LineChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis dataKey="data" className="text-xs" />
+                    <YAxis className="text-xs" tickFormatter={(v) => `R$ ${v.toFixed(2)}`} />
+                    <Tooltip 
+                      formatter={(value: number) => formatCurrency(value)}
+                      labelFormatter={(label) => `Data: ${label}`}
+                      contentStyle={{ backgroundColor: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
+                    />
+                    <Legend />
+                    <Line type="monotone" dataKey="cobre" name="Cobre" stroke="hsl(28, 70%, 45%)" strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="aluminio" name="Alumínio" stroke="hsl(220, 70%, 50%)" strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center">
+                  <p className="text-muted-foreground">Sem dados para exibir</p>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
