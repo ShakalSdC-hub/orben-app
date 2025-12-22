@@ -752,11 +752,13 @@ export default function Beneficiamento() {
           .update({ status: "consumido", peso_kg: 0 })
           .eq("id", item.sublote_id);
 
-        // Também marcar sublotes filhos como consumidos (se o pai foi consumido, filhos também)
+        // Marcar sublotes filhos ANTERIORES como consumidos (não incluir o novo sublote gerado)
+        // Filtra para não consumir o sublote recém-criado
         await supabase
           .from("sublotes")
           .update({ status: "consumido", peso_kg: 0 })
-          .eq("lote_pai_id", item.sublote_id);
+          .eq("lote_pai_id", item.sublote_id)
+          .neq("id", novoSublote.id);
       }
 
       // Atualizar beneficiamento para finalizado
