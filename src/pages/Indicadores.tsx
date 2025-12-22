@@ -480,7 +480,7 @@ export default function Indicadores() {
                             M.S {m.semana_numero} ({m.ano})
                           </TableCell>
                           <TableCell className="text-right font-mono font-semibold text-primary">
-                            {m.cobre_usd_t ? `$ ${Math.round(m.cobre_usd_t).toLocaleString("pt-BR")}` : "-"}
+                            {m.cobre_usd_t ? `$ ${Number(m.cobre_usd_t).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "-"}
                           </TableCell>
                           <TableCell className="text-right font-mono font-semibold">
                             {m.cobre_brl_kg ? formatCurrency(m.cobre_brl_kg) : "-"}

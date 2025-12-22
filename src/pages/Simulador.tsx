@@ -94,40 +94,41 @@ export default function Simulador() {
     },
   });
 
-  // Calcular médias semanais a partir dos dados diários (usando semana ISO - segunda a domingo)
-  const calcularMediasSemanais = (registros: any[]) => {
-    const semanas: { [key: number]: any[] } = {};
-    registros.forEach((h: any) => {
-      const dataRegistro = parseISO(h.data);
-      const semana = getISOWeek(dataRegistro); // Semana ISO (começa segunda)
-      const ano = getISOWeekYear(dataRegistro); // Ano ISO correto
-      const key = ano * 100 + semana; // Ex: 202551 para semana 51 de 2025
-      if (!semanas[key]) semanas[key] = [];
-      semanas[key].push(h);
-    });
-    
-    return Object.entries(semanas).map(([key, regs]) => {
-      const semana = Number(key) % 100;
-      const ano = Math.floor(Number(key) / 100);
-      const cobreBrlKg = regs.reduce((acc, h) => acc + (h.cobre_brl_kg || 0), 0) / regs.length;
-      const aluminioBrlKg = regs.reduce((acc, h) => acc + (h.aluminio_brl_kg || 0), 0) / regs.length;
-      const dolarBrlMedia = regs.reduce((acc, h) => acc + (h.dolar_brl || 0), 0) / regs.length;
-      const cobreUsdTMedia = regs.reduce((acc, h) => acc + (h.cobre_usd_t || 0), 0) / regs.length;
-      
-      return {
-        semana_numero: semana,
-        ano,
-        key: Number(key),
-        cobre_brl_kg: cobreBrlKg,
-        aluminio_brl_kg: aluminioBrlKg,
-        dolar_brl: dolarBrlMedia,
-        cobre_usd_t: cobreUsdTMedia,
-        registros_count: regs.length
-      };
-    }).sort((a, b) => b.key - a.key); // Mais recente primeiro
-  };
+  // Buscar médias semanais OFICIAIS do banco de dados (is_media_semanal = true)
+  const { data: mediasSemanaisOficiais = [] } = useQuery({
+    queryKey: ["historico_lme_medias_simulador"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("historico_lme")
+        .select("*")
+        .eq("is_media_semanal", true)
+        .order("data", { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return data;
+    },
+  });
 
-  const mediasSemanais = calcularMediasSemanais(historico);
+  // Transformar médias oficiais para o formato esperado pelo componente
+  const mediasSemanais = mediasSemanaisOficiais.map((m: any) => {
+    const dataRegistro = parseISO(m.data);
+    const semana = m.semana_numero || getISOWeek(dataRegistro);
+    const ano = getISOWeekYear(dataRegistro);
+    const key = ano * 100 + semana;
+    
+    return {
+      semana_numero: semana,
+      ano,
+      key,
+      cobre_brl_kg: m.cobre_brl_kg,
+      aluminio_brl_kg: m.aluminio_brl_kg,
+      dolar_brl: m.dolar_brl,
+      cobre_usd_t: m.cobre_usd_t,
+      registros_count: 5,
+      data_original: m.data,
+      fonte: m.fonte
+    };
+  }).sort((a: any, b: any) => b.key - a.key);
 
   // Buscar histórico de simulações
   const { data: historicoSimulacoes } = useQuery({
@@ -143,7 +144,7 @@ export default function Simulador() {
     },
   });
 
-  // Gerar opções de semanas disponíveis
+  // Gerar opções de semanas disponíveis (usando médias oficiais)
   const semanasDisponiveis = mediasSemanais.map((m: any) => ({
     value: String(m.key),
     label: `S${m.semana_numero} (${m.ano})`,
@@ -179,12 +180,13 @@ export default function Simulador() {
       }
       return null;
     } else if (lmeTipoFiltro === "semana") {
+      // Usar médias semanais OFICIAIS importadas do banco
       const media = mediasSemanais.find((m: any) => String(m.key) === lmeSemana);
       if (media) {
         return {
           cobre_usd_t: media.cobre_usd_t,
           dolar_brl: media.dolar_brl,
-          label: `Semana ${media.semana_numero} (${media.ano})`
+          label: `S${media.semana_numero} (${media.ano})`
         };
       }
       return null;
