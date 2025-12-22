@@ -40,7 +40,7 @@ export default function Index() {
   });
 
   // Fetch última cotação LME
-  const { data: ultimaLme } = useQuery({
+  const { data: ultimaLme, isLoading: loadingLme } = useQuery({
     queryKey: ["dashboard-lme"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -265,9 +265,7 @@ export default function Index() {
         )}
 
         {/* Gráficos LME */}
-        {ultimaLme && ultimaLme.length > 0 && (
-          <LMECharts lmeData={ultimaLme} />
-        )}
+        <LMECharts lmeData={ultimaLme || []} isLoading={loadingLme} />
 
         {/* Estoque por Dono */}
         <Card>
