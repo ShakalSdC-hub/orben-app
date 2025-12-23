@@ -511,10 +511,12 @@ export default function Saida() {
           <div className="flex gap-2">
             <ExcelImport
               title="Importar Saídas"
-              description="Importe saídas de material via planilha Excel"
+              description="Importe saídas de material via planilha Excel. Códigos duplicados serão bloqueados."
               templateFilename="template_saidas"
+              tableName="saidas"
+              codeColumn="codigo"
               columns={[
-                { dbColumn: "codigo", excelColumn: "Código", label: "Código", required: true, type: "string" },
+                { dbColumn: "codigo", excelColumn: "Código", label: "Código", required: true, type: "string", isCodeColumn: true },
                 { dbColumn: "data_saida", excelColumn: "Data Saída", label: "Data", required: true, type: "date" },
                 { dbColumn: "tipo_saida", excelColumn: "Tipo Saída", label: "Tipo", required: true, type: "string" },
                 { dbColumn: "peso_total_kg", excelColumn: "Peso Total (kg)", label: "Peso Total", required: true, type: "number" },
@@ -533,6 +535,10 @@ export default function Saida() {
               sampleData={[
                 { "Código": "SAI-001", "Data Saída": "01/01/2025", "Tipo Saída": "Venda", "Peso Total (kg)": "1000", "Valor Unitário (R$)": "50", "Valor Total (R$)": "50000", "Custos Cobrados (R$)": "1000", "Repasse Dono (R$)": "49000", "Comissão IBRAC (R$)": "0", "Resultado Líquido (R$)": "49000", "Nota Fiscal": "12345", "Cenário": "proprio", "Motorista": "João", "Placa Veículo": "ABC-1234", "Observações": "" },
               ]}
+              existingDataQuery={async () => {
+                const { data } = await supabase.from("saidas").select("*").order("data_saida", { ascending: false });
+                return data || [];
+              }}
               onImport={async (data) => {
                 for (const row of data) {
                   const { error } = await supabase.from("saidas").insert({
