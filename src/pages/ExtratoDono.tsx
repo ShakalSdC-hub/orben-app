@@ -18,15 +18,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, PieChart, Pie, Cell, Legend
 } from "recharts";
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
-}
-
-function formatWeight(kg: number) {
-  if (kg >= 1000) return `${(kg / 1000).toFixed(2)}t`;
-  return `${kg.toFixed(0)}kg`;
-}
+import { formatCurrency, formatWeightCompact as formatWeight } from "@/lib/kpis";
 
 const CHART_COLORS = {
   proprio: "hsl(28, 70%, 45%)",

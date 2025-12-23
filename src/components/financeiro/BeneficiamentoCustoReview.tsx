@@ -18,13 +18,7 @@ interface BeneficiamentoCustoReviewProps {
   canEdit: boolean;
 }
 
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
-}
-
-function formatWeight(kg: number) {
-  return kg >= 1000 ? `${(kg / 1000).toFixed(2)} t` : `${kg.toFixed(2)} kg`;
-}
+import { formatCurrency, formatWeight } from "@/lib/kpis";
 
 export function BeneficiamentoCustoReview({ beneficiamentos, canEdit }: BeneficiamentoCustoReviewProps) {
   const queryClient = useQueryClient();

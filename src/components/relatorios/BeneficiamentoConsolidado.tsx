@@ -58,20 +58,7 @@ interface BeneficiamentoConsolidadoRow {
   is_ibrac: boolean;
 }
 
-function formatWeight(kg: number) {
-  if (kg >= 1000) return `${(kg / 1000).toFixed(2)} t`;
-  return `${kg.toFixed(2)} kg`;
-}
-
-function formatCurrency(value: number | null) {
-  if (value === null || value === undefined) return "—";
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
-}
-
-function formatPercent(value: number | null) {
-  if (value === null || value === undefined) return "—";
-  return `${value.toFixed(2)}%`;
-}
+import { formatCurrency, formatWeight, formatPercent, getLMEForDate, calcularEconomiaVsLME } from "@/lib/kpis";
 
 export function BeneficiamentoConsolidado({ dataInicio, dataFim, donoFiltro }: BeneficiamentoConsolidadoProps) {
   // Fetch beneficiamentos com todos os dados relacionados

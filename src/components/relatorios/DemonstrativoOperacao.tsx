@@ -45,14 +45,7 @@ interface OperacaoDono {
   cenario_predominante: CenarioOperacao | null;
 }
 
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
-}
-
-function formatWeight(kg: number) {
-  if (kg >= 1000) return `${(kg / 1000).toFixed(2)} t`;
-  return `${kg.toFixed(2)} kg`;
-}
+import { formatCurrency, formatWeight } from "@/lib/kpis";
 
 export function DemonstrativoOperacao({ dataInicio, dataFim, donoFiltro }: DemonstrativoOperacaoProps) {
   // Fetch donos
