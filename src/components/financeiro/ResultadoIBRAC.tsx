@@ -5,6 +5,7 @@ import { Loader2, TrendingUp, Sparkles, Factory, Percent, DollarSign } from "luc
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, startOfMonth, endOfMonth } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 import { cn } from "@/lib/utils";
 
@@ -177,7 +178,7 @@ export function ResultadoIBRAC() {
               {formatCurrency(resultados.lucroTotal)}
             </p>
             <p className="text-xs text-muted-foreground">
-              {format(mesAtual, "MMMM yyyy", { locale: require("date-fns/locale/pt-BR").ptBR })}
+              {format(mesAtual, "MMMM yyyy", { locale: ptBR })}
             </p>
           </CardContent>
         </Card>
