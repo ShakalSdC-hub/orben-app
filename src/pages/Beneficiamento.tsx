@@ -39,6 +39,7 @@ import { BeneficiamentoRomaneioPrint } from "@/components/romaneio/Beneficiament
 import { GlobalFilters } from "@/components/filters/GlobalFilters";
 import { BeneficiamentoEditForm } from "@/components/beneficiamento/BeneficiamentoEditForm";
 import { CustoCalculoPreview } from "@/components/beneficiamento/CustoCalculoPreview";
+import { LucroPerdaPreview } from "@/components/cenarios/LucroPerdaPreview";
 import { useExportReport } from "@/hooks/useExportReport";
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -1353,6 +1354,16 @@ export default function Beneficiamento() {
                       </div>
                     </CardContent>
                   </Card>
+
+                  {/* Preview de Lucro/Perda - mostrado quando há diferença entre perda cobrada e real */}
+                  {pesoTotalEntrada > 0 && Math.abs(perdaMediaCobrada - perdaMediaReal) >= 0.01 && (
+                    <LucroPerdaPreview
+                      pesoEntrada={pesoTotalEntrada}
+                      perdaCobradaPct={perdaMediaCobrada}
+                      perdaRealPct={perdaMediaReal}
+                      lmeReferenciaKg={historicoLme[0]?.cobre_brl_kg || 0}
+                    />
+                  )}
 
                   <Button className="w-full" onClick={() => setActiveTab("transporte")}>
                     Próximo: Transporte
