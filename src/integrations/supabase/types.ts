@@ -729,6 +729,66 @@ export type Database = {
         }
         Relationships: []
       }
+      lme_semana_config: {
+        Row: {
+          ano: number
+          created_at: string
+          created_by: string | null
+          data_fim: string
+          data_inicio: string
+          dolar_brl: number
+          fator_total: number | null
+          icms_pct: number
+          id: string
+          lme_base_brl_kg: number | null
+          lme_cobre_usd_t: number
+          lme_final_brl_kg: number | null
+          observacoes: string | null
+          pis_cofins_pct: number
+          semana: number
+          taxa_financeira_pct: number
+          updated_at: string
+        }
+        Insert: {
+          ano: number
+          created_at?: string
+          created_by?: string | null
+          data_fim: string
+          data_inicio: string
+          dolar_brl?: number
+          fator_total?: number | null
+          icms_pct?: number
+          id?: string
+          lme_base_brl_kg?: number | null
+          lme_cobre_usd_t?: number
+          lme_final_brl_kg?: number | null
+          observacoes?: string | null
+          pis_cofins_pct?: number
+          semana: number
+          taxa_financeira_pct?: number
+          updated_at?: string
+        }
+        Update: {
+          ano?: number
+          created_at?: string
+          created_by?: string | null
+          data_fim?: string
+          data_inicio?: string
+          dolar_brl?: number
+          fator_total?: number | null
+          icms_pct?: number
+          id?: string
+          lme_base_brl_kg?: number | null
+          lme_cobre_usd_t?: number
+          lme_final_brl_kg?: number | null
+          observacoes?: string | null
+          pis_cofins_pct?: number
+          semana?: number
+          taxa_financeira_pct?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       locais_estoque: {
         Row: {
           ativo: boolean | null
