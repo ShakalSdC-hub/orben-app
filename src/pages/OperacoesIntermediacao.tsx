@@ -16,6 +16,10 @@ import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
 import { formatWeight, formatCurrency } from "@/lib/kpis";
+import { CompraIntermForm } from "@/components/operacoes/CompraIntermForm";
+import { BeneficiamentoIntermForm } from "@/components/operacoes/BeneficiamentoIntermForm";
+import { VendaIntermForm } from "@/components/operacoes/VendaIntermForm";
+import { CustoIntermForm } from "@/components/operacoes/CustoIntermForm";
 
 export default function OperacoesIntermediacao() {
   const queryClient = useQueryClient();
@@ -25,6 +29,10 @@ export default function OperacoesIntermediacao() {
   const [activeTab, setActiveTab] = useState("operacoes");
   const [isNewOperacao, setIsNewOperacao] = useState(false);
   const [selectedOperacao, setSelectedOperacao] = useState<string | null>(null);
+  const [showCompraForm, setShowCompraForm] = useState(false);
+  const [showBenefForm, setShowBenefForm] = useState(false);
+  const [showVendaForm, setShowVendaForm] = useState(false);
+  const [showCustoForm, setShowCustoForm] = useState(false);
   
   const [operacaoForm, setOperacaoForm] = useState({
     nome: "",
@@ -376,7 +384,7 @@ export default function OperacoesIntermediacao() {
                     <Card>
                       <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle>Compras de Material</CardTitle>
-                        <Button size="sm" disabled={!canEdit}><Plus className="mr-2 h-4 w-4" /> Nova</Button>
+                        <Button size="sm" disabled={!canEdit} onClick={() => setShowCompraForm(true)}><Plus className="mr-2 h-4 w-4" /> Nova</Button>
                       </CardHeader>
                       <CardContent>
                         {compras.length === 0 ? (
@@ -421,7 +429,7 @@ export default function OperacoesIntermediacao() {
                     <Card>
                       <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle>Beneficiamentos</CardTitle>
-                        <Button size="sm" disabled={!canEdit || totais.kgDisponivelCompra === 0}><Plus className="mr-2 h-4 w-4" /> Novo</Button>
+                        <Button size="sm" disabled={!canEdit || totais.kgDisponivelCompra === 0} onClick={() => setShowBenefForm(true)}><Plus className="mr-2 h-4 w-4" /> Novo</Button>
                       </CardHeader>
                       <CardContent>
                         {beneficiamentos.length === 0 ? (
@@ -462,7 +470,7 @@ export default function OperacoesIntermediacao() {
                     <Card>
                       <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle>Vendas</CardTitle>
-                        <Button size="sm" disabled={!canEdit || totais.kgDisponivelVenda === 0}><Plus className="mr-2 h-4 w-4" /> Nova</Button>
+                        <Button size="sm" disabled={!canEdit || totais.kgDisponivelVenda === 0} onClick={() => setShowVendaForm(true)}><Plus className="mr-2 h-4 w-4" /> Nova</Button>
                       </CardHeader>
                       <CardContent>
                         {vendas.length === 0 ? (
@@ -501,7 +509,7 @@ export default function OperacoesIntermediacao() {
                     <Card>
                       <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle>Outros Custos</CardTitle>
-                        <Button size="sm" disabled={!canEdit}><Plus className="mr-2 h-4 w-4" /> Novo</Button>
+                        <Button size="sm" disabled={!canEdit} onClick={() => setShowCustoForm(true)}><Plus className="mr-2 h-4 w-4" /> Novo</Button>
                       </CardHeader>
                       <CardContent>
                         {custos.length === 0 ? (
@@ -536,6 +544,34 @@ export default function OperacoesIntermediacao() {
             )}
           </div>
         </div>
+
+        {/* Forms */}
+        {selectedOperacao && (
+          <>
+            <CompraIntermForm 
+              open={showCompraForm} 
+              onOpenChange={setShowCompraForm} 
+              operacaoId={selectedOperacao}
+            />
+            <BeneficiamentoIntermForm 
+              open={showBenefForm} 
+              onOpenChange={setShowBenefForm} 
+              operacaoId={selectedOperacao}
+              kgDisponivel={totais.kgDisponivelCompra}
+            />
+            <VendaIntermForm 
+              open={showVendaForm} 
+              onOpenChange={setShowVendaForm} 
+              operacaoId={selectedOperacao}
+              kgDisponivel={totais.kgDisponivelVenda}
+            />
+            <CustoIntermForm 
+              open={showCustoForm} 
+              onOpenChange={setShowCustoForm} 
+              operacaoId={selectedOperacao}
+            />
+          </>
+        )}
       </div>
     </MainLayout>
   );

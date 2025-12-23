@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Loader2, FileText, Package, Cog, TrendingUp } from "lucide-react";
+import { Plus, Loader2, FileText, Package, Cog, TrendingUp, Pencil, Trash2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -172,6 +172,42 @@ export default function OperacoesProprias() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["entradas_c1"] });
       toast({ title: "Entrada registrada!" });
+    },
+    onError: (error) => toast({ title: "Erro", description: error.message, variant: "destructive" }),
+  });
+
+  const deleteEntrada = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("entradas_c1").update({ is_deleted: true }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["entradas_c1"] });
+      toast({ title: "Entrada excluída!" });
+    },
+    onError: (error) => toast({ title: "Erro", description: error.message, variant: "destructive" }),
+  });
+
+  const deleteBenef = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("beneficiamentos_c1").update({ is_deleted: true }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["beneficiamentos_c1"] });
+      toast({ title: "Beneficiamento excluído!" });
+    },
+    onError: (error) => toast({ title: "Erro", description: error.message, variant: "destructive" }),
+  });
+
+  const deleteSaida = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("saidas_c1").update({ is_deleted: true }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["saidas_c1"] });
+      toast({ title: "Saída excluída!" });
     },
     onError: (error) => toast({ title: "Erro", description: error.message, variant: "destructive" }),
   });
@@ -397,6 +433,7 @@ export default function OperacoesProprias() {
                                 <TableHead className="text-right">Custo R$/kg</TableHead>
                                 <TableHead className="text-right">Custo Total</TableHead>
                                 <TableHead className="text-right">Saldo</TableHead>
+                                {canEdit && <TableHead className="w-[80px]">Ações</TableHead>}
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -413,6 +450,13 @@ export default function OperacoesProprias() {
                                       {formatWeight(e.kg_liquido_disponivel || 0)}
                                     </Badge>
                                   </TableCell>
+                                  {canEdit && (
+                                    <TableCell>
+                                      <Button variant="ghost" size="icon" onClick={() => deleteEntrada.mutate(e.id)} disabled={e.kg_liquido_disponivel !== e.kg_liquido_total}>
+                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                      </Button>
+                                    </TableCell>
+                                  )}
                                 </TableRow>
                               ))}
                             </TableBody>
@@ -426,7 +470,7 @@ export default function OperacoesProprias() {
                     <Card>
                       <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle>Beneficiamentos</CardTitle>
-                        <Button size="sm" disabled={!canEdit || totaisOperacao.kgDisponivel === 0}>
+                        <Button size="sm" disabled={!canEdit || totaisOperacao.kgDisponivel === 0} onClick={() => setShowBenefForm(true)}>
                           <Plus className="mr-2 h-4 w-4" /> Novo Beneficiamento
                         </Button>
                       </CardHeader>
@@ -443,6 +487,7 @@ export default function OperacoesProprias() {
                                 <TableHead className="text-right">Custo Benef.</TableHead>
                                 <TableHead className="text-right">Custo Real/kg</TableHead>
                                 <TableHead className="text-right">Saldo</TableHead>
+                                {canEdit && <TableHead className="w-[80px]">Ações</TableHead>}
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -458,6 +503,13 @@ export default function OperacoesProprias() {
                                       {formatWeight(b.kg_disponivel || 0)}
                                     </Badge>
                                   </TableCell>
+                                  {canEdit && (
+                                    <TableCell>
+                                      <Button variant="ghost" size="icon" onClick={() => deleteBenef.mutate(b.id)} disabled={b.kg_disponivel !== b.kg_retornado}>
+                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                      </Button>
+                                    </TableCell>
+                                  )}
                                 </TableRow>
                               ))}
                             </TableBody>
@@ -471,7 +523,7 @@ export default function OperacoesProprias() {
                     <Card>
                       <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle>Saídas (Vendas)</CardTitle>
-                        <Button size="sm" disabled={!canEdit || totaisOperacao.kgDisponivelVenda === 0}>
+                        <Button size="sm" disabled={!canEdit || totaisOperacao.kgDisponivelVenda === 0} onClick={() => setShowSaidaForm(true)}>
                           <Plus className="mr-2 h-4 w-4" /> Nova Saída
                         </Button>
                       </CardHeader>
@@ -489,6 +541,7 @@ export default function OperacoesProprias() {
                                 <TableHead className="text-right">Receita</TableHead>
                                 <TableHead className="text-right">Custo</TableHead>
                                 <TableHead className="text-right">Resultado</TableHead>
+                                {canEdit && <TableHead className="w-[80px]">Ações</TableHead>}
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -505,6 +558,13 @@ export default function OperacoesProprias() {
                                       {formatCurrency(s.resultado_simulado_rs || 0)}
                                     </span>
                                   </TableCell>
+                                  {canEdit && (
+                                    <TableCell>
+                                      <Button variant="ghost" size="icon" onClick={() => deleteSaida.mutate(s.id)}>
+                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                      </Button>
+                                    </TableCell>
+                                  )}
                                 </TableRow>
                               ))}
                             </TableBody>
