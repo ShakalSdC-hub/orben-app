@@ -115,8 +115,8 @@ export default function Saida() {
         .from("saidas")
         .select(`
           *,
-          tipos_saida(nome, cobra_custos),
-          cliente:clientes(razao_social, nome_fantasia)
+          tipos_saida!fk_saidas_tipo_saida(nome, cobra_custos),
+          cliente:clientes!fk_saidas_cliente(razao_social, nome_fantasia)
         `)
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -131,9 +131,9 @@ export default function Saida() {
         .from("sublotes")
         .select(`
           *,
-          tipo_produto:tipos_produto(nome),
-          dono:donos_material(id, nome, is_ibrac, taxa_operacao_pct),
-          entrada:entradas(codigo, valor_unitario, tipo_entrada:tipos_entrada(id, nome, gera_custo))
+          tipo_produto:tipos_produto!fk_sublotes_tipo_produto(nome),
+          dono:donos_material!fk_sublotes_dono(id, nome, is_ibrac, taxa_operacao_pct),
+          entrada:entradas!fk_sublotes_entrada(codigo, valor_unitario, tipo_entrada:tipos_entrada!fk_entradas_tipo_entrada(id, nome, gera_custo))
         `)
         .eq("status", "disponivel")
         .gt("peso_kg", 0)

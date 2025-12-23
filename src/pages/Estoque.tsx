@@ -89,10 +89,10 @@ export default function Estoque() {
         .from("sublotes")
         .select(`
           *,
-          entrada:entradas(codigo, tipo_material, dono:donos_material(nome), parceiro:parceiros!entradas_parceiro_id_fkey(razao_social)),
-          dono:donos_material(nome),
-          tipo_produto:tipos_produto(nome),
-          local_estoque:locais_estoque(nome, tipo)
+          entrada:entradas!fk_sublotes_entrada(codigo, tipo_material, dono:donos_material!fk_entradas_dono(nome), parceiro:parceiros!fk_entradas_parceiro(razao_social)),
+          dono:donos_material!fk_sublotes_dono(nome),
+          tipo_produto:tipos_produto!fk_sublotes_tipo_produto(nome),
+          local_estoque:locais_estoque!fk_sublotes_local_estoque(nome, tipo)
         `)
         .order("created_at", { ascending: false });
       if (error) throw error;

@@ -67,7 +67,7 @@ export function BeneficiamentoEditForm({ beneficiamento, onClose, readOnly = fal
     queryFn: async () => {
       const { data, error } = await supabase
         .from("beneficiamento_itens_entrada")
-        .select("*, sublote:sublotes(codigo, peso_kg, tipo_produto:tipos_produto(nome), dono:donos_material(nome))")
+        .select("*, sublote:sublotes!fk_bie_sublote(codigo, peso_kg, tipo_produto:tipos_produto!fk_sublotes_tipo_produto(nome), dono:donos_material!fk_sublotes_dono(nome))")
         .eq("beneficiamento_id", beneficiamento.id);
       if (error) throw error;
       return data;

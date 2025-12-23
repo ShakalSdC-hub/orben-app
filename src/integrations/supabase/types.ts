@@ -85,6 +85,27 @@ export type Database = {
             referencedRelation: "parceiros"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fk_acertos_created_by"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_acertos_dono"
+            columns: ["dono_id"]
+            isOneToOne: false
+            referencedRelation: "donos_material"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_acertos_parceiro"
+            columns: ["parceiro_id"]
+            isOneToOne: false
+            referencedRelation: "parceiros"
+            referencedColumns: ["id"]
+          },
         ]
       }
       audit_logs: {
@@ -166,6 +187,20 @@ export type Database = {
             referencedRelation: "entradas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fk_benef_entradas_beneficiamento"
+            columns: ["beneficiamento_id"]
+            isOneToOne: false
+            referencedRelation: "beneficiamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_benef_entradas_entrada"
+            columns: ["entrada_id"]
+            isOneToOne: false
+            referencedRelation: "entradas"
+            referencedColumns: ["id"]
+          },
         ]
       }
       beneficiamento_itens_entrada: {
@@ -213,6 +248,27 @@ export type Database = {
           },
           {
             foreignKeyName: "beneficiamento_itens_entrada_tipo_produto_id_fkey"
+            columns: ["tipo_produto_id"]
+            isOneToOne: false
+            referencedRelation: "tipos_produto"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_bie_beneficiamento"
+            columns: ["beneficiamento_id"]
+            isOneToOne: false
+            referencedRelation: "beneficiamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_bie_sublote"
+            columns: ["sublote_id"]
+            isOneToOne: false
+            referencedRelation: "sublotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_bie_tipo_produto"
             columns: ["tipo_produto_id"]
             isOneToOne: false
             referencedRelation: "tipos_produto"
@@ -280,6 +336,34 @@ export type Database = {
             referencedRelation: "tipos_produto"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fk_bis_beneficiamento"
+            columns: ["beneficiamento_id"]
+            isOneToOne: false
+            referencedRelation: "beneficiamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_bis_local_estoque"
+            columns: ["local_estoque_id"]
+            isOneToOne: false
+            referencedRelation: "locais_estoque"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_bis_sublote_gerado"
+            columns: ["sublote_gerado_id"]
+            isOneToOne: false
+            referencedRelation: "sublotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_bis_tipo_produto"
+            columns: ["tipo_produto_id"]
+            isOneToOne: false
+            referencedRelation: "tipos_produto"
+            referencedColumns: ["id"]
+          },
         ]
       }
       beneficiamento_produtos: {
@@ -323,6 +407,20 @@ export type Database = {
           },
           {
             foreignKeyName: "beneficiamento_produtos_tipo_produto_id_fkey"
+            columns: ["tipo_produto_id"]
+            isOneToOne: false
+            referencedRelation: "tipos_produto"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_benef_prod_beneficiamento"
+            columns: ["beneficiamento_id"]
+            isOneToOne: false
+            referencedRelation: "beneficiamentos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_benef_prod_tipo_produto"
             columns: ["tipo_produto_id"]
             isOneToOne: false
             referencedRelation: "tipos_produto"
@@ -442,6 +540,34 @@ export type Database = {
           },
           {
             foreignKeyName: "beneficiamentos_transportadora_id_fkey"
+            columns: ["transportadora_id"]
+            isOneToOne: false
+            referencedRelation: "parceiros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_beneficiamentos_created_by"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_beneficiamentos_fornecedor"
+            columns: ["fornecedor_terceiro_id"]
+            isOneToOne: false
+            referencedRelation: "parceiros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_beneficiamentos_processo"
+            columns: ["processo_id"]
+            isOneToOne: false
+            referencedRelation: "processos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_beneficiamentos_transportadora"
             columns: ["transportadora_id"]
             isOneToOne: false
             referencedRelation: "parceiros"
@@ -691,6 +817,55 @@ export type Database = {
             referencedRelation: "parceiros"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fk_entradas_conferente"
+            columns: ["conferente_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_entradas_created_by"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_entradas_dono"
+            columns: ["dono_id"]
+            isOneToOne: false
+            referencedRelation: "donos_material"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_entradas_parceiro"
+            columns: ["parceiro_id"]
+            isOneToOne: false
+            referencedRelation: "parceiros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_entradas_tipo_entrada"
+            columns: ["tipo_entrada_id"]
+            isOneToOne: false
+            referencedRelation: "tipos_entrada"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_entradas_tipo_produto"
+            columns: ["tipo_produto_id"]
+            isOneToOne: false
+            referencedRelation: "tipos_produto"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_entradas_transportadora"
+            columns: ["transportadora_id"]
+            isOneToOne: false
+            referencedRelation: "parceiros"
+            referencedColumns: ["id"]
+          },
         ]
       }
       historico_lme: {
@@ -810,6 +985,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_lme_config_created_by"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "lme_semana_config_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
@@ -886,6 +1068,34 @@ export type Database = {
           tipo?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_movimentacoes_created_by"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_movimentacoes_local_destino"
+            columns: ["local_destino_id"]
+            isOneToOne: false
+            referencedRelation: "locais_estoque"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_movimentacoes_local_origem"
+            columns: ["local_origem_id"]
+            isOneToOne: false
+            referencedRelation: "locais_estoque"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_movimentacoes_sublote"
+            columns: ["sublote_id"]
+            isOneToOne: false
+            referencedRelation: "sublotes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "movimentacoes_local_destino_id_fkey"
             columns: ["local_destino_id"]
@@ -1005,6 +1215,27 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_precos_mo_fornecedor"
+            columns: ["fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "parceiros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_precos_mo_processo"
+            columns: ["processo_id"]
+            isOneToOne: false
+            referencedRelation: "processos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_precos_mo_tipo_produto"
+            columns: ["tipo_produto_id"]
+            isOneToOne: false
+            referencedRelation: "tipos_produto"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "precos_mo_terceiros_fornecedor_id_fkey"
             columns: ["fornecedor_id"]
             isOneToOne: false
@@ -1114,6 +1345,20 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_saida_itens_saida"
+            columns: ["saida_id"]
+            isOneToOne: false
+            referencedRelation: "saidas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_saida_itens_sublote"
+            columns: ["sublote_id"]
+            isOneToOne: false
+            referencedRelation: "sublotes"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "saida_itens_saida_id_fkey"
             columns: ["saida_id"]
             isOneToOne: false
@@ -1207,6 +1452,34 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_saidas_cliente"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_saidas_created_by"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_saidas_tipo_saida"
+            columns: ["tipo_saida_id"]
+            isOneToOne: false
+            referencedRelation: "tipos_saida"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_saidas_transportadora"
+            columns: ["transportadora_id"]
+            isOneToOne: false
+            referencedRelation: "parceiros"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "saidas_cliente_id_fkey"
             columns: ["cliente_id"]
             isOneToOne: false
@@ -1292,6 +1565,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_simulacoes_created_by"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "simulacoes_lme_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
@@ -1353,6 +1633,41 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_sublotes_dono"
+            columns: ["dono_id"]
+            isOneToOne: false
+            referencedRelation: "donos_material"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_sublotes_entrada"
+            columns: ["entrada_id"]
+            isOneToOne: false
+            referencedRelation: "entradas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_sublotes_local_estoque"
+            columns: ["local_estoque_id"]
+            isOneToOne: false
+            referencedRelation: "locais_estoque"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_sublotes_lote_pai"
+            columns: ["lote_pai_id"]
+            isOneToOne: false
+            referencedRelation: "sublotes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_sublotes_tipo_produto"
+            columns: ["tipo_produto_id"]
+            isOneToOne: false
+            referencedRelation: "tipos_produto"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "sublotes_dono_id_fkey"
             columns: ["dono_id"]
@@ -1530,6 +1845,34 @@ export type Database = {
           valor_acrescimo?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "fk_transf_dono_created_by"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_transf_dono_destino"
+            columns: ["dono_destino_id"]
+            isOneToOne: false
+            referencedRelation: "donos_material"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_transf_dono_origem"
+            columns: ["dono_origem_id"]
+            isOneToOne: false
+            referencedRelation: "donos_material"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_transf_dono_sublote"
+            columns: ["sublote_id"]
+            isOneToOne: false
+            referencedRelation: "sublotes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "transferencias_dono_created_by_fkey"
             columns: ["created_by"]

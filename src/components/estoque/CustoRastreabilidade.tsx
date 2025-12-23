@@ -60,13 +60,13 @@ export function CustoRastreabilidade({ sublote, isOpen, onClose }: CustoRastreab
           taxa_financeira_valor,
           taxa_financeira_pct,
           valor_documento,
-          entrada:entradas(
+          entrada:entradas!fk_benef_entradas_entrada(
             codigo, 
             data_entrada, 
             valor_total, 
             valor_unitario,
-            parceiro:parceiros!entradas_parceiro_id_fkey(razao_social),
-            dono:donos_material(nome)
+            parceiro:parceiros!fk_entradas_parceiro(razao_social),
+            dono:donos_material!fk_entradas_dono(nome)
           )
         `)
         .eq("beneficiamento_id", beneficiamentoSaida?.beneficiamento_id);

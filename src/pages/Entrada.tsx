@@ -101,11 +101,11 @@ export default function Entrada() {
         .from("entradas")
         .select(`
           *,
-          parceiro:parceiros!entradas_parceiro_id_fkey(razao_social, nome_fantasia),
-          dono:donos_material(nome),
-          tipo_entrada:tipos_entrada(nome),
-          tipo_produto:tipos_produto(nome),
-          transportadora:parceiros!entradas_transportadora_id_fkey(razao_social)
+          parceiro:parceiros!fk_entradas_parceiro(razao_social, nome_fantasia),
+          dono:donos_material!fk_entradas_dono(nome),
+          tipo_entrada:tipos_entrada!fk_entradas_tipo_entrada(nome),
+          tipo_produto:tipos_produto!fk_entradas_tipo_produto(nome),
+          transportadora:parceiros!fk_entradas_transportadora(razao_social)
         `)
         .order("data_entrada", { ascending: false });
       if (error) throw error;
