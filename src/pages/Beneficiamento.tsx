@@ -863,10 +863,12 @@ export default function Beneficiamento() {
           <div className="flex gap-2">
             <ExcelImport
               title="Importar Beneficiamentos"
-              description="Importe beneficiamentos via planilha Excel"
+              description="Importe beneficiamentos via planilha Excel. Códigos duplicados serão bloqueados."
               templateFilename="template_beneficiamentos"
+              tableName="beneficiamentos"
+              codeColumn="codigo"
               columns={[
-                { dbColumn: "codigo", excelColumn: "Código", label: "Código", required: true, type: "string" },
+                { dbColumn: "codigo", excelColumn: "Código", label: "Código", required: true, type: "string", isCodeColumn: true },
                 { dbColumn: "data_inicio", excelColumn: "Data Início", label: "Data Início", required: true, type: "date" },
                 { dbColumn: "data_fim", excelColumn: "Data Fim", label: "Data Fim", required: false, type: "date" },
                 { dbColumn: "tipo_beneficiamento", excelColumn: "Tipo", label: "Tipo", required: false, type: "string" },
@@ -885,9 +887,12 @@ export default function Beneficiamento() {
               sampleData={[
                 { "Código": "BEN-001", "Data Início": "01/01/2025", "Data Fim": "05/01/2025", "Tipo": "interno", "Peso Entrada (kg)": "1000", "Peso Saída (kg)": "950", "Perda Real (%)": "5", "Perda Cobrada (%)": "3", "Custo Frete Ida (R$)": "500", "Custo Frete Volta (R$)": "500", "Custo MO Terceiro (R$)": "0", "Custo MO IBRAC (R$)": "1000", "Taxa Financeira (%)": "1.8", "LME Referência (R$/kg)": "45", "Observações": "" },
               ]}
+              existingDataQuery={async () => {
+                const { data } = await supabase.from("beneficiamentos").select("*").order("data_inicio", { ascending: false });
+                return data || [];
+              }}
               onImport={async (data) => {
                 for (const row of data) {
-                  // Calcular perda real se entrada e saída existem
                   let perdaReal = row.perda_real_pct;
                   if (!perdaReal && row.peso_entrada_kg > 0 && row.peso_saida_kg > 0) {
                     perdaReal = ((row.peso_entrada_kg - row.peso_saida_kg) / row.peso_entrada_kg * 100);

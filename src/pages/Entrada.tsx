@@ -237,10 +237,12 @@ export default function Entrada() {
           <div className="flex gap-2">
             <ExcelImport
               title="Importar Entradas"
-              description="Importe entradas de material via planilha Excel"
+              description="Importe entradas de material via planilha Excel. Códigos duplicados serão bloqueados."
               templateFilename="template_entradas"
+              tableName="entradas"
+              codeColumn="codigo"
               columns={[
-                { dbColumn: "codigo", excelColumn: "Código", label: "Código", required: true, type: "string" },
+                { dbColumn: "codigo", excelColumn: "Código", label: "Código", required: true, type: "string", isCodeColumn: true },
                 { dbColumn: "data_entrada", excelColumn: "Data Entrada", label: "Data", required: true, type: "date" },
                 { dbColumn: "tipo_material", excelColumn: "Tipo Material", label: "Tipo Material", required: true, type: "string" },
                 { dbColumn: "peso_bruto_kg", excelColumn: "Peso Bruto (kg)", label: "Peso Bruto", required: true, type: "number" },
@@ -258,6 +260,10 @@ export default function Entrada() {
               sampleData={[
                 { "Código": "ENT-001", "Data Entrada": "01/01/2025", "Tipo Material": "Cobre", "Peso Bruto (kg)": "1050", "Peso Líquido (kg)": "1000", "Peso NF (kg)": "1000", "Nota Fiscal": "12345", "Teor Cobre (%)": "98.5", "Valor Unitário (R$)": "45.00", "Valor Total (R$)": "45000", "Taxa Financeira (%)": "1.8", "Motorista": "João", "Placa Veículo": "ABC-1234", "Observações": "" },
               ]}
+              existingDataQuery={async () => {
+                const { data } = await supabase.from("entradas").select("*").order("data_entrada", { ascending: false });
+                return data || [];
+              }}
               onImport={async (data) => {
                 for (const row of data) {
                   const { error } = await supabase.from("entradas").insert({
