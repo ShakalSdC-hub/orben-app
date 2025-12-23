@@ -67,6 +67,7 @@ import { GlobalFilters } from "@/components/filters/GlobalFilters";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { useExportReport } from "@/hooks/useExportReport";
+import { ExcelImport } from "@/components/import/ExcelImport";
 
 const statusConfig: Record<string, { label: string; className: string }> = {
   pendente: { label: "Pendente", className: "bg-warning/10 text-warning border-warning/20" },
@@ -77,7 +78,7 @@ const statusConfig: Record<string, { label: string; className: string }> = {
 
 export default function Entrada() {
   const queryClient = useQueryClient();
-  const { role } = useAuth();
+  const { role, user } = useAuth();
   const isAdmin = role === "admin";
   const canEdit = role === "admin" || role === "operacao";
   
@@ -234,10 +235,41 @@ export default function Entrada() {
             <p className="text-muted-foreground">Gerenciamento de recebimento de material com tickets/lotes</p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm">
-              <Upload className="mr-2 h-4 w-4" />
-              Importar XML
-            </Button>
+            <ExcelImport
+              title="Importar Entradas"
+              description="Importe entradas de material via planilha Excel"
+              templateFilename="template_entradas"
+              columns={[
+                { dbColumn: "codigo", excelColumn: "Código", label: "Código", required: true, type: "string" },
+                { dbColumn: "data_entrada", excelColumn: "Data Entrada", label: "Data", required: true, type: "date" },
+                { dbColumn: "tipo_material", excelColumn: "Tipo Material", label: "Tipo Material", required: true, type: "string" },
+                { dbColumn: "peso_bruto_kg", excelColumn: "Peso Bruto (kg)", label: "Peso Bruto", required: true, type: "number" },
+                { dbColumn: "peso_liquido_kg", excelColumn: "Peso Líquido (kg)", label: "Peso Líquido", required: true, type: "number" },
+                { dbColumn: "peso_nf_kg", excelColumn: "Peso NF (kg)", label: "Peso NF", required: false, type: "number" },
+                { dbColumn: "nota_fiscal", excelColumn: "Nota Fiscal", label: "Nota Fiscal", required: false, type: "string" },
+                { dbColumn: "teor_cobre", excelColumn: "Teor Cobre (%)", label: "Teor Cobre", required: false, type: "number" },
+                { dbColumn: "valor_unitario", excelColumn: "Valor Unitário (R$)", label: "Valor Unitário", required: false, type: "number" },
+                { dbColumn: "valor_total", excelColumn: "Valor Total (R$)", label: "Valor Total", required: false, type: "number" },
+                { dbColumn: "taxa_financeira_pct", excelColumn: "Taxa Financeira (%)", label: "Taxa Financeira", required: false, type: "number" },
+                { dbColumn: "motorista", excelColumn: "Motorista", label: "Motorista", required: false, type: "string" },
+                { dbColumn: "placa_veiculo", excelColumn: "Placa Veículo", label: "Placa", required: false, type: "string" },
+                { dbColumn: "observacoes", excelColumn: "Observações", label: "Observações", required: false, type: "string" },
+              ]}
+              sampleData={[
+                { "Código": "ENT-001", "Data Entrada": "01/01/2025", "Tipo Material": "Cobre", "Peso Bruto (kg)": "1050", "Peso Líquido (kg)": "1000", "Peso NF (kg)": "1000", "Nota Fiscal": "12345", "Teor Cobre (%)": "98.5", "Valor Unitário (R$)": "45.00", "Valor Total (R$)": "45000", "Taxa Financeira (%)": "1.8", "Motorista": "João", "Placa Veículo": "ABC-1234", "Observações": "" },
+              ]}
+              onImport={async (data) => {
+                for (const row of data) {
+                  const { error } = await supabase.from("entradas").insert({
+                    ...row,
+                    status: "pendente",
+                    created_by: user?.id,
+                  });
+                  if (error) throw error;
+                }
+                queryClient.invalidateQueries({ queryKey: ["entradas"] });
+              }}
+            />
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
               <DialogTrigger asChild>
                 <Button size="sm" className="bg-gradient-copper hover:opacity-90 shadow-copper">
