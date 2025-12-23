@@ -111,9 +111,9 @@ export function CustoRastreabilidade({ sublote, isOpen, onClose }: CustoRastreab
         .from("entradas")
         .select(`
           *,
-          parceiro:parceiros!entradas_parceiro_id_fkey(razao_social),
+          parceiro:parceiros!fk_entradas_parceiro(razao_social),
           tipo_produto:tipos_produto(nome),
-          dono:donos_material(nome)
+          dono:donos_material!fk_entradas_dono(nome)
         `)
         .eq("id", sublote?.entrada_id)
         .maybeSingle();
