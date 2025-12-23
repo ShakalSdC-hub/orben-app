@@ -144,6 +144,123 @@ export type Database = {
         }
         Relationships: []
       }
+      benef_compra_alocacoes: {
+        Row: {
+          beneficiamento_id: string
+          compra_id: string
+          created_at: string
+          id: string
+          kg_alocado: number
+        }
+        Insert: {
+          beneficiamento_id: string
+          compra_id: string
+          created_at?: string
+          id?: string
+          kg_alocado: number
+        }
+        Update: {
+          beneficiamento_id?: string
+          compra_id?: string
+          created_at?: string
+          id?: string
+          kg_alocado?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "benef_compra_alocacoes_beneficiamento_id_fkey"
+            columns: ["beneficiamento_id"]
+            isOneToOne: false
+            referencedRelation: "beneficiamentos_intermediacao"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "benef_compra_alocacoes_compra_id_fkey"
+            columns: ["compra_id"]
+            isOneToOne: false
+            referencedRelation: "compras_intermediacao"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      benef_ent_aloc_terceiros: {
+        Row: {
+          beneficiamento_id: string
+          created_at: string
+          entrada_id: string
+          id: string
+          kg_alocado: number
+        }
+        Insert: {
+          beneficiamento_id: string
+          created_at?: string
+          entrada_id: string
+          id?: string
+          kg_alocado: number
+        }
+        Update: {
+          beneficiamento_id?: string
+          created_at?: string
+          entrada_id?: string
+          id?: string
+          kg_alocado?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "benef_ent_aloc_terceiros_beneficiamento_id_fkey"
+            columns: ["beneficiamento_id"]
+            isOneToOne: false
+            referencedRelation: "beneficiamentos_terceiros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "benef_ent_aloc_terceiros_entrada_id_fkey"
+            columns: ["entrada_id"]
+            isOneToOne: false
+            referencedRelation: "entradas_terceiros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      benef_entrada_alocacoes: {
+        Row: {
+          beneficiamento_id: string
+          created_at: string
+          entrada_id: string
+          id: string
+          kg_alocado: number
+        }
+        Insert: {
+          beneficiamento_id: string
+          created_at?: string
+          entrada_id: string
+          id?: string
+          kg_alocado: number
+        }
+        Update: {
+          beneficiamento_id?: string
+          created_at?: string
+          entrada_id?: string
+          id?: string
+          kg_alocado?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "benef_entrada_alocacoes_beneficiamento_id_fkey"
+            columns: ["beneficiamento_id"]
+            isOneToOne: false
+            referencedRelation: "beneficiamentos_c1"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "benef_entrada_alocacoes_entrada_id_fkey"
+            columns: ["entrada_id"]
+            isOneToOne: false
+            referencedRelation: "entradas_c1"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       beneficiamento_entradas: {
         Row: {
           beneficiamento_id: string
@@ -575,6 +692,216 @@ export type Database = {
           },
         ]
       }
+      beneficiamentos_c1: {
+        Row: {
+          created_at: string
+          custo_pre_alocado_rs: number | null
+          custo_real_rkg: number | null
+          custo_real_total_rs: number | null
+          custos_benef_total_rs: number | null
+          documento: string | null
+          dt: string
+          frete_ida_mode: string | null
+          frete_ida_val: number | null
+          frete_volta_mode: string | null
+          frete_volta_val: number | null
+          id: string
+          is_deleted: boolean | null
+          kg_disponivel: number | null
+          kg_retornado: number
+          mo_benef_mode: string | null
+          mo_benef_val: number | null
+          operacao_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          custo_pre_alocado_rs?: number | null
+          custo_real_rkg?: number | null
+          custo_real_total_rs?: number | null
+          custos_benef_total_rs?: number | null
+          documento?: string | null
+          dt: string
+          frete_ida_mode?: string | null
+          frete_ida_val?: number | null
+          frete_volta_mode?: string | null
+          frete_volta_val?: number | null
+          id?: string
+          is_deleted?: boolean | null
+          kg_disponivel?: number | null
+          kg_retornado: number
+          mo_benef_mode?: string | null
+          mo_benef_val?: number | null
+          operacao_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          custo_pre_alocado_rs?: number | null
+          custo_real_rkg?: number | null
+          custo_real_total_rs?: number | null
+          custos_benef_total_rs?: number | null
+          documento?: string | null
+          dt?: string
+          frete_ida_mode?: string | null
+          frete_ida_val?: number | null
+          frete_volta_mode?: string | null
+          frete_volta_val?: number | null
+          id?: string
+          is_deleted?: boolean | null
+          kg_disponivel?: number | null
+          kg_retornado?: number
+          mo_benef_mode?: string | null
+          mo_benef_val?: number | null
+          operacao_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "beneficiamentos_c1_operacao_id_fkey"
+            columns: ["operacao_id"]
+            isOneToOne: false
+            referencedRelation: "operacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      beneficiamentos_intermediacao: {
+        Row: {
+          created_at: string
+          custos_benef_total_rs: number | null
+          documento: string | null
+          dt: string
+          frete_ida_mode: string | null
+          frete_ida_val: number | null
+          frete_volta_mode: string | null
+          frete_volta_val: number | null
+          id: string
+          is_deleted: boolean | null
+          kg_disponivel_venda: number | null
+          kg_retornado: number
+          mo_benef_mode: string | null
+          mo_benef_val: number | null
+          operacao_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          custos_benef_total_rs?: number | null
+          documento?: string | null
+          dt: string
+          frete_ida_mode?: string | null
+          frete_ida_val?: number | null
+          frete_volta_mode?: string | null
+          frete_volta_val?: number | null
+          id?: string
+          is_deleted?: boolean | null
+          kg_disponivel_venda?: number | null
+          kg_retornado: number
+          mo_benef_mode?: string | null
+          mo_benef_val?: number | null
+          operacao_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          custos_benef_total_rs?: number | null
+          documento?: string | null
+          dt?: string
+          frete_ida_mode?: string | null
+          frete_ida_val?: number | null
+          frete_volta_mode?: string | null
+          frete_volta_val?: number | null
+          id?: string
+          is_deleted?: boolean | null
+          kg_disponivel_venda?: number | null
+          kg_retornado?: number
+          mo_benef_mode?: string | null
+          mo_benef_val?: number | null
+          operacao_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "beneficiamentos_intermediacao_operacao_id_fkey"
+            columns: ["operacao_id"]
+            isOneToOne: false
+            referencedRelation: "operacoes_intermediacao"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      beneficiamentos_terceiros: {
+        Row: {
+          created_at: string
+          custos_servico_total_rs: number | null
+          documento: string | null
+          dt: string
+          frete_ida_mode: string | null
+          frete_ida_val: number | null
+          frete_volta_mode: string | null
+          frete_volta_val: number | null
+          id: string
+          is_deleted: boolean | null
+          kg_disponivel_cliente: number | null
+          kg_retornado: number
+          mo_ibrac_mode: string | null
+          mo_ibrac_val: number | null
+          mo_terceiro_mode: string | null
+          mo_terceiro_val: number | null
+          operacao_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          custos_servico_total_rs?: number | null
+          documento?: string | null
+          dt: string
+          frete_ida_mode?: string | null
+          frete_ida_val?: number | null
+          frete_volta_mode?: string | null
+          frete_volta_val?: number | null
+          id?: string
+          is_deleted?: boolean | null
+          kg_disponivel_cliente?: number | null
+          kg_retornado: number
+          mo_ibrac_mode?: string | null
+          mo_ibrac_val?: number | null
+          mo_terceiro_mode?: string | null
+          mo_terceiro_val?: number | null
+          operacao_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          custos_servico_total_rs?: number | null
+          documento?: string | null
+          dt?: string
+          frete_ida_mode?: string | null
+          frete_ida_val?: number | null
+          frete_volta_mode?: string | null
+          frete_volta_val?: number | null
+          id?: string
+          is_deleted?: boolean | null
+          kg_disponivel_cliente?: number | null
+          kg_retornado?: number
+          mo_ibrac_mode?: string | null
+          mo_ibrac_val?: number | null
+          mo_terceiro_mode?: string | null
+          mo_terceiro_val?: number | null
+          operacao_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "beneficiamentos_terceiros_operacao_id_fkey"
+            columns: ["operacao_id"]
+            isOneToOne: false
+            referencedRelation: "operacoes_terceiros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clientes: {
         Row: {
           ativo: boolean | null
@@ -623,6 +950,116 @@ export type Database = {
         }
         Relationships: []
       }
+      cobrancas_servico_terceiros: {
+        Row: {
+          base_kg_mode: string | null
+          created_at: string
+          documento: string | null
+          dt: string
+          id: string
+          is_deleted: boolean | null
+          mode: string | null
+          operacao_id: string
+          tipo: string | null
+          updated_at: string
+          val: number | null
+        }
+        Insert: {
+          base_kg_mode?: string | null
+          created_at?: string
+          documento?: string | null
+          dt: string
+          id?: string
+          is_deleted?: boolean | null
+          mode?: string | null
+          operacao_id: string
+          tipo?: string | null
+          updated_at?: string
+          val?: number | null
+        }
+        Update: {
+          base_kg_mode?: string | null
+          created_at?: string
+          documento?: string | null
+          dt?: string
+          id?: string
+          is_deleted?: boolean | null
+          mode?: string | null
+          operacao_id?: string
+          tipo?: string | null
+          updated_at?: string
+          val?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cobrancas_servico_terceiros_operacao_id_fkey"
+            columns: ["operacao_id"]
+            isOneToOne: false
+            referencedRelation: "operacoes_terceiros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      compras_intermediacao: {
+        Row: {
+          created_at: string
+          dt: string
+          fornecedor_compra_id: string | null
+          id: string
+          is_deleted: boolean | null
+          kg_comprado: number
+          kg_disponivel_compra: number | null
+          nf_compra: string | null
+          operacao_id: string
+          preco_compra_rkg: number
+          updated_at: string
+          valor_compra_rs: number | null
+        }
+        Insert: {
+          created_at?: string
+          dt: string
+          fornecedor_compra_id?: string | null
+          id?: string
+          is_deleted?: boolean | null
+          kg_comprado: number
+          kg_disponivel_compra?: number | null
+          nf_compra?: string | null
+          operacao_id: string
+          preco_compra_rkg: number
+          updated_at?: string
+          valor_compra_rs?: number | null
+        }
+        Update: {
+          created_at?: string
+          dt?: string
+          fornecedor_compra_id?: string | null
+          id?: string
+          is_deleted?: boolean | null
+          kg_comprado?: number
+          kg_disponivel_compra?: number | null
+          nf_compra?: string | null
+          operacao_id?: string
+          preco_compra_rkg?: number
+          updated_at?: string
+          valor_compra_rs?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compras_intermediacao_fornecedor_compra_id_fkey"
+            columns: ["fornecedor_compra_id"]
+            isOneToOne: false
+            referencedRelation: "parceiros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compras_intermediacao_operacao_id_fkey"
+            columns: ["operacao_id"]
+            isOneToOne: false
+            referencedRelation: "operacoes_intermediacao"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       config_fiscal: {
         Row: {
           ativo: boolean | null
@@ -652,6 +1089,59 @@ export type Database = {
           valor?: number
         }
         Relationships: []
+      }
+      custos_intermediacao: {
+        Row: {
+          base_kg_mode: string | null
+          categoria: string
+          created_at: string
+          documento: string | null
+          dt: string
+          id: string
+          is_deleted: boolean | null
+          mode: string | null
+          obs: string | null
+          operacao_id: string
+          updated_at: string
+          val: number
+        }
+        Insert: {
+          base_kg_mode?: string | null
+          categoria: string
+          created_at?: string
+          documento?: string | null
+          dt: string
+          id?: string
+          is_deleted?: boolean | null
+          mode?: string | null
+          obs?: string | null
+          operacao_id: string
+          updated_at?: string
+          val?: number
+        }
+        Update: {
+          base_kg_mode?: string | null
+          categoria?: string
+          created_at?: string
+          documento?: string | null
+          dt?: string
+          id?: string
+          is_deleted?: boolean | null
+          mode?: string | null
+          obs?: string | null
+          operacao_id?: string
+          updated_at?: string
+          val?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custos_intermediacao_operacao_id_fkey"
+            columns: ["operacao_id"]
+            isOneToOne: false
+            referencedRelation: "operacoes_intermediacao"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       donos_material: {
         Row: {
@@ -864,6 +1354,204 @@ export type Database = {
             columns: ["transportadora_id"]
             isOneToOne: false
             referencedRelation: "parceiros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      entradas_c1: {
+        Row: {
+          benchmark_sucata_rkg: number | null
+          created_at: string
+          custo_unit_pre_rkg: number | null
+          custos_pre_total_rs: number | null
+          dt_emissao: string | null
+          dt_recebimento: string | null
+          financeiro_mode: string | null
+          financeiro_val: number | null
+          frete_ida_moagem_mode: string | null
+          frete_ida_moagem_val: number | null
+          frete_volta_moagem_mode: string | null
+          frete_volta_moagem_val: number | null
+          id: string
+          is_deleted: boolean | null
+          kg_liquido_disponivel: number | null
+          kg_liquido_total: number | null
+          kg_ticket: number | null
+          moagem_mode: string | null
+          moagem_val: number | null
+          nf_num: string | null
+          operacao_id: string
+          perda_mel_pct: number
+          perda_mista_pct: number
+          perda_total_kg: number | null
+          procedencia: string | null
+          ticket_mel_kg: number | null
+          ticket_mista_kg: number | null
+          ticket_num: string | null
+          updated_at: string
+          valor_ticket_rs: number | null
+          valor_unit_sucata_rkg: number
+        }
+        Insert: {
+          benchmark_sucata_rkg?: number | null
+          created_at?: string
+          custo_unit_pre_rkg?: number | null
+          custos_pre_total_rs?: number | null
+          dt_emissao?: string | null
+          dt_recebimento?: string | null
+          financeiro_mode?: string | null
+          financeiro_val?: number | null
+          frete_ida_moagem_mode?: string | null
+          frete_ida_moagem_val?: number | null
+          frete_volta_moagem_mode?: string | null
+          frete_volta_moagem_val?: number | null
+          id?: string
+          is_deleted?: boolean | null
+          kg_liquido_disponivel?: number | null
+          kg_liquido_total?: number | null
+          kg_ticket?: number | null
+          moagem_mode?: string | null
+          moagem_val?: number | null
+          nf_num?: string | null
+          operacao_id: string
+          perda_mel_pct: number
+          perda_mista_pct: number
+          perda_total_kg?: number | null
+          procedencia?: string | null
+          ticket_mel_kg?: number | null
+          ticket_mista_kg?: number | null
+          ticket_num?: string | null
+          updated_at?: string
+          valor_ticket_rs?: number | null
+          valor_unit_sucata_rkg: number
+        }
+        Update: {
+          benchmark_sucata_rkg?: number | null
+          created_at?: string
+          custo_unit_pre_rkg?: number | null
+          custos_pre_total_rs?: number | null
+          dt_emissao?: string | null
+          dt_recebimento?: string | null
+          financeiro_mode?: string | null
+          financeiro_val?: number | null
+          frete_ida_moagem_mode?: string | null
+          frete_ida_moagem_val?: number | null
+          frete_volta_moagem_mode?: string | null
+          frete_volta_moagem_val?: number | null
+          id?: string
+          is_deleted?: boolean | null
+          kg_liquido_disponivel?: number | null
+          kg_liquido_total?: number | null
+          kg_ticket?: number | null
+          moagem_mode?: string | null
+          moagem_val?: number | null
+          nf_num?: string | null
+          operacao_id?: string
+          perda_mel_pct?: number
+          perda_mista_pct?: number
+          perda_total_kg?: number | null
+          procedencia?: string | null
+          ticket_mel_kg?: number | null
+          ticket_mista_kg?: number | null
+          ticket_num?: string | null
+          updated_at?: string
+          valor_ticket_rs?: number | null
+          valor_unit_sucata_rkg?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "entradas_c1_operacao_id_fkey"
+            columns: ["operacao_id"]
+            isOneToOne: false
+            referencedRelation: "operacoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      entradas_terceiros: {
+        Row: {
+          created_at: string
+          documento: string | null
+          dt: string
+          id: string
+          is_deleted: boolean | null
+          kg_disponivel: number | null
+          kg_recebido: number
+          operacao_id: string
+          updated_at: string
+          valor_ref_rkg: number | null
+        }
+        Insert: {
+          created_at?: string
+          documento?: string | null
+          dt: string
+          id?: string
+          is_deleted?: boolean | null
+          kg_disponivel?: number | null
+          kg_recebido: number
+          operacao_id: string
+          updated_at?: string
+          valor_ref_rkg?: number | null
+        }
+        Update: {
+          created_at?: string
+          documento?: string | null
+          dt?: string
+          id?: string
+          is_deleted?: boolean | null
+          kg_disponivel?: number | null
+          kg_recebido?: number
+          operacao_id?: string
+          updated_at?: string
+          valor_ref_rkg?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "entradas_terceiros_operacao_id_fkey"
+            columns: ["operacao_id"]
+            isOneToOne: false
+            referencedRelation: "operacoes_terceiros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ganhos_material_ibrac: {
+        Row: {
+          created_at: string
+          dt: string
+          id: string
+          kg_ganho: number
+          operacao_id: string
+          origem: string | null
+          valor_ref_rkg: number | null
+          valor_ref_total_rs: number | null
+        }
+        Insert: {
+          created_at?: string
+          dt: string
+          id?: string
+          kg_ganho: number
+          operacao_id: string
+          origem?: string | null
+          valor_ref_rkg?: number | null
+          valor_ref_total_rs?: number | null
+        }
+        Update: {
+          created_at?: string
+          dt?: string
+          id?: string
+          kg_ganho?: number
+          operacao_id?: string
+          origem?: string | null
+          valor_ref_rkg?: number | null
+          valor_ref_total_rs?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ganhos_material_ibrac_operacao_id_fkey"
+            columns: ["operacao_id"]
+            isOneToOne: false
+            referencedRelation: "operacoes_terceiros"
             referencedColumns: ["id"]
           },
         ]
@@ -1119,6 +1807,186 @@ export type Database = {
           },
         ]
       }
+      operacoes: {
+        Row: {
+          benchmark_vergalhao_default: number | null
+          beneficiador_id: string
+          created_at: string
+          id: string
+          is_deleted: boolean | null
+          nome: string
+          obs: string | null
+          perda_mel_default: number | null
+          perda_mista_default: number | null
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          benchmark_vergalhao_default?: number | null
+          beneficiador_id: string
+          created_at?: string
+          id?: string
+          is_deleted?: boolean | null
+          nome: string
+          obs?: string | null
+          perda_mel_default?: number | null
+          perda_mista_default?: number | null
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          benchmark_vergalhao_default?: number | null
+          beneficiador_id?: string
+          created_at?: string
+          id?: string
+          is_deleted?: boolean | null
+          nome?: string
+          obs?: string | null
+          perda_mel_default?: number | null
+          perda_mista_default?: number | null
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operacoes_beneficiador_id_fkey"
+            columns: ["beneficiador_id"]
+            isOneToOne: false
+            referencedRelation: "parceiros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      operacoes_intermediacao: {
+        Row: {
+          beneficiador_id: string
+          comissao_mode: string | null
+          comissao_val: number
+          comprador_operacional_id: string
+          created_at: string
+          dono_economico_id: string
+          id: string
+          is_deleted: boolean | null
+          nome: string
+          obs: string | null
+          status: string | null
+          updated_at: string
+          valor_ref_material_rkg: number | null
+        }
+        Insert: {
+          beneficiador_id: string
+          comissao_mode?: string | null
+          comissao_val?: number
+          comprador_operacional_id: string
+          created_at?: string
+          dono_economico_id: string
+          id?: string
+          is_deleted?: boolean | null
+          nome: string
+          obs?: string | null
+          status?: string | null
+          updated_at?: string
+          valor_ref_material_rkg?: number | null
+        }
+        Update: {
+          beneficiador_id?: string
+          comissao_mode?: string | null
+          comissao_val?: number
+          comprador_operacional_id?: string
+          created_at?: string
+          dono_economico_id?: string
+          id?: string
+          is_deleted?: boolean | null
+          nome?: string
+          obs?: string | null
+          status?: string | null
+          updated_at?: string
+          valor_ref_material_rkg?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operacoes_intermediacao_beneficiador_id_fkey"
+            columns: ["beneficiador_id"]
+            isOneToOne: false
+            referencedRelation: "parceiros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "operacoes_intermediacao_comprador_operacional_id_fkey"
+            columns: ["comprador_operacional_id"]
+            isOneToOne: false
+            referencedRelation: "parceiros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "operacoes_intermediacao_dono_economico_id_fkey"
+            columns: ["dono_economico_id"]
+            isOneToOne: false
+            referencedRelation: "parceiros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      operacoes_terceiros: {
+        Row: {
+          beneficiador_id: string
+          cliente_id: string
+          created_at: string
+          id: string
+          is_deleted: boolean | null
+          nome: string
+          obs: string | null
+          perda_comercial_mode: string | null
+          perda_comercial_val: number
+          status: string | null
+          updated_at: string
+          valor_ref_material_rkg: number | null
+        }
+        Insert: {
+          beneficiador_id: string
+          cliente_id: string
+          created_at?: string
+          id?: string
+          is_deleted?: boolean | null
+          nome: string
+          obs?: string | null
+          perda_comercial_mode?: string | null
+          perda_comercial_val?: number
+          status?: string | null
+          updated_at?: string
+          valor_ref_material_rkg?: number | null
+        }
+        Update: {
+          beneficiador_id?: string
+          cliente_id?: string
+          created_at?: string
+          id?: string
+          is_deleted?: boolean | null
+          nome?: string
+          obs?: string | null
+          perda_comercial_mode?: string | null
+          perda_comercial_val?: number
+          status?: string | null
+          updated_at?: string
+          valor_ref_material_rkg?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operacoes_terceiros_beneficiador_id_fkey"
+            columns: ["beneficiador_id"]
+            isOneToOne: false
+            referencedRelation: "parceiros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "operacoes_terceiros_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "parceiros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       parceiros: {
         Row: {
           ativo: boolean | null
@@ -1136,6 +2004,7 @@ export type Database = {
           nome_fantasia: string | null
           razao_social: string
           telefone: string | null
+          tipo: string | null
           updated_at: string
         }
         Insert: {
@@ -1154,6 +2023,7 @@ export type Database = {
           nome_fantasia?: string | null
           razao_social: string
           telefone?: string | null
+          tipo?: string | null
           updated_at?: string
         }
         Update: {
@@ -1172,6 +2042,7 @@ export type Database = {
           nome_fantasia?: string | null
           razao_social?: string
           telefone?: string | null
+          tipo?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -1320,6 +2191,90 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      saida_benef_aloc_terceiros: {
+        Row: {
+          beneficiamento_id: string
+          created_at: string
+          custo_servico_rkg_snapshot: number
+          id: string
+          kg_alocado: number
+          saida_id: string
+        }
+        Insert: {
+          beneficiamento_id: string
+          created_at?: string
+          custo_servico_rkg_snapshot: number
+          id?: string
+          kg_alocado: number
+          saida_id: string
+        }
+        Update: {
+          beneficiamento_id?: string
+          created_at?: string
+          custo_servico_rkg_snapshot?: number
+          id?: string
+          kg_alocado?: number
+          saida_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saida_benef_aloc_terceiros_beneficiamento_id_fkey"
+            columns: ["beneficiamento_id"]
+            isOneToOne: false
+            referencedRelation: "beneficiamentos_terceiros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saida_benef_aloc_terceiros_saida_id_fkey"
+            columns: ["saida_id"]
+            isOneToOne: false
+            referencedRelation: "saidas_terceiros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saida_benef_alocacoes: {
+        Row: {
+          beneficiamento_id: string
+          created_at: string
+          custo_real_rkg_snapshot: number
+          id: string
+          kg_alocado: number
+          saida_id: string
+        }
+        Insert: {
+          beneficiamento_id: string
+          created_at?: string
+          custo_real_rkg_snapshot: number
+          id?: string
+          kg_alocado: number
+          saida_id: string
+        }
+        Update: {
+          beneficiamento_id?: string
+          created_at?: string
+          custo_real_rkg_snapshot?: number
+          id?: string
+          kg_alocado?: number
+          saida_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saida_benef_alocacoes_beneficiamento_id_fkey"
+            columns: ["beneficiamento_id"]
+            isOneToOne: false
+            referencedRelation: "beneficiamentos_c1"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saida_benef_alocacoes_saida_id_fkey"
+            columns: ["saida_id"]
+            isOneToOne: false
+            referencedRelation: "saidas_c1"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       saida_itens: {
         Row: {
@@ -1498,6 +2453,122 @@ export type Database = {
             columns: ["transportadora_id"]
             isOneToOne: false
             referencedRelation: "parceiros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saidas_c1: {
+        Row: {
+          benchmark_vergalhao_rkg: number | null
+          created_at: string
+          custo_saida_rkg: number | null
+          custo_saida_rs: number | null
+          documento: string | null
+          dt: string
+          id: string
+          is_deleted: boolean | null
+          kg_saida: number
+          obs: string | null
+          operacao_id: string
+          parceiro_destino_id: string | null
+          receita_simulada_rs: number | null
+          resultado_simulado_rs: number | null
+          tipo_saida: string
+          updated_at: string
+        }
+        Insert: {
+          benchmark_vergalhao_rkg?: number | null
+          created_at?: string
+          custo_saida_rkg?: number | null
+          custo_saida_rs?: number | null
+          documento?: string | null
+          dt: string
+          id?: string
+          is_deleted?: boolean | null
+          kg_saida: number
+          obs?: string | null
+          operacao_id: string
+          parceiro_destino_id?: string | null
+          receita_simulada_rs?: number | null
+          resultado_simulado_rs?: number | null
+          tipo_saida: string
+          updated_at?: string
+        }
+        Update: {
+          benchmark_vergalhao_rkg?: number | null
+          created_at?: string
+          custo_saida_rkg?: number | null
+          custo_saida_rs?: number | null
+          documento?: string | null
+          dt?: string
+          id?: string
+          is_deleted?: boolean | null
+          kg_saida?: number
+          obs?: string | null
+          operacao_id?: string
+          parceiro_destino_id?: string | null
+          receita_simulada_rs?: number | null
+          resultado_simulado_rs?: number | null
+          tipo_saida?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saidas_c1_operacao_id_fkey"
+            columns: ["operacao_id"]
+            isOneToOne: false
+            referencedRelation: "operacoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saidas_c1_parceiro_destino_id_fkey"
+            columns: ["parceiro_destino_id"]
+            isOneToOne: false
+            referencedRelation: "parceiros"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      saidas_terceiros: {
+        Row: {
+          created_at: string
+          custo_servico_saida_rs: number | null
+          documento: string | null
+          dt: string
+          id: string
+          is_deleted: boolean | null
+          kg_devolvido: number
+          operacao_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          custo_servico_saida_rs?: number | null
+          documento?: string | null
+          dt: string
+          id?: string
+          is_deleted?: boolean | null
+          kg_devolvido: number
+          operacao_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          custo_servico_saida_rs?: number | null
+          documento?: string | null
+          dt?: string
+          id?: string
+          is_deleted?: boolean | null
+          kg_devolvido?: number
+          operacao_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saidas_terceiros_operacao_id_fkey"
+            columns: ["operacao_id"]
+            isOneToOne: false
+            referencedRelation: "operacoes_terceiros"
             referencedColumns: ["id"]
           },
         ]
@@ -1923,6 +2994,114 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      venda_benef_alocacoes: {
+        Row: {
+          beneficiamento_id: string
+          created_at: string
+          id: string
+          kg_alocado: number
+          venda_id: string
+        }
+        Insert: {
+          beneficiamento_id: string
+          created_at?: string
+          id?: string
+          kg_alocado: number
+          venda_id: string
+        }
+        Update: {
+          beneficiamento_id?: string
+          created_at?: string
+          id?: string
+          kg_alocado?: number
+          venda_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "venda_benef_alocacoes_beneficiamento_id_fkey"
+            columns: ["beneficiamento_id"]
+            isOneToOne: false
+            referencedRelation: "beneficiamentos_intermediacao"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "venda_benef_alocacoes_venda_id_fkey"
+            columns: ["venda_id"]
+            isOneToOne: false
+            referencedRelation: "vendas_intermediacao"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vendas_intermediacao: {
+        Row: {
+          cliente_id: string | null
+          comissao_ibrac_rs: number | null
+          created_at: string
+          custo_material_dono_rs: number | null
+          custos_operacao_alocados_rs: number | null
+          dt: string
+          id: string
+          is_deleted: boolean | null
+          kg_vendido: number
+          nf_venda: string | null
+          operacao_id: string
+          preco_venda_rkg: number
+          saldo_repassar_rs: number | null
+          updated_at: string
+          valor_venda_rs: number | null
+        }
+        Insert: {
+          cliente_id?: string | null
+          comissao_ibrac_rs?: number | null
+          created_at?: string
+          custo_material_dono_rs?: number | null
+          custos_operacao_alocados_rs?: number | null
+          dt: string
+          id?: string
+          is_deleted?: boolean | null
+          kg_vendido: number
+          nf_venda?: string | null
+          operacao_id: string
+          preco_venda_rkg: number
+          saldo_repassar_rs?: number | null
+          updated_at?: string
+          valor_venda_rs?: number | null
+        }
+        Update: {
+          cliente_id?: string | null
+          comissao_ibrac_rs?: number | null
+          created_at?: string
+          custo_material_dono_rs?: number | null
+          custos_operacao_alocados_rs?: number | null
+          dt?: string
+          id?: string
+          is_deleted?: boolean | null
+          kg_vendido?: number
+          nf_venda?: string | null
+          operacao_id?: string
+          preco_venda_rkg?: number
+          saldo_repassar_rs?: number | null
+          updated_at?: string
+          valor_venda_rs?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendas_intermediacao_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "parceiros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendas_intermediacao_operacao_id_fkey"
+            columns: ["operacao_id"]
+            isOneToOne: false
+            referencedRelation: "operacoes_intermediacao"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
