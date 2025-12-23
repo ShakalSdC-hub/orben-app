@@ -3,20 +3,13 @@ import { Badge } from "@/components/ui/badge";
 import { TrendingUp, TrendingDown, AlertTriangle, Sparkles } from "lucide-react";
 import { calcularLucroPerda, ResultadoLucroPerda } from "@/lib/cenarios-orben";
 import { cn } from "@/lib/utils";
+import { formatCurrency, formatWeight } from "@/lib/kpis";
 
 interface LucroPerdaPreviewProps {
   pesoEntrada: number;
   perdaCobradaPct: number;
   perdaRealPct: number;
   lmeReferenciaKg: number;
-}
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
-}
-
-function formatWeight(kg: number) {
-  return kg >= 1000 ? `${(kg / 1000).toFixed(2)} t` : `${kg.toFixed(2)} kg`;
 }
 
 export function LucroPerdaPreview({

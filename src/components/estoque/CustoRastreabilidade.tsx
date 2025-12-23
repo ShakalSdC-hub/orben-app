@@ -10,19 +10,12 @@ import { Receipt, Truck, Users, Percent, Calculator, Package, History, Factory, 
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import * as XLSX from "xlsx";
+import { formatCurrency, formatWeight } from "@/lib/kpis";
 
 interface CustoRastreabilidadeProps {
   sublote: any;
   isOpen: boolean;
   onClose: () => void;
-}
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
-}
-
-function formatWeight(kg: number) {
-  return kg >= 1000 ? `${(kg / 1000).toFixed(2)} t` : `${kg.toFixed(2)} kg`;
 }
 
 export function CustoRastreabilidade({ sublote, isOpen, onClose }: CustoRastreabilidadeProps) {

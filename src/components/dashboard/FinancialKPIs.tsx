@@ -9,6 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { startOfMonth, endOfMonth, format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
 import { detectarCenario, CenarioOperacao } from "@/lib/cenarios-orben";
+import { formatCurrency, formatWeight } from "@/lib/kpis";
 
 interface FinancialKPIsProps {
   selectedDono?: string | null;
@@ -27,15 +28,6 @@ interface DetalheEconomia {
   lmeKg: number | null;
   economiaKg: number;
   economiaTotal: number;
-}
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
-}
-
-function formatWeight(kg: number) {
-  if (kg >= 1000) return `${(kg / 1000).toFixed(2)} t`;
-  return `${kg.toFixed(0)} kg`;
 }
 
 export function FinancialKPIs({ selectedDono }: FinancialKPIsProps) {
