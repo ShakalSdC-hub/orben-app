@@ -1,6 +1,9 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TrendingUp, TrendingDown, DollarSign, Scale, Percent, Factory, Users, Sparkles, ArrowUpRight } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { TrendingUp, TrendingDown, DollarSign, Scale, Percent, Factory, Sparkles, ArrowUpRight, Calculator } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { startOfMonth, endOfMonth, format, parseISO } from "date-fns";
@@ -9,6 +12,21 @@ import { detectarCenario, CenarioOperacao } from "@/lib/cenarios-orben";
 
 interface FinancialKPIsProps {
   selectedDono?: string | null;
+}
+
+interface DetalheEconomia {
+  codigo: string;
+  pesoEntrada: number;
+  pesoSaida: number;
+  custoAquisicao: number;
+  custoMO: number;
+  custoFrete: number;
+  custoFinanceiro: number;
+  custoTotal: number;
+  custoKg: number;
+  lmeKg: number | null;
+  economiaKg: number;
+  economiaTotal: number;
 }
 
 function formatCurrency(value: number) {
@@ -21,6 +39,7 @@ function formatWeight(kg: number) {
 }
 
 export function FinancialKPIs({ selectedDono }: FinancialKPIsProps) {
+  const [showEconomiaDialog, setShowEconomiaDialog] = useState(false);
   const mesAtual = new Date();
   const inicioMes = format(startOfMonth(mesAtual), "yyyy-MM-dd");
   const fimMes = format(endOfMonth(mesAtual), "yyyy-MM-dd");
@@ -122,7 +141,7 @@ export function FinancialKPIs({ selectedDono }: FinancialKPIsProps) {
   });
 
   // Calcular KPIs por cenário
-  const kpis = useMemo(() => {
+  const { kpis, detalhesEconomia } = useMemo(() => {
     const resultado = {
       // KPIs gerais
       economiaTotalMes: 0,
@@ -144,7 +163,9 @@ export function FinancialKPIs({ selectedDono }: FinancialKPIsProps) {
       } as Record<CenarioOperacao, { peso: number; economia?: number; receita?: number; comissao?: number; count: number }>,
     };
 
-    if (!beneficiamentos) return resultado;
+    const detalhes: DetalheEconomia[] = [];
+
+    if (!beneficiamentos) return { kpis: resultado, detalhesEconomia: detalhes };
 
     let custoTotalVergalhao = 0;
     let pesoTotalSaida = 0;
@@ -241,6 +262,22 @@ export function FinancialKPIs({ selectedDono }: FinancialKPIsProps) {
         const economiaBenef = economiaKg * pesoSaida;
         resultado.economiaTotalMes += economiaBenef;
 
+        // Adicionar aos detalhes
+        detalhes.push({
+          codigo: benef.codigo,
+          pesoEntrada,
+          pesoSaida,
+          custoAquisicao,
+          custoMO,
+          custoFrete,
+          custoFinanceiro,
+          custoTotal,
+          custoKg: custoKgVergalhao,
+          lmeKg: lmeSemana,
+          economiaKg,
+          economiaTotal: economiaBenef,
+        });
+
         if (cenario === 'proprio') {
           resultado.cenarios.proprio.economia = (resultado.cenarios.proprio.economia || 0) + economiaBenef;
         }
@@ -261,7 +298,7 @@ export function FinancialKPIs({ selectedDono }: FinancialKPIsProps) {
       a.tipo === 'receita' && a.dono_id
     ).reduce((acc, a) => acc + (a.valor || 0), 0) || 0;
 
-    return resultado;
+    return { kpis: resultado, detalhesEconomia: detalhes };
   }, [beneficiamentos, itensEntrada, benefEntradas, historicoLme, sublotesVergalhao, acertosPendentes, selectedDono]);
 
   const lucroTotalIbrac = kpis.lucroPerdaTotal + kpis.lucroMOTotal + kpis.lucroComissaoTotal;
@@ -271,12 +308,18 @@ export function FinancialKPIs({ selectedDono }: FinancialKPIsProps) {
       {/* Linha 1: KPIs principais */}
       <div className="grid gap-4 md:grid-cols-3">
         {/* Economia Total do Mês */}
-        <Card className={cn(
-          "border-2",
-          kpis.economiaPositiva ? "border-success/30 bg-success/5" : "border-destructive/30 bg-destructive/5"
-        )}>
+        <Card 
+          className={cn(
+            "border-2 cursor-pointer transition-all hover:shadow-md",
+            kpis.economiaPositiva ? "border-success/30 bg-success/5 hover:border-success/50" : "border-destructive/30 bg-destructive/5 hover:border-destructive/50"
+          )}
+          onClick={() => setShowEconomiaDialog(true)}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Economia vs LME (Mês)</CardTitle>
+            <CardTitle className="text-sm font-medium flex items-center gap-1.5">
+              Economia vs LME (Mês)
+              <Calculator className="h-3 w-3 text-muted-foreground" />
+            </CardTitle>
             {kpis.economiaPositiva ? (
               <TrendingUp className="h-4 w-4 text-success" />
             ) : (
@@ -291,7 +334,7 @@ export function FinancialKPIs({ selectedDono }: FinancialKPIsProps) {
               {formatCurrency(kpis.economiaTotalMes)}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {formatWeight(kpis.pesoProcessadoMes)} processado
+              {formatWeight(kpis.pesoProcessadoMes)} processado • Clique para detalhes
             </p>
           </CardContent>
         </Card>
@@ -395,6 +438,134 @@ export function FinancialKPIs({ selectedDono }: FinancialKPIsProps) {
           </CardContent>
         </Card>
       </div>
+
+      {/* Dialog com Memória de Cálculo - Economia vs LME */}
+      <Dialog open={showEconomiaDialog} onOpenChange={setShowEconomiaDialog}>
+        <DialogContent className="max-w-4xl max-h-[85vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Calculator className="h-5 w-5" />
+              Memória de Cálculo - Economia vs LME
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* Resumo */}
+            <div className="grid grid-cols-3 gap-4 p-4 bg-muted/50 rounded-lg">
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">Total Economia</p>
+                <p className={cn(
+                  "text-xl font-bold",
+                  kpis.economiaPositiva ? "text-success" : "text-destructive"
+                )}>
+                  {formatCurrency(kpis.economiaTotalMes)}
+                </p>
+              </div>
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">Peso Processado</p>
+                <p className="text-xl font-bold">{formatWeight(kpis.pesoProcessadoMes)}</p>
+              </div>
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">Custo Médio</p>
+                <p className="text-xl font-bold text-copper">{formatCurrency(kpis.custoMedioVergalhao)}/kg</p>
+              </div>
+            </div>
+
+            {/* Fórmula */}
+            <div className="p-3 bg-muted/30 rounded border text-sm">
+              <p className="font-medium mb-1">Fórmula:</p>
+              <code className="text-xs">
+                Economia = (LME R$/kg - Custo R$/kg) × Peso Saída
+              </code>
+              <p className="text-xs text-muted-foreground mt-2">
+                Onde Custo = (Aquisição + MO + Frete + Taxa Financeira) ÷ Peso Saída
+              </p>
+            </div>
+
+            {/* Tabela de detalhes */}
+            <ScrollArea className="h-[350px]">
+              {detalhesEconomia.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  Nenhum beneficiamento finalizado no mês atual
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Beneficiamento</TableHead>
+                      <TableHead className="text-right">Peso Saída</TableHead>
+                      <TableHead className="text-right">Aquisição</TableHead>
+                      <TableHead className="text-right">MO</TableHead>
+                      <TableHead className="text-right">Frete</TableHead>
+                      <TableHead className="text-right">Financeiro</TableHead>
+                      <TableHead className="text-right">Custo/kg</TableHead>
+                      <TableHead className="text-right">LME/kg</TableHead>
+                      <TableHead className="text-right">Economia/kg</TableHead>
+                      <TableHead className="text-right">Economia Total</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {detalhesEconomia.map((d) => (
+                      <TableRow key={d.codigo}>
+                        <TableCell className="font-mono text-xs">{d.codigo}</TableCell>
+                        <TableCell className="text-right">{formatWeight(d.pesoSaida)}</TableCell>
+                        <TableCell className="text-right text-xs">{formatCurrency(d.custoAquisicao)}</TableCell>
+                        <TableCell className="text-right text-xs">{formatCurrency(d.custoMO)}</TableCell>
+                        <TableCell className="text-right text-xs">{formatCurrency(d.custoFrete)}</TableCell>
+                        <TableCell className="text-right text-xs">{formatCurrency(d.custoFinanceiro)}</TableCell>
+                        <TableCell className="text-right font-medium">{formatCurrency(d.custoKg)}</TableCell>
+                        <TableCell className="text-right font-medium text-primary">
+                          {d.lmeKg ? formatCurrency(d.lmeKg) : "-"}
+                        </TableCell>
+                        <TableCell className={cn(
+                          "text-right font-medium",
+                          d.economiaKg >= 0 ? "text-success" : "text-destructive"
+                        )}>
+                          {formatCurrency(d.economiaKg)}
+                        </TableCell>
+                        <TableCell className={cn(
+                          "text-right font-bold",
+                          d.economiaTotal >= 0 ? "text-success" : "text-destructive"
+                        )}>
+                          {formatCurrency(d.economiaTotal)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {/* Linha de total */}
+                    <TableRow className="bg-muted/50 font-bold">
+                      <TableCell>TOTAL ({detalhesEconomia.length} beneficiamentos)</TableCell>
+                      <TableCell className="text-right">
+                        {formatWeight(detalhesEconomia.reduce((acc, d) => acc + d.pesoSaida, 0))}
+                      </TableCell>
+                      <TableCell className="text-right text-xs">
+                        {formatCurrency(detalhesEconomia.reduce((acc, d) => acc + d.custoAquisicao, 0))}
+                      </TableCell>
+                      <TableCell className="text-right text-xs">
+                        {formatCurrency(detalhesEconomia.reduce((acc, d) => acc + d.custoMO, 0))}
+                      </TableCell>
+                      <TableCell className="text-right text-xs">
+                        {formatCurrency(detalhesEconomia.reduce((acc, d) => acc + d.custoFrete, 0))}
+                      </TableCell>
+                      <TableCell className="text-right text-xs">
+                        {formatCurrency(detalhesEconomia.reduce((acc, d) => acc + d.custoFinanceiro, 0))}
+                      </TableCell>
+                      <TableCell className="text-right">{formatCurrency(kpis.custoMedioVergalhao)}</TableCell>
+                      <TableCell className="text-right">-</TableCell>
+                      <TableCell className="text-right">-</TableCell>
+                      <TableCell className={cn(
+                        "text-right",
+                        kpis.economiaPositiva ? "text-success" : "text-destructive"
+                      )}>
+                        {formatCurrency(kpis.economiaTotalMes)}
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              )}
+            </ScrollArea>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
