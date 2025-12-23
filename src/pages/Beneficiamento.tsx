@@ -42,6 +42,7 @@ import { BeneficiamentoEditForm } from "@/components/beneficiamento/Beneficiamen
 import { CustoCalculoPreview } from "@/components/beneficiamento/CustoCalculoPreview";
 import { LucroPerdaPreview } from "@/components/cenarios/LucroPerdaPreview";
 import { useExportReport } from "@/hooks/useExportReport";
+import { ExcelImport } from "@/components/import/ExcelImport";
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   em_andamento: { label: "Em Andamento", variant: "default" },
@@ -860,6 +861,49 @@ export default function Beneficiamento() {
             <p className="text-muted-foreground">Gerencie os processos de beneficiamento de materiais</p>
           </div>
           <div className="flex gap-2">
+            <ExcelImport
+              title="Importar Beneficiamentos"
+              description="Importe beneficiamentos via planilha Excel"
+              templateFilename="template_beneficiamentos"
+              columns={[
+                { dbColumn: "codigo", excelColumn: "Código", label: "Código", required: true, type: "string" },
+                { dbColumn: "data_inicio", excelColumn: "Data Início", label: "Data Início", required: true, type: "date" },
+                { dbColumn: "data_fim", excelColumn: "Data Fim", label: "Data Fim", required: false, type: "date" },
+                { dbColumn: "tipo_beneficiamento", excelColumn: "Tipo", label: "Tipo", required: false, type: "string" },
+                { dbColumn: "peso_entrada_kg", excelColumn: "Peso Entrada (kg)", label: "Peso Entrada", required: true, type: "number" },
+                { dbColumn: "peso_saida_kg", excelColumn: "Peso Saída (kg)", label: "Peso Saída", required: false, type: "number" },
+                { dbColumn: "perda_real_pct", excelColumn: "Perda Real (%)", label: "Perda Real", required: false, type: "number" },
+                { dbColumn: "perda_cobrada_pct", excelColumn: "Perda Cobrada (%)", label: "Perda Cobrada", required: false, type: "number" },
+                { dbColumn: "custo_frete_ida", excelColumn: "Custo Frete Ida (R$)", label: "Frete Ida", required: false, type: "number" },
+                { dbColumn: "custo_frete_volta", excelColumn: "Custo Frete Volta (R$)", label: "Frete Volta", required: false, type: "number" },
+                { dbColumn: "custo_mo_terceiro", excelColumn: "Custo MO Terceiro (R$)", label: "MO Terceiro", required: false, type: "number" },
+                { dbColumn: "custo_mo_ibrac", excelColumn: "Custo MO IBRAC (R$)", label: "MO IBRAC", required: false, type: "number" },
+                { dbColumn: "taxa_financeira_pct", excelColumn: "Taxa Financeira (%)", label: "Taxa Financeira", required: false, type: "number" },
+                { dbColumn: "lme_referencia_kg", excelColumn: "LME Referência (R$/kg)", label: "LME Ref", required: false, type: "number" },
+                { dbColumn: "observacoes", excelColumn: "Observações", label: "Observações", required: false, type: "string" },
+              ]}
+              sampleData={[
+                { "Código": "BEN-001", "Data Início": "01/01/2025", "Data Fim": "05/01/2025", "Tipo": "interno", "Peso Entrada (kg)": "1000", "Peso Saída (kg)": "950", "Perda Real (%)": "5", "Perda Cobrada (%)": "3", "Custo Frete Ida (R$)": "500", "Custo Frete Volta (R$)": "500", "Custo MO Terceiro (R$)": "0", "Custo MO IBRAC (R$)": "1000", "Taxa Financeira (%)": "1.8", "LME Referência (R$/kg)": "45", "Observações": "" },
+              ]}
+              onImport={async (data) => {
+                for (const row of data) {
+                  // Calcular perda real se entrada e saída existem
+                  let perdaReal = row.perda_real_pct;
+                  if (!perdaReal && row.peso_entrada_kg > 0 && row.peso_saida_kg > 0) {
+                    perdaReal = ((row.peso_entrada_kg - row.peso_saida_kg) / row.peso_entrada_kg * 100);
+                  }
+                  
+                  const { error } = await supabase.from("beneficiamentos").insert({
+                    ...row,
+                    perda_real_pct: perdaReal || 0,
+                    status: row.data_fim ? "finalizado" : "em_andamento",
+                    created_by: user?.id,
+                  });
+                  if (error) throw error;
+                }
+                queryClient.invalidateQueries({ queryKey: ["beneficiamentos"] });
+              }}
+            />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline"><FileText className="h-4 w-4 mr-2" />Exportar</Button>

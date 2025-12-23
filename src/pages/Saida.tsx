@@ -40,6 +40,7 @@ import { GlobalFilters } from "@/components/filters/GlobalFilters";
 import { SaidaEditForm } from "@/components/saida/SaidaEditForm";
 import { useExportReport } from "@/hooks/useExportReport";
 import { CenarioPreview } from "@/components/cenarios/CenarioPreview";
+import { ExcelImport } from "@/components/import/ExcelImport";
 import { 
   CenarioOperacao,
   detectarCenario, 
@@ -507,19 +508,57 @@ export default function Saida() {
             <h1 className="text-3xl font-bold text-foreground">Saída</h1>
             <p className="text-muted-foreground">Registre as saídas de material do estoque</p>
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline"><FileText className="h-4 w-4 mr-2" />Exportar</Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => exportToExcel(formatSaidaReport(saidas), { filename: "relatorio_saidas", sheetName: "Saídas" })}>
-                <FileSpreadsheet className="mr-2 h-4 w-4" />Excel
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => printReport("Relatório de Saídas", formatSaidaReport(saidas), ["Código", "Data", "Tipo", "Cliente", "Nota Fiscal", "Peso Total (kg)", "Valor Unitário", "Valor Total", "Custos Cobrados", "Repasse Dono", "Status"])}>
-                <Printer className="mr-2 h-4 w-4" />Imprimir PDF
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex gap-2">
+            <ExcelImport
+              title="Importar Saídas"
+              description="Importe saídas de material via planilha Excel"
+              templateFilename="template_saidas"
+              columns={[
+                { dbColumn: "codigo", excelColumn: "Código", label: "Código", required: true, type: "string" },
+                { dbColumn: "data_saida", excelColumn: "Data Saída", label: "Data", required: true, type: "date" },
+                { dbColumn: "tipo_saida", excelColumn: "Tipo Saída", label: "Tipo", required: true, type: "string" },
+                { dbColumn: "peso_total_kg", excelColumn: "Peso Total (kg)", label: "Peso Total", required: true, type: "number" },
+                { dbColumn: "valor_unitario", excelColumn: "Valor Unitário (R$)", label: "Valor Unitário", required: false, type: "number" },
+                { dbColumn: "valor_total", excelColumn: "Valor Total (R$)", label: "Valor Total", required: false, type: "number" },
+                { dbColumn: "custos_cobrados", excelColumn: "Custos Cobrados (R$)", label: "Custos Cobrados", required: false, type: "number" },
+                { dbColumn: "valor_repasse_dono", excelColumn: "Repasse Dono (R$)", label: "Repasse Dono", required: false, type: "number" },
+                { dbColumn: "comissao_ibrac", excelColumn: "Comissão IBRAC (R$)", label: "Comissão IBRAC", required: false, type: "number" },
+                { dbColumn: "resultado_liquido_dono", excelColumn: "Resultado Líquido (R$)", label: "Resultado Líquido", required: false, type: "number" },
+                { dbColumn: "nota_fiscal", excelColumn: "Nota Fiscal", label: "Nota Fiscal", required: false, type: "string" },
+                { dbColumn: "cenario_operacao", excelColumn: "Cenário", label: "Cenário", required: false, type: "string" },
+                { dbColumn: "motorista", excelColumn: "Motorista", label: "Motorista", required: false, type: "string" },
+                { dbColumn: "placa_veiculo", excelColumn: "Placa Veículo", label: "Placa", required: false, type: "string" },
+                { dbColumn: "observacoes", excelColumn: "Observações", label: "Observações", required: false, type: "string" },
+              ]}
+              sampleData={[
+                { "Código": "SAI-001", "Data Saída": "01/01/2025", "Tipo Saída": "Venda", "Peso Total (kg)": "1000", "Valor Unitário (R$)": "50", "Valor Total (R$)": "50000", "Custos Cobrados (R$)": "1000", "Repasse Dono (R$)": "49000", "Comissão IBRAC (R$)": "0", "Resultado Líquido (R$)": "49000", "Nota Fiscal": "12345", "Cenário": "proprio", "Motorista": "João", "Placa Veículo": "ABC-1234", "Observações": "" },
+              ]}
+              onImport={async (data) => {
+                for (const row of data) {
+                  const { error } = await supabase.from("saidas").insert({
+                    ...row,
+                    status: "pendente",
+                    created_by: user?.id,
+                  });
+                  if (error) throw error;
+                }
+                queryClient.invalidateQueries({ queryKey: ["saidas"] });
+              }}
+            />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline"><FileText className="h-4 w-4 mr-2" />Exportar</Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={() => exportToExcel(formatSaidaReport(saidas), { filename: "relatorio_saidas", sheetName: "Saídas" })}>
+                  <FileSpreadsheet className="mr-2 h-4 w-4" />Excel
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => printReport("Relatório de Saídas", formatSaidaReport(saidas), ["Código", "Data", "Tipo", "Cliente", "Nota Fiscal", "Peso Total (kg)", "Valor Unitário", "Valor Total", "Custos Cobrados", "Repasse Dono", "Status"])}>
+                  <Printer className="mr-2 h-4 w-4" />Imprimir PDF
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
           <Dialog open={isOpen} onOpenChange={(v) => v ? setIsOpen(true) : handleClose()}>
             <DialogTrigger asChild>
               <Button className="bg-gradient-copper"><Plus className="h-4 w-4 mr-2" />Nova Saída</Button>
