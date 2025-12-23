@@ -40,6 +40,7 @@ import { TransferenciaDono } from "@/components/estoque/TransferenciaDono";
 import { LoteHistorico } from "@/components/estoque/LoteHistorico";
 import { CustoRastreabilidade } from "@/components/estoque/CustoRastreabilidade";
 import { useExportReport } from "@/hooks/useExportReport";
+import { ExcelImport } from "@/components/import/ExcelImport";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -387,6 +388,42 @@ export default function Estoque() {
             </p>
           </div>
           <div className="flex gap-2">
+            <ExcelImport
+              title="Importar Sublotes"
+              description="Importe sublotes com rastreabilidade. Entrada/Dono/Local são buscados pelo nome."
+              templateFilename="template_sublotes"
+              tableName="sublotes"
+              codeColumn="codigo"
+              columns={[
+                { dbColumn: "codigo", excelColumn: "Código", label: "Código", required: true, type: "string", isCodeColumn: true },
+                { dbColumn: "entrada_id", excelColumn: "Entrada", label: "Entrada", required: false, type: "lookup", lookup: { table: "entradas", matchColumn: "codigo" } },
+                { dbColumn: "dono_id", excelColumn: "Dono", label: "Dono", required: false, type: "lookup", lookup: { table: "donos_material", matchColumn: "nome" } },
+                { dbColumn: "tipo_produto_id", excelColumn: "Tipo Produto", label: "Tipo Produto", required: false, type: "lookup", lookup: { table: "tipos_produto", matchColumn: "nome", alternativeColumns: ["codigo"] } },
+                { dbColumn: "local_estoque_id", excelColumn: "Local Estoque", label: "Local", required: false, type: "lookup", lookup: { table: "locais_estoque", matchColumn: "nome" } },
+                { dbColumn: "peso_kg", excelColumn: "Peso (kg)", label: "Peso", required: true, type: "number" },
+                { dbColumn: "teor_cobre", excelColumn: "Teor Cobre (%)", label: "Teor Cobre", required: false, type: "number" },
+                { dbColumn: "custo_unitario_total", excelColumn: "Custo Unitário (R$)", label: "Custo Unit.", required: false, type: "number" },
+                { dbColumn: "numero_volume", excelColumn: "Nº Volume", label: "Volume", required: false, type: "number" },
+                { dbColumn: "observacoes", excelColumn: "Observações", label: "Obs", required: false, type: "string" },
+              ]}
+              sampleData={[
+                { "Código": "SUB-001", "Entrada": "ENT-001", "Dono": "IBRAC", "Tipo Produto": "Fio de Cobre", "Local Estoque": "Galpão Principal", "Peso (kg)": "500", "Teor Cobre (%)": "98", "Custo Unitário (R$)": "45", "Nº Volume": "1", "Observações": "" },
+              ]}
+              existingDataQuery={async () => {
+                const { data } = await supabase.from("sublotes").select("*").order("created_at", { ascending: false }).limit(500);
+                return data || [];
+              }}
+              onImport={async (data) => {
+                for (const row of data) {
+                  const { error } = await supabase.from("sublotes").insert({
+                    ...row,
+                    status: "disponivel",
+                  });
+                  if (error) throw error;
+                }
+                queryClient.invalidateQueries({ queryKey: ["sublotes"] });
+              }}
+            />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm">

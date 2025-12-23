@@ -2,22 +2,30 @@ import { useState, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Upload, FileSpreadsheet, Download, AlertTriangle, CheckCircle2, Loader2, Trash2, Pencil, X, Check, Database } from "lucide-react";
+import { Upload, FileSpreadsheet, Download, AlertTriangle, CheckCircle2, Loader2, Trash2, Pencil, X, Check, Database, Link } from "lucide-react";
 import * as XLSX from "xlsx";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+
+export interface LookupConfig {
+  table: string;                    // Nome da tabela para busca
+  matchColumn: string;              // Coluna para fazer match (ex: "razao_social", "nome")
+  returnColumn?: string;            // Coluna a retornar (default: "id")
+  alternativeColumns?: string[];    // Colunas alternativas para match (ex: ["nome_fantasia", "codigo"])
+  createIfNotExists?: boolean;      // Se deve criar registro se não existir (futuro)
+}
 
 export interface ColumnMapping {
   dbColumn: string;
   excelColumn: string;
   label: string;
   required: boolean;
-  type: 'string' | 'number' | 'date' | 'boolean';
+  type: 'string' | 'number' | 'date' | 'boolean' | 'lookup';
   transform?: (value: any) => any;
-  isCodeColumn?: boolean; // Marca a coluna como código único para validação de duplicados
+  isCodeColumn?: boolean;
+  lookup?: LookupConfig;  // Configuração de lookup para tipo 'lookup'
 }
 
 interface ExcelImportProps {
@@ -27,16 +35,23 @@ interface ExcelImportProps {
   onImport: (data: any[]) => Promise<void>;
   templateFilename: string;
   sampleData?: Record<string, any>[];
-  tableName?: string; // Nome da tabela para validação de duplicados
-  codeColumn?: string; // Nome da coluna de código no banco (ex: "codigo")
-  existingDataQuery?: () => Promise<any[]>; // Função para buscar dados existentes para exportação
+  tableName?: string;
+  codeColumn?: string;
+  existingDataQuery?: () => Promise<any[]>;
 }
 
 interface PreviewRow {
   data: Record<string, any>;
   errors: string[];
+  warnings: string[];
+  lookupResolved: Record<string, { found: boolean; value: string; id: string | null }>;
   isDuplicate: boolean;
   isEditing: boolean;
+}
+
+// Cache para lookups
+interface LookupCache {
+  [key: string]: Map<string, string | null>;
 }
 
 export function ExcelImport({ 
@@ -58,6 +73,7 @@ export function ExcelImport({
   const [existingCodes, setExistingCodes] = useState<Set<string>>(new Set());
   const [editingRowIndex, setEditingRowIndex] = useState<number | null>(null);
   const [editValues, setEditValues] = useState<Record<string, any>>({});
+  const [lookupCache, setLookupCache] = useState<LookupCache>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Buscar códigos existentes no banco
@@ -77,18 +93,74 @@ export function ExcelImport({
     }
   }, [tableName, codeColumn]);
 
+  // Buscar e cachear lookups
+  const fetchLookupData = useCallback(async (lookup: LookupConfig): Promise<Map<string, string>> => {
+    const cacheKey = `${lookup.table}_${lookup.matchColumn}`;
+    
+    if (lookupCache[cacheKey]) {
+      return lookupCache[cacheKey] as Map<string, string>;
+    }
+
+    try {
+      const selectColumns = [lookup.returnColumn || 'id', lookup.matchColumn, ...(lookup.alternativeColumns || [])].join(',');
+      const { data, error } = await supabase
+        .from(lookup.table as any)
+        .select(selectColumns);
+      
+      if (error) throw error;
+
+      const map = new Map<string, string>();
+      data?.forEach((row: any) => {
+        const id = row[lookup.returnColumn || 'id'];
+        // Match pela coluna principal
+        const mainValue = String(row[lookup.matchColumn] || '').toLowerCase().trim();
+        if (mainValue) map.set(mainValue, id);
+        
+        // Match por colunas alternativas
+        lookup.alternativeColumns?.forEach(col => {
+          const altValue = String(row[col] || '').toLowerCase().trim();
+          if (altValue && !map.has(altValue)) map.set(altValue, id);
+        });
+      });
+
+      setLookupCache(prev => ({ ...prev, [cacheKey]: map }));
+      return map;
+    } catch (error) {
+      console.error(`Erro ao buscar lookup ${lookup.table}:`, error);
+      return new Map();
+    }
+  }, [lookupCache]);
+
+  // Resolver lookup para um valor
+  const resolveLookup = async (value: string, lookup: LookupConfig): Promise<{ found: boolean; id: string | null }> => {
+    if (!value) return { found: false, id: null };
+    
+    const lookupMap = await fetchLookupData(lookup);
+    const searchValue = String(value).toLowerCase().trim();
+    const id = lookupMap.get(searchValue);
+    
+    return { found: !!id, id: id || null };
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setIsValidating(true);
+    setLookupCache({}); // Limpar cache
 
     // Buscar códigos existentes
     const codes = await fetchExistingCodes();
     setExistingCodes(codes);
 
+    // Pré-carregar todos os lookups necessários
+    const lookupColumns = columns.filter(c => c.type === 'lookup' && c.lookup);
+    for (const col of lookupColumns) {
+      if (col.lookup) await fetchLookupData(col.lookup);
+    }
+
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         const data = event.target?.result;
         const workbook = XLSX.read(data, { type: 'binary', cellDates: true });
@@ -97,21 +169,23 @@ export function ExcelImport({
         const jsonData = XLSX.utils.sheet_to_json(sheet, { raw: false });
 
         const rows: PreviewRow[] = [];
-        const globalValidationErrors: string[] = [];
         const importedCodes = new Set<string>();
 
-        jsonData.forEach((row: any, index) => {
+        for (let index = 0; index < jsonData.length; index++) {
+          const row: any = jsonData[index];
           const mappedRow: Record<string, any> = {};
           const rowErrors: string[] = [];
+          const rowWarnings: string[] = [];
+          const lookupResolved: Record<string, { found: boolean; value: string; id: string | null }> = {};
           let isDuplicate = false;
 
-          columns.forEach((col) => {
+          for (const col of columns) {
             const value = row[col.excelColumn];
             
             // Verificar campos obrigatórios
             if (col.required && (value === undefined || value === null || value === '')) {
               rowErrors.push(`"${col.label}" é obrigatório`);
-              return;
+              continue;
             }
 
             // Transformar valor conforme o tipo
@@ -137,9 +211,28 @@ export function ExcelImport({
                 }
               } else if (col.type === 'boolean') {
                 transformedValue = ['sim', 's', 'true', '1', 'yes'].includes(String(value).toLowerCase());
+              } else if (col.type === 'lookup' && col.lookup) {
+                // Resolver lookup
+                const lookupResult = await resolveLookup(String(value), col.lookup);
+                lookupResolved[col.dbColumn] = { 
+                  found: lookupResult.found, 
+                  value: String(value), 
+                  id: lookupResult.id 
+                };
+                
+                if (lookupResult.found) {
+                  transformedValue = lookupResult.id;
+                } else {
+                  if (col.required) {
+                    rowErrors.push(`"${col.label}": "${value}" não encontrado`);
+                  } else {
+                    rowWarnings.push(`"${col.label}": "${value}" não encontrado`);
+                  }
+                  transformedValue = null;
+                }
               }
 
-              if (col.transform) {
+              if (col.transform && col.type !== 'lookup') {
                 transformedValue = col.transform(transformedValue);
               }
             }
@@ -150,39 +243,43 @@ export function ExcelImport({
             if (col.isCodeColumn || col.dbColumn === codeColumn) {
               const codeValue = String(transformedValue || '').toLowerCase();
               if (codeValue) {
-                // Duplicado no banco
                 if (codes.has(codeValue)) {
-                  rowErrors.push(`Código "${transformedValue}" já existe no sistema`);
+                  rowErrors.push(`Código "${transformedValue}" já existe`);
                   isDuplicate = true;
                 }
-                // Duplicado no próprio arquivo
                 if (importedCodes.has(codeValue)) {
-                  rowErrors.push(`Código "${transformedValue}" duplicado na planilha`);
+                  rowErrors.push(`Código duplicado na planilha`);
                   isDuplicate = true;
                 }
                 importedCodes.add(codeValue);
               }
             }
-          });
+          }
 
           rows.push({
             data: mappedRow,
             errors: rowErrors,
+            warnings: rowWarnings,
+            lookupResolved,
             isDuplicate,
             isEditing: false,
           });
-        });
+        }
 
         setPreviewRows(rows);
-        setGlobalErrors(globalValidationErrors);
 
         const validRows = rows.filter(r => r.errors.length === 0 && !r.isDuplicate);
         const errorRows = rows.filter(r => r.errors.length > 0 || r.isDuplicate);
+        const warningRows = rows.filter(r => r.warnings.length > 0);
         
         if (rows.length > 0) {
+          let description = '';
+          if (errorRows.length > 0) description += `${errorRows.length} com erros`;
+          if (warningRows.length > 0) description += `${description ? ', ' : ''}${warningRows.length} com avisos`;
+          
           toast({ 
-            title: `${validRows.length} registros válidos`, 
-            description: errorRows.length > 0 ? `${errorRows.length} com erros (edite ou remova)` : undefined,
+            title: `${validRows.length} de ${rows.length} registros válidos`,
+            description: description || undefined,
             variant: errorRows.length > 0 ? "default" : undefined
           });
         }
@@ -226,6 +323,7 @@ export function ExcelImport({
     setGlobalErrors([]);
     setEditingRowIndex(null);
     setEditValues({});
+    setLookupCache({});
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -248,40 +346,52 @@ export function ExcelImport({
   const saveEditing = async () => {
     if (editingRowIndex === null) return;
 
-    // Revalidar a linha editada
     const rowErrors: string[] = [];
+    const rowWarnings: string[] = [];
+    const lookupResolved: Record<string, { found: boolean; value: string; id: string | null }> = {};
     let isDuplicate = false;
     const codes = await fetchExistingCodes();
 
-    columns.forEach((col) => {
+    for (const col of columns) {
       const value = editValues[col.dbColumn];
       
       if (col.required && (value === undefined || value === null || value === '')) {
         rowErrors.push(`"${col.label}" é obrigatório`);
       }
 
+      // Re-resolver lookups se necessário
+      if (col.type === 'lookup' && col.lookup && value) {
+        const lookupResult = await resolveLookup(String(value), col.lookup);
+        if (!lookupResult.found) {
+          if (col.required) {
+            rowErrors.push(`"${col.label}": não encontrado`);
+          }
+        } else {
+          editValues[col.dbColumn] = lookupResult.id;
+        }
+      }
+
       // Verificar duplicados
       if ((col.isCodeColumn || col.dbColumn === codeColumn) && value) {
         const codeValue = String(value).toLowerCase();
         if (codes.has(codeValue)) {
-          rowErrors.push(`Código "${value}" já existe no sistema`);
+          rowErrors.push(`Código já existe no sistema`);
           isDuplicate = true;
         }
-        // Verificar duplicados na planilha (exceto a própria linha)
         const duplicateInFile = previewRows.some((r, i) => 
           i !== editingRowIndex && 
           String(r.data[codeColumn] || '').toLowerCase() === codeValue
         );
         if (duplicateInFile) {
-          rowErrors.push(`Código "${value}" duplicado na planilha`);
+          rowErrors.push(`Código duplicado na planilha`);
           isDuplicate = true;
         }
       }
-    });
+    }
 
     setPreviewRows(prev => prev.map((row, i) => 
       i === editingRowIndex 
-        ? { data: editValues, errors: rowErrors, isDuplicate, isEditing: false }
+        ? { data: editValues, errors: rowErrors, warnings: rowWarnings, lookupResolved, isDuplicate, isEditing: false }
         : row
     ));
     
@@ -293,8 +403,12 @@ export function ExcelImport({
     const headers = columns.map(c => c.excelColumn);
     const templateData = sampleData || [
       columns.reduce((acc, col) => {
-        acc[col.excelColumn] = col.type === 'number' ? '0' : 
-          col.type === 'date' ? '01/01/2025' : 'Exemplo';
+        if (col.type === 'lookup') {
+          acc[col.excelColumn] = 'Nome do registro';
+        } else {
+          acc[col.excelColumn] = col.type === 'number' ? '0' : 
+            col.type === 'date' ? '01/01/2025' : 'Exemplo';
+        }
         return acc;
       }, {} as Record<string, string>)
     ];
@@ -321,13 +435,11 @@ export function ExcelImport({
         return;
       }
 
-      // Mapear dados para o formato do Excel
       const excelData = data.map((row: any) => {
         const excelRow: Record<string, any> = {};
         columns.forEach(col => {
           let value = row[col.dbColumn];
           if (col.type === 'date' && value) {
-            // Formatar data para DD/MM/YYYY
             const date = new Date(value);
             value = `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}/${date.getFullYear()}`;
           } else if (col.type === 'number' && value !== null && value !== undefined) {
@@ -354,6 +466,10 @@ export function ExcelImport({
 
   const validRowsCount = previewRows.filter(r => r.errors.length === 0 && !r.isDuplicate).length;
   const errorRowsCount = previewRows.filter(r => r.errors.length > 0 || r.isDuplicate).length;
+  const warningRowsCount = previewRows.filter(r => r.warnings.length > 0 && r.errors.length === 0).length;
+
+  // Identificar colunas de lookup para mostrar ícones
+  const lookupColumns = columns.filter(c => c.type === 'lookup');
 
   return (
     <>
@@ -391,12 +507,12 @@ export function ExcelImport({
               </div>
               <Button variant="outline" size="sm" onClick={downloadTemplate}>
                 <Download className="mr-2 h-4 w-4" />
-                Template Vazio
+                Template
               </Button>
               {existingDataQuery && (
                 <Button variant="outline" size="sm" onClick={downloadExistingData} disabled={isLoading}>
                   <Database className="mr-2 h-4 w-4" />
-                  Exportar Dados
+                  Exportar
                 </Button>
               )}
             </div>
@@ -408,18 +524,27 @@ export function ExcelImport({
                 <Badge 
                   key={col.dbColumn} 
                   variant={col.required ? "default" : "secondary"}
-                  className="text-xs"
+                  className="text-xs flex items-center gap-1"
                 >
+                  {col.type === 'lookup' && <Link className="h-3 w-3" />}
                   {col.excelColumn}{col.required && '*'}
                 </Badge>
               ))}
             </div>
 
+            {/* Legenda de lookups */}
+            {lookupColumns.length > 0 && (
+              <div className="text-xs text-muted-foreground flex items-center gap-1">
+                <Link className="h-3 w-3" />
+                <span>= Campo buscado automaticamente pelo nome</span>
+              </div>
+            )}
+
             {/* Loading */}
             {isValidating && (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin mr-2" />
-                <span>Validando dados...</span>
+                <span>Validando dados e resolvendo relacionamentos...</span>
               </div>
             )}
 
@@ -432,6 +557,12 @@ export function ExcelImport({
                       <span className="flex items-center gap-1 text-sm">
                         <CheckCircle2 className="h-4 w-4 text-success" />
                         <span className="font-medium">{validRowsCount} válidos</span>
+                      </span>
+                    )}
+                    {warningRowsCount > 0 && (
+                      <span className="flex items-center gap-1 text-sm text-warning">
+                        <AlertTriangle className="h-4 w-4" />
+                        <span className="font-medium">{warningRowsCount} com avisos</span>
                       </span>
                     )}
                     {errorRowsCount > 0 && (
@@ -449,6 +580,7 @@ export function ExcelImport({
                         <TableHead className="w-10">#</TableHead>
                         {columns.slice(0, 6).map(col => (
                           <TableHead key={col.dbColumn} className="whitespace-nowrap text-xs">
+                            {col.type === 'lookup' && <Link className="h-3 w-3 inline mr-1" />}
                             {col.label}
                           </TableHead>
                         ))}
@@ -460,7 +592,13 @@ export function ExcelImport({
                       {previewRows.map((row, i) => (
                         <TableRow 
                           key={i} 
-                          className={row.errors.length > 0 || row.isDuplicate ? "bg-destructive/5" : ""}
+                          className={
+                            row.errors.length > 0 || row.isDuplicate 
+                              ? "bg-destructive/5" 
+                              : row.warnings.length > 0 
+                                ? "bg-warning/5" 
+                                : ""
+                          }
                         >
                           <TableCell className="text-xs text-muted-foreground">{i + 1}</TableCell>
                           {columns.slice(0, 6).map(col => (
@@ -475,10 +613,27 @@ export function ExcelImport({
                                   className="h-7 text-xs min-w-[80px]"
                                 />
                               ) : (
-                                <span className={row.isDuplicate && (col.isCodeColumn || col.dbColumn === codeColumn) ? "text-destructive font-medium" : ""}>
-                                  {row.data[col.dbColumn] !== null && row.data[col.dbColumn] !== undefined 
-                                    ? String(row.data[col.dbColumn]).substring(0, 20) 
-                                    : '-'}
+                                <span className={
+                                  (row.isDuplicate && (col.isCodeColumn || col.dbColumn === codeColumn)) 
+                                    ? "text-destructive font-medium" 
+                                    : row.lookupResolved[col.dbColumn]?.found === false 
+                                      ? "text-warning" 
+                                      : ""
+                                }>
+                                  {col.type === 'lookup' && row.lookupResolved[col.dbColumn] ? (
+                                    <>
+                                      {row.lookupResolved[col.dbColumn].value}
+                                      {row.lookupResolved[col.dbColumn].found ? (
+                                        <CheckCircle2 className="h-3 w-3 inline ml-1 text-success" />
+                                      ) : (
+                                        <AlertTriangle className="h-3 w-3 inline ml-1 text-warning" />
+                                      )}
+                                    </>
+                                  ) : (
+                                    row.data[col.dbColumn] !== null && row.data[col.dbColumn] !== undefined 
+                                      ? String(row.data[col.dbColumn]).substring(0, 20) 
+                                      : '-'
+                                  )}
                                 </span>
                               )}
                             </TableCell>
@@ -486,7 +641,11 @@ export function ExcelImport({
                           <TableCell>
                             {row.errors.length > 0 || row.isDuplicate ? (
                               <Badge variant="destructive" className="text-xs whitespace-nowrap">
-                                {row.errors[0]?.substring(0, 25) || 'Duplicado'}
+                                {row.errors[0]?.substring(0, 20) || 'Duplicado'}
+                              </Badge>
+                            ) : row.warnings.length > 0 ? (
+                              <Badge variant="outline" className="text-xs text-warning border-warning/30">
+                                Aviso
                               </Badge>
                             ) : (
                               <Badge variant="outline" className="text-xs text-success border-success/30">
