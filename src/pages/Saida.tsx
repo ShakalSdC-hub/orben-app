@@ -41,6 +41,7 @@ import { SaidaEditForm } from "@/components/saida/SaidaEditForm";
 import { useExportReport } from "@/hooks/useExportReport";
 import { CenarioPreview } from "@/components/cenarios/CenarioPreview";
 import { ExcelImport } from "@/components/import/ExcelImport";
+import { PaginationControls } from "@/components/ui/PaginationControls";
 import { 
   CenarioOperacao,
   detectarCenario, 
@@ -91,6 +92,10 @@ export default function Saida() {
   const [deleteSaida, setDeleteSaida] = useState<any | null>(null);
   const [editSaida, setEditSaida] = useState<any | null>(null);
   const { exportToExcel, formatSaidaReport, printReport } = useExportReport();
+  
+  // Paginação
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
 
   const [formData, setFormData] = useState({
     tipo_saida_id: "",
@@ -98,19 +103,30 @@ export default function Saida() {
     valor_unitario: 0,
     nota_fiscal: "",
     observacoes: "",
-    // Custos a cobrar
     perda_cobrada_pct: 0,
     custos_adicionais: 0,
-    // Transporte
     transportadora_id: "",
     motorista: "",
     placa_veiculo: "",
   });
 
-  // Queries
-  const { data: saidas = [], isLoading } = useQuery({
-    queryKey: ["saidas"],
+  // Count total
+  const { data: totalCount = 0 } = useQuery({
+    queryKey: ["saidas_count"],
     queryFn: async () => {
+      const { count, error } = await supabase.from("saidas").select("*", { count: "exact", head: true });
+      if (error) throw error;
+      return count || 0;
+    },
+  });
+  const totalPages = Math.ceil(totalCount / pageSize);
+
+  // Queries com paginação
+  const { data: saidas = [], isLoading } = useQuery({
+    queryKey: ["saidas", page, pageSize],
+    queryFn: async () => {
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
       const { data, error } = await supabase
         .from("saidas")
         .select(`
@@ -118,7 +134,8 @@ export default function Saida() {
           tipos_saida!fk_saidas_tipo_saida(nome, cobra_custos),
           cliente:clientes!fk_saidas_cliente(razao_social, nome_fantasia)
         `)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .range(from, to);
       if (error) throw error;
       return data;
     },
@@ -1099,6 +1116,11 @@ export default function Saida() {
                 )}
               </TableBody>
             </Table>
+            <PaginationControls
+              pagination={{ page, pageSize, totalCount, totalPages }}
+              onPageChange={(p) => setPage(p)}
+              onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
+            />
           </CardContent>
         </Card>
 
