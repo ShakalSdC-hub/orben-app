@@ -1,4 +1,4 @@
-import { Bell, Search, User, LogOut, Package, Factory, FileOutput, FileInput, Loader2 } from "lucide-react";
+import { Bell, Search, User, LogOut, Factory, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -32,69 +32,63 @@ const roleLabels: Record<string, string> = {
 export function Header() {
   const { profile, role, signOut } = useAuth();
 
-  // Buscar atividades recentes para notificações
+  // Buscar atividades recentes para notificações (operações dos 3 cenários)
   const { data: recentActivities, isLoading } = useQuery({
     queryKey: ["recent-activities"],
     queryFn: async () => {
-      const [entradas, saidas, beneficiamentos] = await Promise.all([
+      const [opProprias, opTerceiros, opIntermediacao] = await Promise.all([
         supabase
-          .from("entradas")
-          .select("id, codigo, created_at, tipo_material")
+          .from("operacoes")
+          .select("id, nome, created_at, status")
+          .eq("is_deleted", false)
           .order("created_at", { ascending: false })
           .limit(3),
         supabase
-          .from("saidas")
-          .select("id, codigo, created_at, tipo_saida")
+          .from("operacoes_terceiros")
+          .select("id, nome, created_at, status")
+          .eq("is_deleted", false)
           .order("created_at", { ascending: false })
           .limit(3),
         supabase
-          .from("beneficiamentos")
-          .select("id, codigo, created_at, status")
+          .from("operacoes_intermediacao")
+          .select("id, nome, created_at, status")
+          .eq("is_deleted", false)
           .order("created_at", { ascending: false })
           .limit(3),
       ]);
       
       const activities = [
-        ...(entradas.data || []).map((e) => ({
-          id: e.id,
-          type: "entrada" as const,
-          codigo: e.codigo,
-          created_at: e.created_at,
-          label: `Nova entrada: ${e.codigo}`,
+        ...(opProprias.data || []).map((o) => ({
+          id: o.id,
+          type: "propria" as const,
+          nome: o.nome,
+          created_at: o.created_at,
+          label: `Op. Própria: ${o.nome}`,
         })),
-        ...(saidas.data || []).map((s) => ({
-          id: s.id,
-          type: "saida" as const,
-          codigo: s.codigo,
-          created_at: s.created_at,
-          label: `Nova saída: ${s.codigo}`,
+        ...(opTerceiros.data || []).map((o) => ({
+          id: o.id,
+          type: "terceiros" as const,
+          nome: o.nome,
+          created_at: o.created_at,
+          label: `Serviço: ${o.nome}`,
         })),
-        ...(beneficiamentos.data || []).map((b) => ({
-          id: b.id,
-          type: "beneficiamento" as const,
-          codigo: b.codigo,
-          created_at: b.created_at,
-          label: `Beneficiamento: ${b.codigo}`,
+        ...(opIntermediacao.data || []).map((o) => ({
+          id: o.id,
+          type: "intermediacao" as const,
+          nome: o.nome,
+          created_at: o.created_at,
+          label: `Intermediação: ${o.nome}`,
         })),
       ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       
       return activities.slice(0, 5);
     },
-    refetchInterval: 60000, // Atualizar a cada 1 min
+    refetchInterval: 60000,
   });
 
   const displayName = profile?.full_name || profile?.email?.split("@")[0] || "Usuário";
   const roleLabel = role ? roleLabels[role] || role : "Sem perfil";
   const notificationCount = recentActivities?.length || 0;
-
-  const getActivityIcon = (type: string) => {
-    switch (type) {
-      case "entrada": return <FileInput className="h-4 w-4 text-success" />;
-      case "saida": return <FileOutput className="h-4 w-4 text-destructive" />;
-      case "beneficiamento": return <Factory className="h-4 w-4 text-copper" />;
-      default: return <Package className="h-4 w-4" />;
-    }
-  };
 
   return (
     <header className="sticky top-0 z-30 h-16 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -104,7 +98,7 @@ export function Header() {
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             type="search"
-            placeholder="Buscar entrada, lote, fornecedor..."
+            placeholder="Buscar operação, parceiro..."
             className="pl-10 bg-muted/50 border-0 focus-visible:ring-1 focus-visible:ring-primary/50"
           />
         </div>
@@ -138,7 +132,7 @@ export function Header() {
                       <div key={activity.id} className="p-3 hover:bg-muted/50 transition-colors">
                         <div className="flex items-start gap-3">
                           <div className="mt-0.5">
-                            {getActivityIcon(activity.type)}
+                            <Factory className="h-4 w-4 text-copper" />
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate">{activity.label}</p>

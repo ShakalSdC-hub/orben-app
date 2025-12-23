@@ -25,7 +25,7 @@ export function GlobalFilters({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("parceiros")
-        .select("id, razao_social, nome_fantasia, is_fornecedor, is_cliente, is_transportadora")
+        .select("id, razao_social, nome_fantasia, is_fornecedor, is_cliente, is_transportadora, tipo")
         .eq("ativo", true)
         .order("razao_social");
       if (error) throw error;
@@ -34,15 +34,16 @@ export function GlobalFilters({
     enabled: showParceiro,
   });
 
-  // Fetch donos
+  // Fetch donos (parceiros com tipo DONO)
   const { data: donos } = useQuery({
     queryKey: ["donos-filtro"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("donos_material")
-        .select("id, nome")
+        .from("parceiros")
+        .select("id, razao_social, nome_fantasia")
         .eq("ativo", true)
-        .order("nome");
+        .eq("tipo", "DONO")
+        .order("razao_social");
       if (error) throw error;
       return data;
     },
@@ -85,7 +86,7 @@ export function GlobalFilters({
             <SelectItem value="ibrac">IBRAC (Próprio)</SelectItem>
             {donos?.map((d) => (
               <SelectItem key={d.id} value={d.id}>
-                {d.nome}
+                {d.nome_fantasia || d.razao_social}
               </SelectItem>
             ))}
           </SelectContent>
