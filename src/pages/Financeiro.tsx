@@ -10,7 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { 
   DollarSign, TrendingUp, TrendingDown, Users, AlertTriangle, CheckCircle, 
   Clock, Calculator, ArrowUpRight, ArrowDownRight, Wallet, PiggyBank,
-  BarChart3, Loader2, Check, Sparkles, HandCoins
+  BarChart3, Loader2, Check, Sparkles, HandCoins, Calendar
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -25,6 +25,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { BeneficiamentoCustoReview } from "@/components/financeiro/BeneficiamentoCustoReview";
 import { ResultadoIBRAC } from "@/components/financeiro/ResultadoIBRAC";
 import { RepassesPendentes } from "@/components/financeiro/RepassesPendentes";
+import { LMESemanaConfig } from "@/components/financeiro/LMESemanaConfig";
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
@@ -368,7 +369,7 @@ export default function Financeiro() {
         </div>
 
         <Tabs defaultValue="fluxo" className="w-full">
-          <TabsList className="grid w-full grid-cols-7 lg:w-auto lg:grid-cols-none lg:flex">
+          <TabsList className="grid w-full grid-cols-8 lg:w-auto lg:grid-cols-none lg:flex">
             <TabsTrigger value="fluxo">Fluxo de Caixa</TabsTrigger>
             <TabsTrigger value="resultado" className="flex items-center gap-1">
               <Sparkles className="h-3 w-3" />
@@ -377,6 +378,10 @@ export default function Financeiro() {
             <TabsTrigger value="repasses" className="flex items-center gap-1">
               <HandCoins className="h-3 w-3" />
               Repasses
+            </TabsTrigger>
+            <TabsTrigger value="lme-semana" className="flex items-center gap-1">
+              <Calendar className="h-3 w-3" />
+              LME Semana
             </TabsTrigger>
             <TabsTrigger value="contas">Contas</TabsTrigger>
             <TabsTrigger value="custos">Custos</TabsTrigger>
@@ -392,6 +397,11 @@ export default function Financeiro() {
           {/* Repasses Pendentes */}
           <TabsContent value="repasses" className="mt-6">
             <RepassesPendentes />
+          </TabsContent>
+          
+          {/* LME Semana Config */}
+          <TabsContent value="lme-semana" className="mt-6">
+            <LMESemanaConfig />
           </TabsContent>
 
           {/* Fluxo de Caixa */}

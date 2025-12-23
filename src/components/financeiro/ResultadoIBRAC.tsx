@@ -21,10 +21,11 @@ const COLORS = {
 
 export function ResultadoIBRAC() {
   const mesAtual = new Date();
-  const dataInicio = format(startOfMonth(mesAtual), "yyyy-MM-dd");
+  // Use 3 months range to capture more data
+  const dataInicio = format(startOfMonth(new Date(mesAtual.getFullYear(), mesAtual.getMonth() - 2, 1)), "yyyy-MM-dd");
   const dataFim = format(endOfMonth(mesAtual), "yyyy-MM-dd");
 
-  // Beneficiamentos - Lucro na perda
+  // Beneficiamentos - Lucro na perda (get all finalized, not just current month)
   const { data: beneficiamentos = [], isLoading: loadingBenef } = useQuery({
     queryKey: ["resultado-ibrac-beneficiamentos", dataInicio, dataFim],
     queryFn: async () => {
@@ -37,6 +38,9 @@ export function ResultadoIBRAC() {
           lucro_perda_valor,
           perda_cobrada_pct,
           perda_real_pct,
+          peso_entrada_kg,
+          peso_saida_kg,
+          lme_referencia_kg,
           data_inicio
         `)
         .gte("data_inicio", dataInicio)
@@ -71,7 +75,25 @@ export function ResultadoIBRAC() {
 
   // Calcular totais
   const resultados = useMemo(() => {
-    const lucroPerdas = beneficiamentos.reduce((acc, b) => acc + (b.lucro_perda_valor || 0), 0);
+    // Calcular lucro na perda: diferença entre perda cobrada e perda real, multiplicada pelo LME
+    const lucroPerdas = beneficiamentos.reduce((acc, b) => {
+      // Se tiver lucro_perda_valor preenchido, usa ele
+      if (b.lucro_perda_valor && b.lucro_perda_valor !== 0) {
+        return acc + b.lucro_perda_valor;
+      }
+      
+      // Caso contrário, calcula: (perda_cobrada - perda_real) * peso_entrada * lme_referencia
+      const perdaCobradaPct = b.perda_cobrada_pct || 0;
+      const perdaRealPct = b.perda_real_pct || 0;
+      const pesoEntrada = b.peso_entrada_kg || 0;
+      const lmeRef = b.lme_referencia_kg || 55; // Fallback para 55 R$/kg se não tiver
+      
+      const kgLucro = pesoEntrada * ((perdaCobradaPct - perdaRealPct) / 100);
+      const valorLucro = kgLucro * lmeRef;
+      
+      return acc + valorLucro;
+    }, 0);
+
     const receitaServicos = saidas
       .filter((s: any) => s.cenario_operacao === "industrializacao")
       .reduce((acc, s) => acc + (s.custos_cobrados || 0), 0);
