@@ -3,9 +3,6 @@ import { Link, useLocation } from "react-router-dom";
 import {
   LayoutDashboard,
   Package,
-  FileInput,
-  FileOutput,
-  Warehouse,
   DollarSign,
   Calculator,
   FileText,
@@ -14,13 +11,14 @@ import {
   ChevronLeft,
   ChevronRight,
   TrendingUp,
-  Cog,
   Menu,
-  X,
   ShieldCheck,
+  Factory,
+  Handshake,
+  Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
 import orbenLogo from "@/assets/orben-logo.jpeg";
@@ -34,12 +32,11 @@ const menuItems = [
     ],
   },
   {
-    title: "Operacional",
+    title: "Operações",
     items: [
-      { icon: FileInput, label: "Entrada", path: "/entrada" },
-      { icon: Cog, label: "Beneficiamento", path: "/beneficiamento" },
-      { icon: FileOutput, label: "Saída", path: "/saida" },
-      { icon: Warehouse, label: "Estoque", path: "/estoque" },
+      { icon: Factory, label: "Material Próprio", path: "/operacoes-proprias" },
+      { icon: Handshake, label: "Serviço Terceiros", path: "/operacoes-terceiros" },
+      { icon: Building2, label: "Intermediação", path: "/operacoes-intermediacao" },
     ],
   },
   {
