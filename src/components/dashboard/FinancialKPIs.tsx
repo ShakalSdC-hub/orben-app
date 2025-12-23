@@ -40,7 +40,7 @@ export function FinancialKPIs({ selectedDono }: FinancialKPIsProps) {
     },
   });
 
-  // Fetch itens de entrada para pegar dono e cenário
+  // Fetch itens de entrada para pegar dono, cenário e custo de aquisição
   const { data: itensEntrada } = useQuery({
     queryKey: ["dashboard-itens-entrada-mes"],
     queryFn: async () => {
@@ -48,10 +48,12 @@ export function FinancialKPIs({ selectedDono }: FinancialKPIsProps) {
         .from("beneficiamento_itens_entrada")
         .select(`
           beneficiamento_id,
+          peso_kg,
           sublote:sublotes(
             dono_id,
+            custo_unitario_total,
             dono:donos_material(id, nome, is_ibrac, taxa_operacao_pct),
-            entrada:entradas(tipo_entrada:tipos_entrada(gera_custo))
+            entrada:entradas(id, valor_total, peso_liquido_kg, tipo_entrada:tipos_entrada(gera_custo))
           )
         `);
       if (error) throw error;
@@ -173,14 +175,35 @@ export function FinancialKPIs({ selectedDono }: FinancialKPIsProps) {
 
       // Buscar documentos vinculados
       const docsDoBenef = benefEntradas?.filter(be => be.beneficiamento_id === benef.id) || [];
-      const valorDocumento = docsDoBenef.reduce((acc, doc) => acc + (doc.valor_documento || 0), 0);
+      const valorDocumentoFromDocs = docsDoBenef.reduce((acc, doc) => acc + (doc.valor_documento || 0), 0);
       const custoFinanceiro = docsDoBenef.reduce((acc, doc) => acc + (doc.taxa_financeira_valor || 0), 0);
 
       // Custos operacionais
       const custoMO = (benef.custo_mo_terceiro || 0) + (benef.custo_mo_ibrac || 0);
       const custoFrete = (benef.custo_frete_ida || 0) + (benef.custo_frete_volta || 0);
       
-      const custoTotal = valorDocumento + custoFinanceiro + custoMO + custoFrete;
+      // Calcular custo de aquisição dos sublotes de entrada
+      // Se tiver valor nos documentos, usar. Senão, calcular proporcional das entradas originais
+      let custoAquisicao = valorDocumentoFromDocs;
+      
+      if (custoAquisicao === 0 && itensDoBenef.length > 0) {
+        // Calcular custo proporcional a partir dos sublotes e suas entradas
+        // Usar Set para não contar a mesma entrada mais de uma vez
+        const entradasProcessadas = new Set<string>();
+        
+        for (const item of itensDoBenef) {
+          const sublote = item.sublote as any;
+          const entrada = sublote?.entrada;
+          const entradaId = entrada?.id;
+          
+          if (entradaId && !entradasProcessadas.has(entradaId)) {
+            entradasProcessadas.add(entradaId);
+            custoAquisicao += entrada?.valor_total || 0;
+          }
+        }
+      }
+      
+      const custoTotal = custoAquisicao + custoFinanceiro + custoMO + custoFrete;
       const custoKgVergalhao = pesoSaida > 0 ? custoTotal / pesoSaida : 0;
       custoTotalVergalhao += custoTotal;
       pesoTotalSaida += pesoSaida;
