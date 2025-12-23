@@ -24,7 +24,9 @@ import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "rec
 import { GlobalFilters } from "@/components/filters/GlobalFilters";
 import { LMECharts } from "@/components/dashboard/LMECharts";
 import { FinancialKPIs } from "@/components/dashboard/FinancialKPIs";
-import { formatCurrency, formatWeightCompact as formatWeight, custoMedioPonderado } from "@/lib/kpis";
+import { formatCurrency, formatWeightCompact, custoMedioPonderado } from "@/lib/kpis";
+
+const formatWeight = formatWeightCompact;
 
 export default function Index() {
   const [selectedDono, setSelectedDono] = useState<string | null>(null);
