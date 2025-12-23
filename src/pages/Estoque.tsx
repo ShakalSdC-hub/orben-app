@@ -42,6 +42,7 @@ import { LoteHistorico } from "@/components/estoque/LoteHistorico";
 import { CustoRastreabilidade } from "@/components/estoque/CustoRastreabilidade";
 import { useExportReport } from "@/hooks/useExportReport";
 import { ExcelImport } from "@/components/import/ExcelImport";
+import { PaginationControls } from "@/components/ui/PaginationControls";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -80,12 +81,35 @@ export default function Estoque() {
   const [selectedLoteDono, setSelectedLoteDono] = useState<any | null>(null);
   const [selectedLoteRastreio, setSelectedLoteRastreio] = useState<any | null>(null);
   const { exportToExcel, formatEstoqueReport, formatRastreabilidadeReport, printReport } = useExportReport();
+  
+  // Paginação
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
 
-  // Fetch sublotes com relacionamentos
-  const { data: sublotes, isLoading } = useQuery({
-    queryKey: ["sublotes"],
+  // Fetch count total de sublotes
+  const { data: totalCount = 0 } = useQuery({
+    queryKey: ["sublotes_count", selectedDono, selectedTipo, selectedLocal],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase.from("sublotes").select("*", { count: "exact", head: true });
+      if (selectedDono) query = query.eq("dono_id", selectedDono);
+      if (selectedTipo) query = query.eq("tipo_produto_id", selectedTipo);
+      if (selectedLocal) query = query.eq("local_estoque_id", selectedLocal);
+      const { count, error } = await query;
+      if (error) throw error;
+      return count || 0;
+    },
+  });
+
+  const totalPages = Math.ceil(totalCount / pageSize);
+
+  // Fetch sublotes com relacionamentos e paginação
+  const { data: sublotes, isLoading } = useQuery({
+    queryKey: ["sublotes", page, pageSize, selectedDono, selectedTipo, selectedLocal],
+    queryFn: async () => {
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+      
+      let query = supabase
         .from("sublotes")
         .select(`
           *,
@@ -94,7 +118,14 @@ export default function Estoque() {
           tipo_produto:tipos_produto!fk_sublotes_tipo_produto(nome),
           local_estoque:locais_estoque!fk_sublotes_local_estoque(nome, tipo)
         `)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .range(from, to);
+      
+      if (selectedDono) query = query.eq("dono_id", selectedDono);
+      if (selectedTipo) query = query.eq("tipo_produto_id", selectedTipo);
+      if (selectedLocal) query = query.eq("local_estoque_id", selectedLocal);
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
@@ -564,121 +595,130 @@ export default function Estoque() {
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
             ) : (
-              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                {filteredSublotes?.map((lote) => {
-                  const estoqueInfo = getEstoqueDescricao(lote);
-                  return (
-                  <div
-                    key={lote.id}
-                    className="rounded-xl border bg-card p-4 shadow-sm hover:shadow-md transition-all hover:border-primary/30 group"
-                  >
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
-                          <Package className="h-4 w-4 text-primary" />
+              <>
+                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                  {filteredSublotes?.map((lote) => {
+                    const estoqueInfo = getEstoqueDescricao(lote);
+                    return (
+                    <div
+                      key={lote.id}
+                      className="rounded-xl border bg-card p-4 shadow-sm hover:shadow-md transition-all hover:border-primary/30 group"
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                            <Package className="h-4 w-4 text-primary" />
+                          </div>
+                          <div>
+                            <p className="font-semibold">{lote.codigo}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {lote.lote_pai_id 
+                                ? `Origem: ${sublotes?.find(s => s.id === lote.lote_pai_id)?.codigo || lote.lote_pai_id}`
+                                : lote.entrada?.codigo || "—"}
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-semibold">{lote.codigo}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {lote.lote_pai_id 
-                              ? `Origem: ${sublotes?.find(s => s.id === lote.lote_pai_id)?.codigo || lote.lote_pai_id}`
-                              : lote.entrada?.codigo || "—"}
-                          </p>
-                        </div>
-                      </div>
-                      <Badge
-                        variant="outline"
-                        className={cn("text-xs", statusConfig[lote.status as keyof typeof statusConfig]?.className)}
-                      >
-                        {statusConfig[lote.status as keyof typeof statusConfig]?.label || lote.status}
-                      </Badge>
-                    </div>
-
-                    {/* Tipo de Estoque / Processo */}
-                    <div className={cn("rounded-lg px-3 py-2 mb-3", estoqueInfo.cor)}>
-                      <p className="text-xs font-medium">{estoqueInfo.tipo}</p>
-                      <p className="text-xs opacity-75">{estoqueInfo.detalhe}</p>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3 text-sm">
-                      <div>
-                        <p className="text-muted-foreground text-xs">Peso</p>
-                        <p className="font-semibold">{formatWeight(lote.peso_kg)}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground text-xs">Material</p>
-                        <p className="font-medium">{lote.tipo_produto?.nome || "—"}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground text-xs">Local</p>
-                        <p className="font-medium">{lote.local_estoque?.nome || "IBRAC"}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground text-xs">Dono</p>
-                        <Badge variant="secondary" className="text-xs">
-                          {lote.dono?.nome || "IBRAC"}
+                        <Badge
+                          variant="outline"
+                          className={cn("text-xs", statusConfig[lote.status as keyof typeof statusConfig]?.className)}
+                        >
+                          {statusConfig[lote.status as keyof typeof statusConfig]?.label || lote.status}
                         </Badge>
                       </div>
-                    </div>
 
-                    {lote.custo_unitario_total && lote.custo_unitario_total > 0 && (
-                      <div className="mt-3 pt-3 border-t flex items-center justify-between">
+                      {/* Tipo de Estoque / Processo */}
+                      <div className={cn("rounded-lg px-3 py-2 mb-3", estoqueInfo.cor)}>
+                        <p className="text-xs font-medium">{estoqueInfo.tipo}</p>
+                        <p className="text-xs opacity-75">{estoqueInfo.detalhe}</p>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 text-sm">
                         <div>
-                          <p className="text-xs text-muted-foreground">Custo Unitário</p>
-                          <p className="font-semibold text-copper">
-                            R$ {lote.custo_unitario_total.toFixed(2)}/kg
-                          </p>
+                          <p className="text-muted-foreground text-xs">Peso</p>
+                          <p className="font-semibold">{formatWeight(lote.peso_kg)}</p>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setSelectedLoteRastreio(lote)}
-                          title="Ver composição do custo"
-                        >
-                          <Calculator className="h-4 w-4" />
-                        </Button>
+                        <div>
+                          <p className="text-muted-foreground text-xs">Material</p>
+                          <p className="font-medium">{lote.tipo_produto?.nome || "—"}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground text-xs">Local</p>
+                          <p className="font-medium">{lote.local_estoque?.nome || "IBRAC"}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground text-xs">Dono</p>
+                          <Badge variant="secondary" className="text-xs">
+                            {lote.dono?.nome || "IBRAC"}
+                          </Badge>
+                        </div>
                       </div>
-                    )}
 
-                    {/* Histórico de Transferências */}
-                    <div className="mt-3 pt-3 border-t">
-                      <LoteHistorico loteId={lote.id} loteCodigo={lote.codigo} />
+                      {lote.custo_unitario_total && lote.custo_unitario_total > 0 && (
+                        <div className="mt-3 pt-3 border-t flex items-center justify-between">
+                          <div>
+                            <p className="text-xs text-muted-foreground">Custo Unitário</p>
+                            <p className="font-semibold text-copper">
+                              R$ {lote.custo_unitario_total.toFixed(2)}/kg
+                            </p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setSelectedLoteRastreio(lote)}
+                            title="Ver composição do custo"
+                          >
+                            <Calculator className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
+
+                      {/* Histórico de Transferências */}
+                      <div className="mt-3 pt-3 border-t">
+                        <LoteHistorico loteId={lote.id} loteCodigo={lote.codigo} />
+                      </div>
+
+                      {lote.status === "disponivel" && (
+                        <div className="mt-3 pt-3 border-t flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1"
+                            onClick={() => handleTransfer(lote)}
+                          >
+                            <MoveRight className="h-4 w-4 mr-1" />
+                            Local
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1"
+                            onClick={() => {
+                              setSelectedLoteDono(lote);
+                              setIsTransferDonoOpen(true);
+                            }}
+                          >
+                            <UserRoundCog className="h-4 w-4 mr-1" />
+                            Dono
+                          </Button>
+                        </div>
+                      )}
                     </div>
-
-                    {lote.status === "disponivel" && (
-                      <div className="mt-3 pt-3 border-t flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1"
-                          onClick={() => handleTransfer(lote)}
-                        >
-                          <MoveRight className="h-4 w-4 mr-1" />
-                          Local
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1"
-                          onClick={() => {
-                            setSelectedLoteDono(lote);
-                            setIsTransferDonoOpen(true);
-                          }}
-                        >
-                          <UserRoundCog className="h-4 w-4 mr-1" />
-                          Dono
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                )})}
-              
-                {(!filteredSublotes || filteredSublotes.length === 0) && (
-                  <div className="col-span-full text-center py-8 text-muted-foreground">
-                    {searchTerm || selectedDono || selectedTipo || selectedLocal ? "Nenhum sublote encontrado" : "Nenhum sublote no estoque ainda"}
-                  </div>
-                )}
-              </div>
+                  )})}
+                
+                  {(!filteredSublotes || filteredSublotes.length === 0) && (
+                    <div className="col-span-full text-center py-8 text-muted-foreground">
+                      {searchTerm || selectedDono || selectedTipo || selectedLocal ? "Nenhum sublote encontrado" : "Nenhum sublote no estoque ainda"}
+                    </div>
+                  )}
+                </div>
+                
+                {/* Paginação */}
+                <PaginationControls
+                  pagination={{ page, pageSize, totalCount, totalPages }}
+                  onPageChange={(p) => setPage(p)}
+                  onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
+                />
+              </>
             )}
           </TabsContent>
 

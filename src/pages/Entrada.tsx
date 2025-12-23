@@ -68,6 +68,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { useExportReport } from "@/hooks/useExportReport";
 import { ExcelImport } from "@/components/import/ExcelImport";
+import { PaginationControls } from "@/components/ui/PaginationControls";
 
 const statusConfig: Record<string, { label: string; className: string }> = {
   pendente: { label: "Pendente", className: "bg-warning/10 text-warning border-warning/20" },
@@ -92,12 +93,35 @@ export default function Entrada() {
   const [editEntrada, setEditEntrada] = useState<any | null>(null);
   
   const { exportToExcel, formatEntradaReport, printReport } = useExportReport();
+  
+  // Paginação
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
 
-  // Fetch entradas with sublotes
-  const { data: entradas, isLoading } = useQuery({
-    queryKey: ["entradas"],
+  // Fetch count total de entradas
+  const { data: totalCount = 0 } = useQuery({
+    queryKey: ["entradas_count", selectedParceiro, selectedDono],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase.from("entradas").select("*", { count: "exact", head: true });
+      if (selectedParceiro) query = query.eq("parceiro_id", selectedParceiro);
+      if (selectedDono && selectedDono !== "ibrac") query = query.eq("dono_id", selectedDono);
+      if (selectedDono === "ibrac") query = query.is("dono_id", null);
+      const { count, error } = await query;
+      if (error) throw error;
+      return count || 0;
+    },
+  });
+
+  const totalPages = Math.ceil(totalCount / pageSize);
+
+  // Fetch entradas with sublotes e paginação
+  const { data: entradas, isLoading } = useQuery({
+    queryKey: ["entradas", page, pageSize, selectedParceiro, selectedDono],
+    queryFn: async () => {
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
+      
+      let query = supabase
         .from("entradas")
         .select(`
           *,
@@ -107,7 +131,14 @@ export default function Entrada() {
           tipo_produto:tipos_produto!fk_entradas_tipo_produto(nome),
           transportadora:parceiros!fk_entradas_transportadora(razao_social)
         `)
-        .order("data_entrada", { ascending: false });
+        .order("data_entrada", { ascending: false })
+        .range(from, to);
+      
+      if (selectedParceiro) query = query.eq("parceiro_id", selectedParceiro);
+      if (selectedDono && selectedDono !== "ibrac") query = query.eq("dono_id", selectedDono);
+      if (selectedDono === "ibrac") query = query.is("dono_id", null);
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
@@ -567,6 +598,13 @@ export default function Entrada() {
               </TableBody>
             </Table>
           )}
+          
+          {/* Paginação */}
+          <PaginationControls
+            pagination={{ page, pageSize, totalCount, totalPages }}
+            onPageChange={(p) => setPage(p)}
+            onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
+          />
         </div>
 
         {/* Romaneio Print Dialog */}

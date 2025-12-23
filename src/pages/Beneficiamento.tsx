@@ -43,6 +43,7 @@ import { CustoCalculoPreview } from "@/components/beneficiamento/CustoCalculoPre
 import { LucroPerdaPreview } from "@/components/cenarios/LucroPerdaPreview";
 import { useExportReport } from "@/hooks/useExportReport";
 import { ExcelImport } from "@/components/import/ExcelImport";
+import { PaginationControls } from "@/components/ui/PaginationControls";
 import { formatWeight, formatCurrency } from "@/lib/kpis";
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
@@ -101,31 +102,44 @@ export default function Beneficiamento() {
   const [viewBeneficiamento, setViewBeneficiamento] = useState<any | null>(null);
   const [finalizeData, setFinalizeData] = useState({ peso_saida_real: 0, local_destino_id: "", tipo_produto_saida_id: "", lme_referencia_kg: 0 });
   const { exportToExcel, formatBeneficiamentoReport, printReport } = useExportReport();
+  
+  // Paginação
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
 
-  // Estado para perdas por produto - chave é o CÓDIGO do produto
   const [perdasPorProduto, setPerdasPorProduto] = useState<Record<string, { padrao: number; cobrada: number }>>({});
-  // Estado para taxa financeira global
   const [taxaFinanceiraGlobal, setTaxaFinanceiraGlobal] = useState(1.8);
 
   const [formData, setFormData] = useState({
     processo_id: "",
     tipo_beneficiamento: "interno",
     fornecedor_terceiro_id: "",
-    // Custos em R$/kg - frete ida usa peso entrada, frete volta usa peso após perda
     custo_frete_ida_kg: 0,
     custo_frete_volta_kg: 0,
     custo_mo_terceiro_kg: 0,
     custo_mo_ibrac_kg: 0,
-    // Transporte
     transportadora_id: "",
     motorista: "",
     placa_veiculo: "",
   });
 
-  // Queries
-  const { data: beneficiamentos = [], isLoading } = useQuery({
-    queryKey: ["beneficiamentos"],
+  // Count total
+  const { data: totalCount = 0 } = useQuery({
+    queryKey: ["beneficiamentos_count"],
     queryFn: async () => {
+      const { count, error } = await supabase.from("beneficiamentos").select("*", { count: "exact", head: true });
+      if (error) throw error;
+      return count || 0;
+    },
+  });
+  const totalPages = Math.ceil(totalCount / pageSize);
+
+  // Queries com paginação
+  const { data: beneficiamentos = [], isLoading } = useQuery({
+    queryKey: ["beneficiamentos", page, pageSize],
+    queryFn: async () => {
+      const from = (page - 1) * pageSize;
+      const to = from + pageSize - 1;
       const { data, error } = await supabase
         .from("beneficiamentos")
         .select(`
@@ -133,7 +147,8 @@ export default function Beneficiamento() {
           processos(nome),
           fornecedor_terceiro:parceiros!beneficiamentos_fornecedor_terceiro_id_fkey(razao_social, nome_fantasia)
         `)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .range(from, to);
       if (error) throw error;
       return data;
     },
