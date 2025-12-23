@@ -1731,6 +1731,11 @@ export default function Beneficiamento() {
               </TableBody>
             </Table>
             </div>
+            <PaginationControls
+              pagination={{ page, pageSize, totalCount, totalPages }}
+              onPageChange={(p) => setPage(p)}
+              onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
+            />
           </CardContent>
         </Card>
 
