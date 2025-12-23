@@ -520,7 +520,7 @@ export default function Saida() {
                 { dbColumn: "data_saida", excelColumn: "Data Saída", label: "Data", required: true, type: "date" },
                 { dbColumn: "tipo_saida", excelColumn: "Tipo Saída", label: "Tipo", required: true, type: "string" },
                 { dbColumn: "peso_total_kg", excelColumn: "Peso Total (kg)", label: "Peso Total", required: true, type: "number" },
-                { dbColumn: "cliente_id", excelColumn: "Cliente", label: "Cliente", required: false, type: "lookup", lookup: { table: "clientes", matchColumn: "razao_social", alternativeColumns: ["nome_fantasia"] } },
+                { dbColumn: "cliente_id", excelColumn: "Cliente", label: "Cliente", required: false, type: "lookup", lookup: { table: "clientes", matchColumn: "razao_social", alternativeColumns: ["nome_fantasia"], canCreate: true, createData: (value) => ({ razao_social: value, ativo: true }) } },
                 { dbColumn: "valor_unitario", excelColumn: "Valor Unitário (R$)", label: "Valor Unitário", required: false, type: "number" },
                 { dbColumn: "valor_total", excelColumn: "Valor Total (R$)", label: "Valor Total", required: false, type: "number" },
                 { dbColumn: "custos_cobrados", excelColumn: "Custos Cobrados (R$)", label: "Custos Cobrados", required: false, type: "number" },

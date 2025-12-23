@@ -4,7 +4,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Upload, FileSpreadsheet, Download, AlertTriangle, CheckCircle2, Loader2, Trash2, Pencil, X, Check, Database, Link } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Upload, FileSpreadsheet, Download, AlertTriangle, CheckCircle2, Loader2, Trash2, Pencil, X, Check, Database, Link, Plus } from "lucide-react";
 import * as XLSX from "xlsx";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,7 +16,8 @@ export interface LookupConfig {
   matchColumn: string;              // Coluna para fazer match (ex: "razao_social", "nome")
   returnColumn?: string;            // Coluna a retornar (default: "id")
   alternativeColumns?: string[];    // Colunas alternativas para match (ex: ["nome_fantasia", "codigo"])
-  createIfNotExists?: boolean;      // Se deve criar registro se não existir (futuro)
+  canCreate?: boolean;              // Se pode criar registro se não existir
+  createData?: (value: string) => Record<string, any>;  // Dados para criar o registro
 }
 
 export interface ColumnMapping {
@@ -40,13 +43,21 @@ interface ExcelImportProps {
   existingDataQuery?: () => Promise<any[]>;
 }
 
+interface LookupResolvedInfo {
+  found: boolean;
+  value: string;
+  id: string | null;
+  canCreate?: boolean;
+}
+
 interface PreviewRow {
   data: Record<string, any>;
   errors: string[];
   warnings: string[];
-  lookupResolved: Record<string, { found: boolean; value: string; id: string | null }>;
+  lookupResolved: Record<string, LookupResolvedInfo>;
   isDuplicate: boolean;
   isEditing: boolean;
+  pendingCreates?: Record<string, { table: string; data: Record<string, any> }>;
 }
 
 // Cache para lookups
@@ -74,6 +85,7 @@ export function ExcelImport({
   const [editingRowIndex, setEditingRowIndex] = useState<number | null>(null);
   const [editValues, setEditValues] = useState<Record<string, any>>({});
   const [lookupCache, setLookupCache] = useState<LookupCache>({});
+  const [autoCreateMissing, setAutoCreateMissing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Buscar códigos existentes no banco
@@ -132,14 +144,31 @@ export function ExcelImport({
   }, [lookupCache]);
 
   // Resolver lookup para um valor
-  const resolveLookup = async (value: string, lookup: LookupConfig): Promise<{ found: boolean; id: string | null }> => {
-    if (!value) return { found: false, id: null };
+  const resolveLookup = async (value: string, lookup: LookupConfig): Promise<{ found: boolean; id: string | null; canCreate: boolean }> => {
+    if (!value) return { found: false, id: null, canCreate: false };
     
     const lookupMap = await fetchLookupData(lookup);
     const searchValue = String(value).toLowerCase().trim();
     const id = lookupMap.get(searchValue);
     
-    return { found: !!id, id: id || null };
+    return { found: !!id, id: id || null, canCreate: lookup.canCreate || false };
+  };
+
+  // Criar registro que não existe
+  const createMissingRecord = async (table: string, data: Record<string, any>): Promise<string | null> => {
+    try {
+      const { data: result, error } = await supabase
+        .from(table as any)
+        .insert(data)
+        .select('id')
+        .single();
+      
+      if (error) throw error;
+      return (result as any)?.id || null;
+    } catch (error) {
+      console.error(`Erro ao criar registro em ${table}:`, error);
+      return null;
+    }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -176,7 +205,7 @@ export function ExcelImport({
           const mappedRow: Record<string, any> = {};
           const rowErrors: string[] = [];
           const rowWarnings: string[] = [];
-          const lookupResolved: Record<string, { found: boolean; value: string; id: string | null }> = {};
+          const lookupResolved: Record<string, LookupResolvedInfo> = {};
           let isDuplicate = false;
 
           for (const col of columns) {
@@ -217,13 +246,17 @@ export function ExcelImport({
                 lookupResolved[col.dbColumn] = { 
                   found: lookupResult.found, 
                   value: String(value), 
-                  id: lookupResult.id 
+                  id: lookupResult.id,
+                  canCreate: lookupResult.canCreate
                 };
                 
                 if (lookupResult.found) {
                   transformedValue = lookupResult.id;
                 } else {
-                  if (col.required) {
+                  // Se pode criar e auto-create está ativo, marcar para criação
+                  if (lookupResult.canCreate && col.lookup.createData) {
+                    rowWarnings.push(`"${col.label}": "${value}" será criado`);
+                  } else if (col.required) {
                     rowErrors.push(`"${col.label}": "${value}" não encontrado`);
                   } else {
                     rowWarnings.push(`"${col.label}": "${value}" não encontrado`);
@@ -298,17 +331,77 @@ export function ExcelImport({
   };
 
   const handleImport = async () => {
-    const validRows = previewRows.filter(r => r.errors.length === 0 && !r.isDuplicate);
+    let rowsToImport = previewRows.filter(r => !r.isDuplicate);
     
-    if (validRows.length === 0) {
+    // Se auto-create está ativo, filtrar linhas que podem ser processadas
+    if (autoCreateMissing) {
+      rowsToImport = rowsToImport.filter(r => {
+        // Verificar se todos os lookups não encontrados podem ser criados
+        const unresolvedLookups = Object.entries(r.lookupResolved).filter(
+          ([_, info]) => !info.found && info.value
+        );
+        return unresolvedLookups.every(([colName, info]) => info.canCreate);
+      });
+    } else {
+      rowsToImport = rowsToImport.filter(r => r.errors.length === 0);
+    }
+    
+    if (rowsToImport.length === 0) {
       toast({ title: "Nenhum registro válido para importar", variant: "destructive" });
       return;
     }
 
     setIsLoading(true);
     try {
-      await onImport(validRows.map(r => r.data));
-      toast({ title: "Importação concluída!", description: `${validRows.length} registros importados` });
+      // Se auto-create está ativo, criar registros faltantes primeiro
+      if (autoCreateMissing) {
+        const createdRecords: Record<string, Map<string, string>> = {};
+        let totalCreated = 0;
+
+        for (const row of rowsToImport) {
+          for (const col of columns) {
+            if (col.type === 'lookup' && col.lookup) {
+              const lookupInfo = row.lookupResolved[col.dbColumn];
+              
+              if (lookupInfo && !lookupInfo.found && lookupInfo.value && lookupInfo.canCreate && col.lookup.createData) {
+                const cacheKey = `${col.lookup.table}_${lookupInfo.value.toLowerCase()}`;
+                
+                // Verificar se já criamos este registro
+                if (!createdRecords[col.lookup.table]) {
+                  createdRecords[col.lookup.table] = new Map();
+                }
+                
+                let newId = createdRecords[col.lookup.table].get(lookupInfo.value.toLowerCase());
+                
+                if (!newId) {
+                  // Criar o registro
+                  const createData = col.lookup.createData(lookupInfo.value);
+                  newId = await createMissingRecord(col.lookup.table, createData);
+                  
+                  if (newId) {
+                    createdRecords[col.lookup.table].set(lookupInfo.value.toLowerCase(), newId);
+                    totalCreated++;
+                  }
+                }
+                
+                if (newId) {
+                  row.data[col.dbColumn] = newId;
+                }
+              }
+            }
+          }
+        }
+
+        if (totalCreated > 0) {
+          toast({ 
+            title: `${totalCreated} registro(s) criado(s)`, 
+            description: "Registros relacionados foram criados automaticamente" 
+          });
+        }
+      }
+
+      await onImport(rowsToImport.map(r => r.data));
+      toast({ title: "Importação concluída!", description: `${rowsToImport.length} registros importados` });
       handleClose();
     } catch (error: any) {
       toast({ title: "Erro na importação", description: error.message, variant: "destructive" });
@@ -324,6 +417,7 @@ export function ExcelImport({
     setEditingRowIndex(null);
     setEditValues({});
     setLookupCache({});
+    setAutoCreateMissing(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -464,12 +558,56 @@ export function ExcelImport({
     }
   };
 
-  const validRowsCount = previewRows.filter(r => r.errors.length === 0 && !r.isDuplicate).length;
-  const errorRowsCount = previewRows.filter(r => r.errors.length > 0 || r.isDuplicate).length;
-  const warningRowsCount = previewRows.filter(r => r.warnings.length > 0 && r.errors.length === 0).length;
+  // Calcular contagens considerando auto-create
+  const getRowCounts = () => {
+    let valid = 0;
+    let errors = 0;
+    let warnings = 0;
+    let canAutoCreate = 0;
+
+    for (const row of previewRows) {
+      if (row.isDuplicate) {
+        errors++;
+        continue;
+      }
+
+      // Verificar lookups não resolvidos que podem ser criados
+      const unresolvedLookups = Object.entries(row.lookupResolved).filter(
+        ([_, info]) => !info.found && info.value
+      );
+      const allCanCreate = unresolvedLookups.every(([colName, info]) => info.canCreate);
+      
+      if (row.errors.length === 0) {
+        if (unresolvedLookups.length === 0) {
+          valid++;
+        } else if (allCanCreate) {
+          canAutoCreate++;
+          if (autoCreateMissing) valid++;
+        } else {
+          errors++;
+        }
+      } else {
+        // Verificar se os erros são apenas de lookup não encontrado que pode ser criado
+        const onlyLookupErrors = row.errors.every(err => err.includes('não encontrado'));
+        if (onlyLookupErrors && allCanCreate && autoCreateMissing) {
+          valid++;
+          canAutoCreate++;
+        } else {
+          errors++;
+        }
+      }
+
+      if (row.warnings.length > 0) warnings++;
+    }
+
+    return { valid, errors, warnings, canAutoCreate };
+  };
+
+  const { valid: validRowsCount, errors: errorRowsCount, warnings: warningRowsCount, canAutoCreate: canAutoCreateCount } = getRowCounts();
 
   // Identificar colunas de lookup para mostrar ícones
   const lookupColumns = columns.filter(c => c.type === 'lookup');
+  const hasCreatableLookups = columns.some(c => c.type === 'lookup' && c.lookup?.canCreate);
 
   return (
     <>
@@ -540,6 +678,28 @@ export function ExcelImport({
               </div>
             )}
 
+            {/* Opção de auto-criar registros */}
+            {hasCreatableLookups && previewRows.length > 0 && (
+              <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border">
+                <div className="flex items-center gap-2">
+                  <Plus className="h-4 w-4 text-primary" />
+                  <div>
+                    <Label htmlFor="auto-create" className="text-sm font-medium cursor-pointer">
+                      Criar registros automaticamente
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Cria parceiros, produtos, etc. que não existem no sistema
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  id="auto-create"
+                  checked={autoCreateMissing}
+                  onCheckedChange={setAutoCreateMissing}
+                />
+              </div>
+            )}
+
             {/* Loading */}
             {isValidating && (
               <div className="flex items-center justify-center py-8">
@@ -557,6 +717,12 @@ export function ExcelImport({
                       <span className="flex items-center gap-1 text-sm">
                         <CheckCircle2 className="h-4 w-4 text-success" />
                         <span className="font-medium">{validRowsCount} válidos</span>
+                      </span>
+                    )}
+                    {canAutoCreateCount > 0 && autoCreateMissing && (
+                      <span className="flex items-center gap-1 text-sm text-primary">
+                        <Plus className="h-4 w-4" />
+                        <span className="font-medium">{canAutoCreateCount} serão criados</span>
                       </span>
                     )}
                     {warningRowsCount > 0 && (
@@ -625,6 +791,8 @@ export function ExcelImport({
                                       {row.lookupResolved[col.dbColumn].value}
                                       {row.lookupResolved[col.dbColumn].found ? (
                                         <CheckCircle2 className="h-3 w-3 inline ml-1 text-success" />
+                                      ) : row.lookupResolved[col.dbColumn].canCreate && autoCreateMissing ? (
+                                        <Plus className="h-3 w-3 inline ml-1 text-primary" />
                                       ) : (
                                         <AlertTriangle className="h-3 w-3 inline ml-1 text-warning" />
                                       )}
