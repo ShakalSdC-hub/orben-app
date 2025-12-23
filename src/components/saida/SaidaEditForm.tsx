@@ -58,7 +58,7 @@ export function SaidaEditForm({ saida, onClose }: SaidaEditFormProps) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("saida_itens")
-        .select("*, sublote:sublotes(codigo, tipo_produto:tipos_produto(nome), dono:donos_material(nome))")
+        .select("*, sublote:sublotes!fk_saida_itens_sublote(codigo, tipo_produto:tipos_produto!fk_sublotes_tipo_produto(nome), dono:donos_material!fk_sublotes_dono(nome))")
         .eq("saida_id", saida.id);
       if (error) throw error;
       return data;

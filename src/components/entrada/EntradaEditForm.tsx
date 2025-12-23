@@ -71,7 +71,7 @@ export function EntradaEditForm({ entrada, onClose, readOnly = false }: EntradaE
     queryFn: async () => {
       const { data, error } = await supabase
         .from("sublotes")
-        .select("*, tipo_produto:tipos_produto(nome)")
+        .select("*, tipo_produto:tipos_produto!fk_sublotes_tipo_produto(nome)")
         .eq("entrada_id", entrada.id)
         .gt("numero_volume", 0)
         .order("numero_volume");

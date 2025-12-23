@@ -146,9 +146,9 @@ export default function Beneficiamento() {
         .from("sublotes")
         .select(`
           *,
-          tipo_produto:tipos_produto(id, codigo, nome, perda_beneficiamento_pct),
-          dono:donos_material(nome),
-          entrada:entradas(id, codigo, valor_total, parceiro:parceiros!entradas_parceiro_id_fkey(razao_social, nome_fantasia))
+          tipo_produto:tipos_produto!fk_sublotes_tipo_produto(id, codigo, nome, perda_beneficiamento_pct),
+          dono:donos_material!fk_sublotes_dono(nome),
+          entrada:entradas!fk_sublotes_entrada(id, codigo, valor_total, parceiro:parceiros!fk_entradas_parceiro(razao_social, nome_fantasia))
         `)
         .eq("status", "disponivel")
         .gt("peso_kg", 0)
@@ -1646,7 +1646,7 @@ export default function Beneficiamento() {
                                     // Buscar tipo de produto do primeiro item de entrada
                                     const { data: itensEntrada } = await supabase
                                       .from("beneficiamento_itens_entrada")
-                                      .select("sublote:sublotes(tipo_produto_id)")
+                                      .select("sublote:sublotes!fk_bie_sublote(tipo_produto_id)")
                                       .eq("beneficiamento_id", b.id)
                                       .limit(1);
                                     

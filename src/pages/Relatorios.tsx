@@ -89,9 +89,9 @@ export default function Relatorios() {
         .from("entradas")
         .select(`
           *,
-          parceiro:parceiros!entradas_parceiro_id_fkey(razao_social, nome_fantasia),
-          dono:donos_material(nome),
-          tipo_produto:tipos_produto(nome)
+          parceiro:parceiros!fk_entradas_parceiro(razao_social, nome_fantasia),
+          dono:donos_material!fk_entradas_dono(nome),
+          tipo_produto:tipos_produto!fk_entradas_tipo_produto(nome)
         `)
         .order("data_entrada", { ascending: false });
 
@@ -111,19 +111,17 @@ export default function Relatorios() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("saidas")
-        .select(
-          `
+        .select(`
           *,
-          cliente:clientes(razao_social),
-          itens:saida_itens(
+          cliente:clientes!fk_saidas_cliente(razao_social),
+          itens:saida_itens!fk_saida_itens_saida(
             peso_kg,
-            sublote:sublotes(
+            sublote:sublotes!fk_saida_itens_sublote(
               codigo,
-              dono:donos_material(nome)
+              dono:donos_material!fk_sublotes_dono(nome)
             )
           )
-        `
-        )
+        `)
         .gte("data_saida", dataInicio)
         .lte("data_saida", dataFim)
         .order("data_saida", { ascending: false });
@@ -139,14 +137,12 @@ export default function Relatorios() {
     queryFn: async () => {
       let query = supabase
         .from("sublotes")
-        .select(
-          `
+        .select(`
           *,
-          dono:donos_material(nome),
-          tipo_produto:tipos_produto(nome),
-          local:locais_estoque(nome)
-        `
-        )
+          dono:donos_material!fk_sublotes_dono(nome),
+          tipo_produto:tipos_produto!fk_sublotes_tipo_produto(nome),
+          local:locais_estoque!fk_sublotes_local_estoque(nome)
+        `)
         .eq("status", "disponivel");
 
       if (donoFiltro) {
@@ -165,13 +161,11 @@ export default function Relatorios() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("beneficiamentos")
-        .select(
-          `
+        .select(`
           *,
-          processo:processos(nome),
-          fornecedor_terceiro:parceiros!beneficiamentos_fornecedor_terceiro_id_fkey(razao_social, nome_fantasia)
-        `
-        )
+          processo:processos!fk_beneficiamentos_processo(nome),
+          fornecedor_terceiro:parceiros!fk_beneficiamentos_fornecedor(razao_social, nome_fantasia)
+        `)
         .gte("data_inicio", dataInicio)
         .lte("data_inicio", dataFim)
         .order("data_inicio", { ascending: false });

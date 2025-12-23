@@ -65,8 +65,8 @@ export default function Index() {
         .from("entradas")
         .select(`
           *,
-          parceiro:parceiros!entradas_parceiro_id_fkey(razao_social, nome_fantasia),
-          dono:donos_material(nome)
+          parceiro:parceiros!fk_entradas_parceiro(razao_social, nome_fantasia),
+          dono:donos_material!fk_entradas_dono(nome)
         `)
         .order("data_entrada", { ascending: false })
         .limit(5);

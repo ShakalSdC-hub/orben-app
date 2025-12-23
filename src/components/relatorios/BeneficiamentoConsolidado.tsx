@@ -109,13 +109,13 @@ export function BeneficiamentoConsolidado({ dataInicio, dataFim, donoFiltro }: B
         .from("beneficiamento_itens_entrada")
         .select(`
           *,
-          tipo_produto:tipos_produto(nome),
-          sublote:sublotes(
+          tipo_produto:tipos_produto!fk_bie_tipo_produto(nome),
+          sublote:sublotes!fk_bie_sublote(
             id,
             codigo,
-            tipo_produto:tipos_produto(nome),
-            dono:donos_material(id, nome),
-            entrada:entradas(codigo, valor_total, nota_fiscal)
+            tipo_produto:tipos_produto!fk_sublotes_tipo_produto(nome),
+            dono:donos_material!fk_sublotes_dono(id, nome),
+            entrada:entradas!fk_sublotes_entrada(codigo, valor_total, nota_fiscal)
           )
         `);
       if (error) throw error;
@@ -131,7 +131,7 @@ export function BeneficiamentoConsolidado({ dataInicio, dataFim, donoFiltro }: B
         .from("beneficiamento_entradas")
         .select(`
           *,
-          entrada:entradas(codigo, valor_total, nota_fiscal)
+          entrada:entradas!fk_benef_entradas_entrada(codigo, valor_total, nota_fiscal)
         `);
       if (error) throw error;
       return data;

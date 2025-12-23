@@ -60,11 +60,11 @@ export function FinancialKPIs({ selectedDono }: FinancialKPIsProps) {
         .select(`
           beneficiamento_id,
           peso_kg,
-          sublote:sublotes(
+          sublote:sublotes!fk_bie_sublote(
             dono_id,
             custo_unitario_total,
-            dono:donos_material(id, nome, is_ibrac, taxa_operacao_pct),
-            entrada:entradas(id, valor_total, peso_liquido_kg, tipo_entrada:tipos_entrada(gera_custo))
+            dono:donos_material!fk_sublotes_dono(id, nome, is_ibrac, taxa_operacao_pct),
+            entrada:entradas!fk_sublotes_entrada(id, valor_total, peso_liquido_kg, tipo_entrada:tipos_entrada!fk_entradas_tipo_entrada(gera_custo))
           )
         `);
       if (error) throw error;
@@ -105,7 +105,7 @@ export function FinancialKPIs({ selectedDono }: FinancialKPIsProps) {
         .from("sublotes")
         .select(`
           *,
-          tipo_produto:tipos_produto(nome, codigo)
+          tipo_produto:tipos_produto!fk_sublotes_tipo_produto(nome, codigo)
         `)
         .eq("status", "disponivel");
 
