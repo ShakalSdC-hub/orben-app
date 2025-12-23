@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2, Download, TrendingUp, TrendingDown, DollarSign, Scale, Percent, Factory } from "lucide-react";
+import { Loader2, Download, TrendingUp, TrendingDown, DollarSign, Scale, Percent, Factory, FileText } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, parseISO, getISOWeek } from "date-fns";
@@ -25,6 +25,8 @@ interface BeneficiamentoConsolidadoRow {
   nf_entrada: string;
   peso_entrada_kg: number;
   valor_documento: number;
+  // Tipo Produto
+  tipo_produto_nome: string | null;
   // Custos Financeiros
   taxa_financeira_pct: number;
   custo_financeiro: number;
@@ -76,16 +78,24 @@ export function BeneficiamentoConsolidado({ dataInicio, dataFim, donoFiltro }: B
   const { data: beneficiamentos, isLoading: loadingBenef } = useQuery({
     queryKey: ["beneficiamento-consolidado", dataInicio, dataFim],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("beneficiamentos")
         .select(`
           *,
           processo:processos(nome),
           fornecedor_terceiro:parceiros!beneficiamentos_fornecedor_terceiro_id_fkey(razao_social)
         `)
-        .gte("data_inicio", dataInicio)
-        .lte("data_inicio", dataFim)
         .order("data_inicio", { ascending: true });
+      
+      // Aplicar filtros de data apenas se informados
+      if (dataInicio) {
+        query = query.gte("data_inicio", dataInicio);
+      }
+      if (dataFim) {
+        query = query.lte("data_inicio", dataFim);
+      }
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
@@ -99,9 +109,11 @@ export function BeneficiamentoConsolidado({ dataInicio, dataFim, donoFiltro }: B
         .from("beneficiamento_itens_entrada")
         .select(`
           *,
+          tipo_produto:tipos_produto(nome),
           sublote:sublotes(
             id,
             codigo,
+            tipo_produto:tipos_produto(nome),
             dono:donos_material(id, nome),
             entrada:entradas(codigo, valor_total, nota_fiscal)
           )
@@ -215,6 +227,10 @@ export function BeneficiamentoConsolidado({ dataInicio, dataFim, donoFiltro }: B
       const economiaKg = lmeSemana !== null ? lmeSemana - custoKgVergalhao : null;
       const economiaTotal = economiaKg !== null ? economiaKg * pesoSaida : null;
 
+      // Obter tipo de produto predominante
+      const tipoProdutoNome = itensDoBenef[0]?.tipo_produto?.nome || 
+                              itensDoBenef[0]?.sublote?.tipo_produto?.nome || null;
+
       return {
         id: benef.id,
         codigo: benef.codigo,
@@ -223,6 +239,7 @@ export function BeneficiamentoConsolidado({ dataInicio, dataFim, donoFiltro }: B
         nf_entrada: nfEntrada,
         peso_entrada_kg: pesoEntrada,
         valor_documento: valorDocumento,
+        tipo_produto_nome: tipoProdutoNome,
         taxa_financeira_pct: taxaFinanceiraPct,
         custo_financeiro: custoFinanceiro,
         custo_frete_ida: custoFreteIda,
@@ -287,6 +304,7 @@ export function BeneficiamentoConsolidado({ dataInicio, dataFim, donoFiltro }: B
       "Data": d.data_inicio ? format(parseISO(d.data_inicio), "dd/MM/yyyy") : "",
       "Semana": d.semana,
       "NF Entrada": d.nf_entrada,
+      "Tipo Produto": d.tipo_produto_nome || "",
       "Dono": d.dono_nome || "IBRAC",
       "Peso Entrada (kg)": d.peso_entrada_kg,
       "Valor NF (R$)": d.valor_documento,
@@ -312,6 +330,7 @@ export function BeneficiamentoConsolidado({ dataInicio, dataFim, donoFiltro }: B
       "Data": "",
       "Semana": 0,
       "NF Entrada": "",
+      "Tipo Produto": "",
       "Dono": "",
       "Peso Entrada (kg)": totais.pesoEntrada,
       "Valor NF (R$)": totais.valorDocumentos,
@@ -340,6 +359,80 @@ export function BeneficiamentoConsolidado({ dataInicio, dataFim, donoFiltro }: B
 
   const isLoading = loadingBenef;
 
+  // Função para imprimir/PDF
+  const printReport = () => {
+    if (dadosConsolidados.length === 0) {
+      toast({ title: "Sem dados para imprimir", variant: "destructive" });
+      return;
+    }
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const tableRows = dadosConsolidados.map(d => `
+      <tr>
+        <td>${d.codigo}</td>
+        <td>${d.data_inicio ? format(parseISO(d.data_inicio), "dd/MM/yyyy") : ""}</td>
+        <td>${d.tipo_produto_nome || "-"}</td>
+        <td style="text-align: right">${d.peso_entrada_kg.toFixed(2)}</td>
+        <td style="text-align: right">${formatCurrency(d.custo_total)}</td>
+        <td style="text-align: right">${d.perda_pct.toFixed(2)}%</td>
+        <td style="text-align: right">${d.peso_saida_kg.toFixed(2)}</td>
+        <td style="text-align: right">${formatCurrency(d.custo_kg_vergalhao)}</td>
+        <td style="text-align: right">${d.economia_total !== null ? formatCurrency(d.economia_total) : "-"}</td>
+      </tr>
+    `).join('');
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Beneficiamento Consolidado</title>
+          <style>
+            body { font-family: Arial, sans-serif; font-size: 12px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 6px; }
+            th { background: #f5f5f5; font-weight: bold; }
+            h1 { font-size: 18px; margin-bottom: 5px; }
+            .periodo { color: #666; font-size: 14px; }
+          </style>
+        </head>
+        <body>
+          <h1>Controle de Beneficiamento - Consolidado</h1>
+          <p class="periodo">${dataInicio ? format(parseISO(dataInicio), "dd/MM/yyyy") : "Início"} a ${dataFim ? format(parseISO(dataFim), "dd/MM/yyyy") : "Fim"}</p>
+          <table>
+            <thead>
+              <tr>
+                <th>Código</th>
+                <th>Data</th>
+                <th>Tipo Produto</th>
+                <th style="text-align: right">Peso Ent.</th>
+                <th style="text-align: right">Custo Total</th>
+                <th style="text-align: right">Perda %</th>
+                <th style="text-align: right">Peso Saída</th>
+                <th style="text-align: right">R$/kg</th>
+                <th style="text-align: right">Economia</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${tableRows}
+              <tr style="font-weight: bold; background: #f5f5f5;">
+                <td colspan="3">TOTAL</td>
+                <td style="text-align: right">${totais.pesoEntrada.toFixed(2)}</td>
+                <td style="text-align: right">${formatCurrency(totais.custoTotal)}</td>
+                <td style="text-align: right">${totais.perdaMedia.toFixed(2)}%</td>
+                <td style="text-align: right">${totais.pesoSaida.toFixed(2)}</td>
+                <td style="text-align: right">${formatCurrency(totais.custoMedioKgVergalhao)}</td>
+                <td style="text-align: right">${formatCurrency(totais.economiaTotal)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -349,14 +442,22 @@ export function BeneficiamentoConsolidado({ dataInicio, dataFim, donoFiltro }: B
             Controle de Beneficiamento - Consolidado
           </CardTitle>
           <CardDescription>
-            {format(parseISO(dataInicio), "dd/MM/yyyy")} a {format(parseISO(dataFim), "dd/MM/yyyy")}
+            {dataInicio && dataFim 
+              ? `${format(parseISO(dataInicio), "dd/MM/yyyy")} a ${format(parseISO(dataFim), "dd/MM/yyyy")}`
+              : "Todos os lançamentos"}
             {" · "}Modelo igual ao controle Excel
           </CardDescription>
         </div>
-        <Button variant="outline" onClick={exportToExcel}>
-          <Download className="h-4 w-4 mr-2" />
-          Exportar Excel
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={printReport}>
+            <FileText className="h-4 w-4 mr-2" />
+            PDF
+          </Button>
+          <Button variant="outline" onClick={exportToExcel}>
+            <Download className="h-4 w-4 mr-2" />
+            Excel
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* KPIs principais */}
@@ -422,20 +523,15 @@ export function BeneficiamentoConsolidado({ dataInicio, dataFim, donoFiltro }: B
                 <TableRow className="text-xs">
                   <TableHead className="whitespace-nowrap">NF/Cód</TableHead>
                   <TableHead className="whitespace-nowrap">Data</TableHead>
+                  <TableHead className="whitespace-nowrap">Tipo Produto</TableHead>
                   <TableHead className="whitespace-nowrap text-right">Peso Ent.</TableHead>
                   <TableHead className="whitespace-nowrap text-right">Valor NF</TableHead>
-                  <TableHead className="whitespace-nowrap text-right">Fin. %</TableHead>
-                  <TableHead className="whitespace-nowrap text-right">Custo Fin.</TableHead>
-                  <TableHead className="whitespace-nowrap text-right">Frete Ida</TableHead>
-                  <TableHead className="whitespace-nowrap text-right">MO</TableHead>
-                  <TableHead className="whitespace-nowrap text-right">Frete Volta</TableHead>
                   <TableHead className="whitespace-nowrap text-right">Custo Total</TableHead>
                   <TableHead className="whitespace-nowrap text-right">R$/kg Sucata</TableHead>
                   <TableHead className="whitespace-nowrap text-right">Perda %</TableHead>
                   <TableHead className="whitespace-nowrap text-right">Peso Saída</TableHead>
                   <TableHead className="whitespace-nowrap text-right">R$/kg Vergalhão</TableHead>
                   <TableHead className="whitespace-nowrap text-right">LME Semana</TableHead>
-                  <TableHead className="whitespace-nowrap text-right">Economia/kg</TableHead>
                   <TableHead className="whitespace-nowrap text-right">Economia Total</TableHead>
                 </TableRow>
               </TableHeader>

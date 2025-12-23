@@ -69,11 +69,14 @@ export function DemonstrativoOperacao({ dataInicio, dataFim, donoFiltro }: Demon
   const { data: entradas = [], isLoading: loadingEntradas } = useQuery({
     queryKey: ["demonstrativo-entradas", dataInicio, dataFim],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("entradas")
-        .select(`*, tipo_entrada:tipos_entrada(gera_custo)`)
-        .gte("data_entrada", dataInicio)
-        .lte("data_entrada", dataFim);
+        .select(`*, tipo_entrada:tipos_entrada(gera_custo)`);
+      
+      if (dataInicio) query = query.gte("data_entrada", dataInicio);
+      if (dataFim) query = query.lte("data_entrada", dataFim);
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
@@ -83,7 +86,7 @@ export function DemonstrativoOperacao({ dataInicio, dataFim, donoFiltro }: Demon
   const { data: beneficiamentos = [], isLoading: loadingBenef } = useQuery({
     queryKey: ["demonstrativo-beneficiamentos", dataInicio, dataFim],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("beneficiamentos")
         .select(`
           *,
@@ -94,9 +97,12 @@ export function DemonstrativoOperacao({ dataInicio, dataFim, donoFiltro }: Demon
               entrada:entradas(tipo_entrada:tipos_entrada(gera_custo))
             )
           )
-        `)
-        .gte("data_inicio", dataInicio)
-        .lte("data_inicio", dataFim);
+        `);
+      
+      if (dataInicio) query = query.gte("data_inicio", dataInicio);
+      if (dataFim) query = query.lte("data_inicio", dataFim);
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
@@ -106,7 +112,7 @@ export function DemonstrativoOperacao({ dataInicio, dataFim, donoFiltro }: Demon
   const { data: saidas = [], isLoading: loadingSaidas } = useQuery({
     queryKey: ["demonstrativo-saidas", dataInicio, dataFim],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from("saidas")
         .select(`
           *,
@@ -117,9 +123,12 @@ export function DemonstrativoOperacao({ dataInicio, dataFim, donoFiltro }: Demon
               entrada:entradas(tipo_entrada:tipos_entrada(gera_custo))
             )
           )
-        `)
-        .gte("data_saida", dataInicio)
-        .lte("data_saida", dataFim);
+        `);
+      
+      if (dataInicio) query = query.gte("data_saida", dataInicio);
+      if (dataFim) query = query.lte("data_saida", dataFim);
+      
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
@@ -267,6 +276,75 @@ export function DemonstrativoOperacao({ dataInicio, dataFim, donoFiltro }: Demon
 
   const isLoading = loadingEntradas || loadingBenef || loadingSaidas;
 
+  // Função para imprimir/PDF
+  const printReport = () => {
+    if (dadosPorDono.length === 0) {
+      toast({ title: "Sem dados para imprimir", variant: "destructive" });
+      return;
+    }
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const tableRows = dadosPorDono.map(d => `
+      <tr>
+        <td>${d.dono_nome}${d.is_ibrac ? ' (IBRAC)' : ''}</td>
+        <td>${d.cenario_predominante ? formatCenarioLabel(d.cenario_predominante) : '-'}</td>
+        <td style="text-align: right">${formatWeight(d.peso_entrada_kg)}</td>
+        <td style="text-align: right">${formatCurrency(d.valor_compras)}</td>
+        <td style="text-align: right">${formatCurrency(d.receita_bruta)}</td>
+        <td style="text-align: right">${formatCurrency(d.comissao_ibrac)}</td>
+        <td style="text-align: right; ${d.resultado_liquido >= 0 ? 'color: green' : 'color: red'}">${formatCurrency(d.resultado_liquido)}</td>
+      </tr>
+    `).join('');
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Demonstrativo por Dono</title>
+          <style>
+            body { font-family: Arial, sans-serif; font-size: 12px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 6px; }
+            th { background: #f5f5f5; font-weight: bold; }
+            h1 { font-size: 18px; margin-bottom: 5px; }
+            .periodo { color: #666; font-size: 14px; }
+          </style>
+        </head>
+        <body>
+          <h1>Demonstrativo por Dono</h1>
+          <p class="periodo">${dataInicio ? format(parseISO(dataInicio), "dd/MM/yyyy") : "Início"} a ${dataFim ? format(parseISO(dataFim), "dd/MM/yyyy") : "Fim"}</p>
+          <table>
+            <thead>
+              <tr>
+                <th>Dono</th>
+                <th>Cenário</th>
+                <th style="text-align: right">Peso Entrada</th>
+                <th style="text-align: right">Compras</th>
+                <th style="text-align: right">Receita</th>
+                <th style="text-align: right">Comissão</th>
+                <th style="text-align: right">Resultado</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${tableRows}
+              <tr style="font-weight: bold; background: #f5f5f5;">
+                <td colspan="2">TOTAL</td>
+                <td style="text-align: right">${formatWeight(totais.peso_entrada)}</td>
+                <td style="text-align: right">${formatCurrency(totais.valor_compras)}</td>
+                <td style="text-align: right">${formatCurrency(totais.receita_bruta)}</td>
+                <td style="text-align: right">${formatCurrency(totais.comissao_ibrac)}</td>
+                <td style="text-align: right; ${totais.resultado >= 0 ? 'color: green' : 'color: red'}">${formatCurrency(totais.resultado)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+  };
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -276,14 +354,22 @@ export function DemonstrativoOperacao({ dataInicio, dataFim, donoFiltro }: Demon
             Demonstrativo por Dono
           </CardTitle>
           <CardDescription>
-            {format(parseISO(dataInicio), "dd/MM/yyyy")} a {format(parseISO(dataFim), "dd/MM/yyyy")}
+            {dataInicio && dataFim 
+              ? `${format(parseISO(dataInicio), "dd/MM/yyyy")} a ${format(parseISO(dataFim), "dd/MM/yyyy")}`
+              : "Todos os lançamentos"}
             {" · "}Resultado operacional por dono do material
           </CardDescription>
         </div>
-        <Button variant="outline" onClick={exportToExcel}>
-          <Download className="h-4 w-4 mr-2" />
-          Exportar Excel
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={printReport}>
+            <FileText className="h-4 w-4 mr-2" />
+            PDF
+          </Button>
+          <Button variant="outline" onClick={exportToExcel}>
+            <Download className="h-4 w-4 mr-2" />
+            Excel
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* KPIs principais */}

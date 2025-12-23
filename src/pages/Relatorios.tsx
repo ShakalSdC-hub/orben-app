@@ -30,12 +30,8 @@ import { BeneficiamentoConsolidado } from "@/components/relatorios/Beneficiament
 import { DemonstrativoOperacao } from "@/components/relatorios/DemonstrativoOperacao";
 
 export default function Relatorios() {
-  const [dataInicio, setDataInicio] = useState(
-    format(startOfMonth(new Date()), "yyyy-MM-dd")
-  );
-  const [dataFim, setDataFim] = useState(
-    format(endOfMonth(new Date()), "yyyy-MM-dd")
-  );
+  const [dataInicio, setDataInicio] = useState("");
+  const [dataFim, setDataFim] = useState("");
   const [donoFiltro, setDonoFiltro] = useState<string>("");
   const [tipoFiltro, setTipoFiltro] = useState<string>("");
 
@@ -71,21 +67,17 @@ export default function Relatorios() {
     queryFn: async () => {
       let query = supabase
         .from("entradas")
-        .select(
-          `
+        .select(`
           *,
           parceiro:parceiros!entradas_parceiro_id_fkey(razao_social, nome_fantasia),
           dono:donos_material(nome),
           tipo_produto:tipos_produto(nome)
-        `
-        )
-        .gte("data_entrada", dataInicio)
-        .lte("data_entrada", dataFim)
+        `)
         .order("data_entrada", { ascending: false });
 
-      if (donoFiltro) {
-        query = query.eq("dono_id", donoFiltro);
-      }
+      if (dataInicio) query = query.gte("data_entrada", dataInicio);
+      if (dataFim) query = query.lte("data_entrada", dataFim);
+      if (donoFiltro) query = query.eq("dono_id", donoFiltro);
 
       const { data, error } = await query;
       if (error) throw error;
