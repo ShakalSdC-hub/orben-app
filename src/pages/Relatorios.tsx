@@ -27,6 +27,7 @@ import * as XLSX from "xlsx";
 import { toast } from "@/hooks/use-toast";
 import { GlobalFilters } from "@/components/filters/GlobalFilters";
 import { BeneficiamentoConsolidado } from "@/components/relatorios/BeneficiamentoConsolidado";
+import { DemonstrativoOperacao } from "@/components/relatorios/DemonstrativoOperacao";
 
 export default function Relatorios() {
   const [dataInicio, setDataInicio] = useState(
@@ -304,10 +305,14 @@ export default function Relatorios() {
 
         {/* Tabs de Relatórios */}
         <Tabs defaultValue="consolidado" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="consolidado" className="flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
               Consolidado
+            </TabsTrigger>
+            <TabsTrigger value="demonstrativo" className="flex items-center gap-2">
+              <DollarSign className="h-4 w-4" />
+              Por Dono
             </TabsTrigger>
             <TabsTrigger value="entradas" className="flex items-center gap-2">
               <FileInput className="h-4 w-4" />
@@ -330,6 +335,15 @@ export default function Relatorios() {
           {/* BENEFICIAMENTO CONSOLIDADO */}
           <TabsContent value="consolidado">
             <BeneficiamentoConsolidado
+              dataInicio={dataInicio}
+              dataFim={dataFim}
+              donoFiltro={donoFiltro || undefined}
+            />
+          </TabsContent>
+          
+          {/* DEMONSTRATIVO POR DONO */}
+          <TabsContent value="demonstrativo">
+            <DemonstrativoOperacao
               dataInicio={dataInicio}
               dataFim={dataFim}
               donoFiltro={donoFiltro || undefined}

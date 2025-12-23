@@ -10,7 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { 
   DollarSign, TrendingUp, TrendingDown, Users, AlertTriangle, CheckCircle, 
   Clock, Calculator, ArrowUpRight, ArrowDownRight, Wallet, PiggyBank,
-  BarChart3, Loader2, Check
+  BarChart3, Loader2, Check, Sparkles, HandCoins
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,6 +23,8 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { BeneficiamentoCustoReview } from "@/components/financeiro/BeneficiamentoCustoReview";
+import { ResultadoIBRAC } from "@/components/financeiro/ResultadoIBRAC";
+import { RepassesPendentes } from "@/components/financeiro/RepassesPendentes";
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
@@ -366,13 +368,31 @@ export default function Financeiro() {
         </div>
 
         <Tabs defaultValue="fluxo" className="w-full">
-          <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:grid-cols-none lg:flex">
+          <TabsList className="grid w-full grid-cols-7 lg:w-auto lg:grid-cols-none lg:flex">
             <TabsTrigger value="fluxo">Fluxo de Caixa</TabsTrigger>
+            <TabsTrigger value="resultado" className="flex items-center gap-1">
+              <Sparkles className="h-3 w-3" />
+              Resultado IBRAC
+            </TabsTrigger>
+            <TabsTrigger value="repasses" className="flex items-center gap-1">
+              <HandCoins className="h-3 w-3" />
+              Repasses
+            </TabsTrigger>
             <TabsTrigger value="contas">Contas</TabsTrigger>
             <TabsTrigger value="custos">Custos</TabsTrigger>
             <TabsTrigger value="margens">Margens</TabsTrigger>
             <TabsTrigger value="fiscal">Fiscal</TabsTrigger>
           </TabsList>
+          
+          {/* Resultado IBRAC */}
+          <TabsContent value="resultado" className="mt-6">
+            <ResultadoIBRAC />
+          </TabsContent>
+          
+          {/* Repasses Pendentes */}
+          <TabsContent value="repasses" className="mt-6">
+            <RepassesPendentes />
+          </TabsContent>
 
           {/* Fluxo de Caixa */}
           <TabsContent value="fluxo" className="mt-6 space-y-6">

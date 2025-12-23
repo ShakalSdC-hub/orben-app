@@ -37,6 +37,7 @@ interface BeneficiamentoConsolidadoRow {
   custo_kg_sucata: number;
   // Perda
   perda_pct: number;
+  perda_real_pct: number;
   perda_kg: number;
   // Saída
   peso_saida_kg: number;
@@ -47,6 +48,12 @@ interface BeneficiamentoConsolidadoRow {
   economia_total: number | null;
   // Dono
   dono_nome: string | null;
+  dono_id: string | null;
+  // Cenário e Lucro Perda
+  cenario: 'proprio' | 'industrializacao' | 'operacao_terceiro' | null;
+  lucro_perda_kg: number;
+  lucro_perda_valor: number;
+  is_ibrac: boolean;
 }
 
 function formatWeight(kg: number) {
