@@ -24,6 +24,7 @@ import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "rec
 import { GlobalFilters } from "@/components/filters/GlobalFilters";
 import { LMECharts } from "@/components/dashboard/LMECharts";
 import { FinancialKPIs } from "@/components/dashboard/FinancialKPIs";
+import { formatCurrency, formatWeightCompact as formatWeight, custoMedioPonderado } from "@/lib/kpis";
 
 export default function Index() {
   const [selectedDono, setSelectedDono] = useState<string | null>(null);
@@ -99,9 +100,8 @@ export default function Index() {
   const estoqueDisponiveis = sublotesFiltrados.filter((s) => s.status === "disponivel");
   const estoqueDisponivel = estoqueDisponiveis.reduce((acc, s) => acc + (s.peso_kg || 0), 0);
 
-  const custoMedio = sublotesFiltrados.length
-    ? sublotesFiltrados.reduce((acc, s) => acc + (s.custo_unitario_total || 0), 0) / sublotesFiltrados.length
-    : 0;
+  // CORRIGIDO: Usando custo médio ponderado em vez de média simples
+  const custoMedio = custoMedioPonderado(sublotesFiltrados);
 
   const lmeAtual = ultimaLme?.[0];
   const lmeAnterior = ultimaLme?.[1];
@@ -114,18 +114,6 @@ export default function Index() {
     data: format(new Date(lme.data), "dd/MM"),
     cobre: lme.cobre_brl_kg || 0,
   })) || [];
-
-  const formatWeight = (kg: number) => {
-    if (kg >= 1000) return `${(kg / 1000).toFixed(1)}t`;
-    return `${kg}kg`;
-  };
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(value);
-  };
 
   // Estoque por dono (usando sublotes sem duplicação)
   const estoquePorDono = donos?.map((dono) => {

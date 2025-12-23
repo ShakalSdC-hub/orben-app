@@ -3,18 +3,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Receipt, Truck, Users, Percent, Calculator, Package } from "lucide-react";
+import { formatCurrency, formatWeight } from "@/lib/kpis";
 
 interface CustoCalculoPreviewProps {
   beneficiamentoId: string;
   pesoSaidaReal: number;
-}
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
-}
-
-function formatWeight(kg: number) {
-  return kg >= 1000 ? `${(kg / 1000).toFixed(2)} t` : `${kg.toFixed(2)} kg`;
 }
 
 export function CustoCalculoPreview({ beneficiamentoId, pesoSaidaReal }: CustoCalculoPreviewProps) {

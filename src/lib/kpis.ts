@@ -76,27 +76,67 @@ export interface AcertoFinanceiro {
 }
 
 // Formatadores padronizados
-export function formatCurrency(value: number): string {
+export function formatCurrency(value: number | null | undefined): string {
+  if (value === null || value === undefined) return "—";
   return new Intl.NumberFormat("pt-BR", { 
     style: "currency", 
     currency: "BRL" 
   }).format(value);
 }
 
-export function formatWeight(kg: number): string {
+export function formatWeight(kg: number | null | undefined): string {
+  if (kg === null || kg === undefined) return "—";
   if (kg >= 1000) return `${(kg / 1000).toFixed(2)} t`;
   return `${kg.toFixed(0)} kg`;
 }
 
-export function formatPercent(value: number, decimals: number = 1): string {
+export function formatWeightCompact(kg: number | null | undefined): string {
+  if (kg === null || kg === undefined) return "—";
+  if (kg >= 1000) return `${(kg / 1000).toFixed(1)}t`;
+  return `${kg.toFixed(0)}kg`;
+}
+
+export function formatPercent(value: number | null | undefined, decimals: number = 1): string {
+  if (value === null || value === undefined) return "—";
   return `${value.toFixed(decimals)}%`;
 }
 
-export function formatNumber(value: number, decimals: number = 2): string {
+export function formatNumber(value: number | null | undefined, decimals: number = 2): string {
+  if (value === null || value === undefined) return "—";
   return new Intl.NumberFormat("pt-BR", {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   }).format(value);
+}
+
+// Cálculo de economia vs LME (função simplificada para uso direto)
+export function economiaVsLME(params: {
+  pesoKg: number;
+  custoTotal: number;
+  lmeKg: number;
+}): number {
+  if (!params.lmeKg || params.lmeKg <= 0 || params.pesoKg <= 0) return 0;
+  const custoLME = params.pesoKg * params.lmeKg;
+  return custoLME - params.custoTotal;
+}
+
+// Cálculo de custo médio ponderado
+export function custoMedioPonderado(
+  sublotes: Array<{ peso_kg: number | null; custo_unitario_total: number | null }> | null | undefined
+): number {
+  if (!sublotes || sublotes.length === 0) return 0;
+  
+  let totalPeso = 0;
+  let totalCusto = 0;
+  
+  for (const s of sublotes) {
+    const peso = s.peso_kg || 0;
+    const custo = s.custo_unitario_total || 0;
+    totalPeso += peso;
+    totalCusto += custo * peso;
+  }
+  
+  return totalPeso > 0 ? totalCusto / totalPeso : 0;
 }
 
 // Busca LME mais próximo da data

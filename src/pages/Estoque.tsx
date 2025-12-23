@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { FileSpreadsheet, FileText, Printer } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatWeight, formatCurrency } from "@/lib/kpis";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -279,14 +280,6 @@ export default function Estoque() {
   const sublotesDisponiveis = sublotes?.filter(s => s.status === "disponivel") || [];
   const totalEstoque = sublotesDisponiveis.reduce((acc, s) => acc + (s.peso_kg || 0), 0);
 
-  const formatWeight = (kg: number) => {
-    if (kg >= 1000) return `${(kg / 1000).toFixed(2)}t`;
-    return `${kg.toFixed(0)}kg`;
-  };
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
-  };
 
   // Mapa de sublotes em beneficiamento
   const beneficiamentoMap = new Map<string, { codigo: string; tipo: string; fornecedor?: string }>();

@@ -43,20 +43,13 @@ import { CustoCalculoPreview } from "@/components/beneficiamento/CustoCalculoPre
 import { LucroPerdaPreview } from "@/components/cenarios/LucroPerdaPreview";
 import { useExportReport } from "@/hooks/useExportReport";
 import { ExcelImport } from "@/components/import/ExcelImport";
+import { formatWeight, formatCurrency } from "@/lib/kpis";
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   em_andamento: { label: "Em Andamento", variant: "default" },
   finalizado: { label: "Finalizado", variant: "secondary" },
   cancelado: { label: "Cancelado", variant: "destructive" },
 };
-
-function formatWeight(kg: number) {
-  return kg >= 1000 ? `${(kg / 1000).toFixed(2)} t` : `${kg.toFixed(2)} kg`;
-}
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
-}
 
 interface SublotesSelecionados {
   id: string;

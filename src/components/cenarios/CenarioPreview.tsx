@@ -12,6 +12,7 @@ import {
   getCenarioColor
 } from "@/lib/cenarios-orben";
 import { cn } from "@/lib/utils";
+import { formatCurrency, formatWeight } from "@/lib/kpis";
 
 interface CenarioPreviewProps {
   cenario: CenarioOperacao | null;
@@ -20,14 +21,6 @@ interface CenarioPreviewProps {
   pesoTotal?: number;
   lmeReferencia?: number;
   custoMedio?: number;
-}
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
-}
-
-function formatWeight(kg: number) {
-  return kg >= 1000 ? `${(kg / 1000).toFixed(2)} t` : `${kg.toFixed(2)} kg`;
 }
 
 export function CenarioPreview({ 

@@ -50,20 +50,14 @@ import {
   getCenarioBadgeVariant
 } from "@/lib/cenarios-orben";
 
+import { formatWeight, formatCurrency } from "@/lib/kpis";
+
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   pendente: { label: "Pendente", variant: "outline" },
   processando: { label: "Processando", variant: "default" },
   finalizada: { label: "Finalizada", variant: "secondary" },
   cancelada: { label: "Cancelada", variant: "destructive" },
 };
-
-function formatWeight(kg: number) {
-  return kg >= 1000 ? `${(kg / 1000).toFixed(2)} t` : `${kg.toFixed(2)} kg`;
-}
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
-}
 
 interface SubloteSelecionado {
   id: string;

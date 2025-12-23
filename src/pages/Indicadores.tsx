@@ -14,10 +14,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { format, getISOWeek, startOfMonth, endOfMonth, subMonths, isWithinInterval, parseISO, getISOWeekYear } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useAuth } from "@/contexts/AuthContext";
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
-}
+import { formatCurrency } from "@/lib/kpis";
 
 function VariationCard({ title, current, previous, unit = "R$/kg" }: { title: string; current: number; previous: number; unit?: string }) {
   const variation = previous > 0 ? ((current - previous) / previous) * 100 : 0;

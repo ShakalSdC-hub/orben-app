@@ -26,15 +26,7 @@ import { BeneficiamentoCustoReview } from "@/components/financeiro/Beneficiament
 import { ResultadoIBRAC } from "@/components/financeiro/ResultadoIBRAC";
 import { RepassesPendentes } from "@/components/financeiro/RepassesPendentes";
 import { LMESemanaConfig } from "@/components/financeiro/LMESemanaConfig";
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
-}
-
-function formatWeight(kg: number) {
-  if (kg >= 1000) return `${(kg / 1000).toFixed(2)}t`;
-  return `${kg.toFixed(0)}kg`;
-}
+import { formatCurrency, formatWeight } from "@/lib/kpis";
 
 const CHART_COLORS = {
   primary: "hsl(28, 70%, 45%)",
