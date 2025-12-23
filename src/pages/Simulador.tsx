@@ -130,19 +130,8 @@ export default function Simulador() {
     };
   }).sort((a: any, b: any) => b.key - a.key);
 
-  // Buscar histórico de simulações
-  const { data: historicoSimulacoes } = useQuery({
-    queryKey: ["simulacoes-lme"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("simulacoes_lme")
-        .select("*")
-        .order("data_simulacao", { ascending: false })
-        .limit(10);
-      if (error) throw error;
-      return data;
-    },
-  });
+  // Histórico de simulações removido - tabela não existe mais
+  const historicoSimulacoes: any[] = [];
 
   // Gerar opções de semanas disponíveis (usando médias oficiais)
   const semanasDisponiveis = mediasSemanais.map((m: any) => ({
@@ -288,31 +277,16 @@ export default function Simulador() {
     ));
   };
 
-  // Salvar simulação
+  // Salvar simulação - funcionalidade removida (tabela não existe mais)
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("simulacoes_lme").insert({
-        cobre_usd_t: cobreUsdT,
-        dolar_brl: dolarBrl,
-        fator_imposto: fatorImposto,
-        pct_lme_negociada: pctLmeNegociada,
-        prazo_dias: parcelas[0]?.dias || 40,
-        lme_semana_brl_kg: lmeSemanaBrlKg,
-        preco_com_imposto: precoComImposto,
-        preco_a_vista: precoAVista,
-        preco_a_prazo: totalParcelas,
-        custo_sucata_kg: precoIndustrializado,
-        economia_pct: economiaPct,
-        resultado: valeAPena ? "COMPRAR SUCATA" : "COMPRAR VERGALHÃO",
-        created_by: user?.id,
-      });
-      if (error) throw error;
+      // Tabela simulacoes_lme foi removida
+      toast({ title: "Info", description: "Funcionalidade de salvar simulações será reimplementada." });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["simulacoes-lme"] });
-      toast({ title: "Simulação salva", description: "Registro salvo no histórico." });
+      toast({ title: "Info", description: "Simulação não foi salva - funcionalidade em desenvolvimento." });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast({ title: "Erro", description: error.message, variant: "destructive" });
     },
   });
