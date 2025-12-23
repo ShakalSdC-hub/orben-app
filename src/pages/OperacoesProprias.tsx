@@ -9,7 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Loader2, FileText, Package, Cog, TrendingUp, Pencil, Trash2 } from "lucide-react";
+import { Plus, Loader2, FileText, Package, Cog, TrendingUp, Pencil, Trash2, Download, Upload } from "lucide-react";
+import { DeleteConfirmDialog } from "@/components/ui/DeleteConfirmDialog";
+import { ExcelImportTemplate } from "@/components/import/ExcelImportTemplate";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -31,6 +33,10 @@ export default function OperacoesProprias() {
   const [showEntradaForm, setShowEntradaForm] = useState(false);
   const [showBenefForm, setShowBenefForm] = useState(false);
   const [showSaidaForm, setShowSaidaForm] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  
+  // Delete confirmation state
+  const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; type: string; id: string }>({ open: false, type: "", id: "" });
   
   // Formulários
   const [operacaoForm, setOperacaoForm] = useState({
@@ -184,6 +190,7 @@ export default function OperacoesProprias() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["entradas_c1"] });
       toast({ title: "Entrada excluída!" });
+      setDeleteConfirm({ open: false, type: "", id: "" });
     },
     onError: (error) => toast({ title: "Erro", description: error.message, variant: "destructive" }),
   });
@@ -196,6 +203,7 @@ export default function OperacoesProprias() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["beneficiamentos_c1"] });
       toast({ title: "Beneficiamento excluído!" });
+      setDeleteConfirm({ open: false, type: "", id: "" });
     },
     onError: (error) => toast({ title: "Erro", description: error.message, variant: "destructive" }),
   });
@@ -208,9 +216,16 @@ export default function OperacoesProprias() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["saidas_c1"] });
       toast({ title: "Saída excluída!" });
+      setDeleteConfirm({ open: false, type: "", id: "" });
     },
     onError: (error) => toast({ title: "Erro", description: error.message, variant: "destructive" }),
   });
+
+  const handleDeleteConfirm = () => {
+    if (deleteConfirm.type === "entrada") deleteEntrada.mutate(deleteConfirm.id);
+    else if (deleteConfirm.type === "benef") deleteBenef.mutate(deleteConfirm.id);
+    else if (deleteConfirm.type === "saida") deleteSaida.mutate(deleteConfirm.id);
+  };
 
   // Calcular totais da operação selecionada
   const operacaoSelecionada = operacoes.find(o => o.id === selectedOperacao);
@@ -452,7 +467,12 @@ export default function OperacoesProprias() {
                                   </TableCell>
                                   {canEdit && (
                                     <TableCell>
-                                      <Button variant="ghost" size="icon" onClick={() => deleteEntrada.mutate(e.id)} disabled={e.kg_liquido_disponivel !== e.kg_liquido_total}>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        onClick={() => setDeleteConfirm({ open: true, type: "entrada", id: e.id })} 
+                                        disabled={e.kg_liquido_disponivel !== e.kg_liquido_total}
+                                      >
                                         <Trash2 className="h-4 w-4 text-destructive" />
                                       </Button>
                                     </TableCell>
@@ -505,7 +525,12 @@ export default function OperacoesProprias() {
                                   </TableCell>
                                   {canEdit && (
                                     <TableCell>
-                                      <Button variant="ghost" size="icon" onClick={() => deleteBenef.mutate(b.id)} disabled={b.kg_disponivel !== b.kg_retornado}>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        onClick={() => setDeleteConfirm({ open: true, type: "benef", id: b.id })} 
+                                        disabled={b.kg_disponivel !== b.kg_retornado}
+                                      >
                                         <Trash2 className="h-4 w-4 text-destructive" />
                                       </Button>
                                     </TableCell>
@@ -560,7 +585,7 @@ export default function OperacoesProprias() {
                                   </TableCell>
                                   {canEdit && (
                                     <TableCell>
-                                      <Button variant="ghost" size="icon" onClick={() => deleteSaida.mutate(s.id)}>
+                                      <Button variant="ghost" size="icon" onClick={() => setDeleteConfirm({ open: true, type: "saida", id: s.id })}>
                                         <Trash2 className="h-4 w-4 text-destructive" />
                                       </Button>
                                     </TableCell>
@@ -604,6 +629,13 @@ export default function OperacoesProprias() {
             />
           </>
         )}
+
+        <DeleteConfirmDialog
+          open={deleteConfirm.open}
+          onOpenChange={(open) => setDeleteConfirm({ ...deleteConfirm, open })}
+          onConfirm={handleDeleteConfirm}
+          isLoading={deleteEntrada.isPending || deleteBenef.isPending || deleteSaida.isPending}
+        />
       </div>
     </MainLayout>
   );
