@@ -57,7 +57,7 @@ export default function Financeiro() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("acertos_financeiros")
-        .select(`*, donos_material(nome), parceiros(razao_social, nome_fantasia)`)
+        .select(`*, dono:donos_material!fk_acertos_dono(nome), parceiro:parceiros!fk_acertos_parceiro(razao_social, nome_fantasia)`)
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data;
@@ -108,7 +108,7 @@ export default function Financeiro() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("entradas")
-        .select(`*, parceiro:parceiros!entradas_parceiro_id_fkey(razao_social, nome_fantasia), dono:donos_material(nome)`)
+        .select(`*, parceiro:parceiros!fk_entradas_parceiro(razao_social, nome_fantasia), dono:donos_material!fk_entradas_dono(nome)`)
         .order("data_entrada", { ascending: false })
         .limit(100);
       if (error) throw error;

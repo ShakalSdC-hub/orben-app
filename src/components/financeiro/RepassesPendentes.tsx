@@ -24,8 +24,8 @@ export function RepassesPendentes() {
         .from("acertos_financeiros")
         .select(`
           *,
-          dono:donos_material(id, nome),
-          parceiro:parceiros(razao_social)
+          dono:donos_material!fk_acertos_dono(id, nome),
+          parceiro:parceiros!fk_acertos_parceiro(razao_social)
         `)
         .eq("status", "pendente")
         .in("tipo", ["repasse", "divida"])

@@ -60,7 +60,7 @@ export default function ExtratoDono() {
         .from("entradas")
         .select(`
           *,
-          dono:donos_material(id, nome),
+          dono:donos_material!fk_entradas_dono(id, nome),
           tipo_entrada:tipos_entrada(id, nome, gera_custo),
           tipo_produto:tipos_produto(nome)
         `)
@@ -85,9 +85,9 @@ export default function ExtratoDono() {
         .from("sublotes")
         .select(`
           *,
-          dono:donos_material(id, nome),
+          dono:donos_material!fk_sublotes_dono(id, nome),
           tipo_produto:tipos_produto(nome),
-          entrada:entradas(
+          entrada:entradas!fk_sublotes_entrada(
             id, 
             codigo, 
             valor_unitario,
@@ -124,8 +124,8 @@ export default function ExtratoDono() {
               id,
               codigo,
               dono_id,
-              dono:donos_material(id, nome),
-              entrada:entradas(tipo_entrada:tipos_entrada(gera_custo))
+              dono:donos_material!fk_sublotes_dono(id, nome),
+              entrada:entradas!fk_sublotes_entrada(tipo_entrada:tipos_entrada(gera_custo))
             )
           )
         `)
@@ -142,7 +142,7 @@ export default function ExtratoDono() {
     queryFn: async () => {
       let query = supabase
         .from("acertos_financeiros")
-        .select(`*, dono:donos_material(id, nome)`)
+        .select(`*, dono:donos_material!fk_acertos_dono(id, nome)`)
         .order("created_at", { ascending: false });
       
       if (selectedDono !== "todos") {

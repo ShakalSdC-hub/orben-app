@@ -88,10 +88,10 @@ export function CustoRastreabilidade({ sublote, isOpen, onClose }: CustoRastreab
           sublote:sublotes(
             codigo, 
             custo_unitario_total,
-            dono:donos_material(nome),
-            entrada:entradas(
+            dono:donos_material!fk_sublotes_dono(nome),
+            entrada:entradas!fk_sublotes_entrada(
               codigo,
-              parceiro:parceiros!entradas_parceiro_id_fkey(razao_social)
+              parceiro:parceiros!fk_entradas_parceiro(razao_social)
             )
           ),
           tipo_produto:tipos_produto(nome)

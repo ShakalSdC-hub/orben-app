@@ -93,8 +93,8 @@ export function DemonstrativoOperacao({ dataInicio, dataFim, donoFiltro }: Demon
           itens_entrada:beneficiamento_itens_entrada(
             sublote:sublotes(
               dono_id,
-              dono:donos_material(id, nome, is_ibrac),
-              entrada:entradas(tipo_entrada:tipos_entrada(gera_custo))
+              dono:donos_material!fk_sublotes_dono(id, nome, is_ibrac),
+              entrada:entradas!fk_sublotes_entrada(tipo_entrada:tipos_entrada(gera_custo))
             )
           )
         `);
@@ -119,8 +119,8 @@ export function DemonstrativoOperacao({ dataInicio, dataFim, donoFiltro }: Demon
           itens:saida_itens(
             sublote:sublotes(
               dono_id,
-              dono:donos_material(id, nome, is_ibrac, taxa_operacao_pct),
-              entrada:entradas(tipo_entrada:tipos_entrada(gera_custo))
+              dono:donos_material!fk_sublotes_dono(id, nome, is_ibrac, taxa_operacao_pct),
+              entrada:entradas!fk_sublotes_entrada(tipo_entrada:tipos_entrada(gera_custo))
             )
           )
         `);

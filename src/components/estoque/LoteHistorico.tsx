@@ -151,7 +151,7 @@ export function LoteHistorico({ loteId, loteCodigo }: LoteHistoricoProps) {
             tipo_saida,
             status,
             cliente:clientes(razao_social),
-            transportadora:parceiros(razao_social)
+            transportadora:parceiros!fk_saidas_transportadora(razao_social)
           )
         `)
         .eq("sublote_id", loteId);
