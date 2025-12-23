@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,15 @@ import { RomaneioPrint } from "@/components/romaneio/RomaneioPrint";
 import { GlobalFilters } from "@/components/filters/GlobalFilters";
 import { SaidaEditForm } from "@/components/saida/SaidaEditForm";
 import { useExportReport } from "@/hooks/useExportReport";
+import { CenarioPreview } from "@/components/cenarios/CenarioPreview";
+import { 
+  CenarioOperacao,
+  detectarCenario, 
+  calcularSaida, 
+  CENARIOS_CONFIG,
+  formatCenarioLabel,
+  getCenarioBadgeVariant
+} from "@/lib/cenarios-orben";
 
 const statusConfig: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
   pendente: { label: "Pendente", variant: "outline" },
@@ -60,8 +69,9 @@ interface SubloteSelecionado {
   codigo: string;
   peso_kg: number;
   custo_unitario_total: number;
+  dono_id?: string | null;
   tipo_produto?: { nome: string } | null;
-  dono?: { nome: string } | null;
+  dono?: { nome: string; is_ibrac?: boolean; taxa_operacao_pct?: number } | null;
   entrada?: { 
     codigo: string; 
     valor_unitario: number | null;
@@ -127,7 +137,7 @@ export default function Saida() {
         .select(`
           *,
           tipo_produto:tipos_produto(nome),
-          dono:donos_material(nome),
+          dono:donos_material(id, nome, is_ibrac, taxa_operacao_pct),
           entrada:entradas(codigo, valor_unitario, tipo_entrada:tipos_entrada(id, nome, gera_custo))
         `)
         .eq("status", "disponivel")
@@ -159,6 +169,33 @@ export default function Saida() {
   const clientes = parceiros.filter((p) => p.is_cliente);
   const transportadoras = parceiros.filter((p) => p.is_transportadora);
 
+  // ============================================================
+  // DETECÇÃO AUTOMÁTICA DE CENÁRIO
+  // ============================================================
+  
+  const cenarioDetectado = useMemo<CenarioOperacao | null>(() => {
+    if (selectedLotes.length === 0) return null;
+    
+    const primeiroLote = selectedLotes[0];
+    const geraCusto = primeiroLote.entrada?.tipo_entrada?.gera_custo ?? true;
+    const isIbrac = primeiroLote.dono?.is_ibrac ?? false;
+    const donoId = primeiroLote.dono_id;
+    
+    return detectarCenario({ geraCusto, donoId, isIbrac });
+  }, [selectedLotes]);
+
+  // Taxa de operação do dono (para cenário 3)
+  const taxaOperacaoDono = useMemo(() => {
+    if (selectedLotes.length === 0) return 0;
+    return selectedLotes[0]?.dono?.taxa_operacao_pct ?? 0;
+  }, [selectedLotes]);
+
+  // Nome do dono do material
+  const donoNome = useMemo(() => {
+    if (selectedLotes.length === 0) return null;
+    return selectedLotes[0]?.dono?.nome || 'IBRAC';
+  }, [selectedLotes]);
+
   // Cálculos base
   const pesoTotal = selectedLotes.reduce((acc, l) => acc + l.peso_kg, 0);
   
@@ -188,7 +225,36 @@ export default function Saida() {
   // Para tipos que cobram custos (Retorno Industrialização, etc): usar custo de MO/Beneficiamento
   const custosAutomaticos = tipoSelecionado?.cobra_custos ? custoMOBeneficiamento : 0;
   const custosTotaisCobrados = custoPerda + formData.custos_adicionais + custosAutomaticos;
-  const valorFinal = valorBruto - custosTotaisCobrados;
+
+  // ============================================================
+  // CÁLCULOS POR CENÁRIO USANDO A BIBLIOTECA
+  // ============================================================
+  
+  const calculosSaida = useMemo(() => {
+    if (!cenarioDetectado) return null;
+    
+    return calcularSaida({
+      cenario: cenarioDetectado,
+      pesoTotal,
+      valorUnitario: formData.valor_unitario,
+      custoMOBeneficiamento,
+      custoPerda,
+      custosAdicionais: formData.custos_adicionais,
+      taxaOperacaoPct: taxaOperacaoDono,
+    });
+  }, [cenarioDetectado, pesoTotal, formData.valor_unitario, custoMOBeneficiamento, custoPerda, formData.custos_adicionais, taxaOperacaoDono]);
+
+  // Valores calculados baseados no cenário
+  const valorFinal = calculosSaida?.valorRepasseDono ?? (valorBruto - custosTotaisCobrados);
+  const comissaoIbrac = calculosSaida?.comissaoIbrac ?? 0;
+  const resultadoLiquidoDono = calculosSaida?.resultadoLiquidoDono ?? 0;
+  const lucroIbrac = calculosSaida?.lucroIbrac ?? 0;
+
+  // Custo médio por kg dos lotes selecionados
+  const custoMedioKg = useMemo(() => {
+    if (pesoTotal === 0) return 0;
+    return custoMOBeneficiamento / pesoTotal;
+  }, [custoMOBeneficiamento, pesoTotal]);
 
   // Mapeamento de tipo de entrada para tipo de saída sugerido
   const tipoEntradaToSaidaMap: Record<string, string> = {
@@ -246,7 +312,11 @@ export default function Saida() {
 
       const codigo = `SAI-${format(new Date(), "yyyyMMdd")}-${String(Math.floor(Math.random() * 9999)).padStart(4, "0")}`;
 
-      // Criar saída
+      // Obter dono_id do primeiro lote para acertos financeiros
+      const primeiroLote = selectedLotes[0];
+      const donoId = primeiroLote.dono_id || null;
+
+      // Criar saída com novos campos de cenário
       const { data: saida, error: saidaError } = await supabase
         .from("saidas")
         .insert({
@@ -265,6 +335,10 @@ export default function Saida() {
           motorista: formData.motorista || null,
           placa_veiculo: formData.placa_veiculo || null,
           created_by: user?.id,
+          // Novos campos de cenário
+          cenario_operacao: cenarioDetectado,
+          comissao_ibrac: comissaoIbrac,
+          resultado_liquido_dono: resultadoLiquidoDono,
         })
         .select()
         .single();
@@ -288,13 +362,72 @@ export default function Saida() {
         if (updateError) throw updateError;
       }
 
+      // ============================================================
+      // CRIAR ACERTOS FINANCEIROS BASEADOS NO CENÁRIO
+      // ============================================================
+      
+      if (cenarioDetectado === 'operacao_terceiro' && donoId) {
+        // Cenário 3: Criar acerto para comissão IBRAC e repasse ao dono
+        
+        // Acerto: Receita IBRAC (comissão)
+        if (comissaoIbrac > 0) {
+          await supabase.from("acertos_financeiros").insert({
+            tipo: 'receita',
+            valor: comissaoIbrac,
+            dono_id: null, // Receita da IBRAC, não de um dono específico
+            referencia_tipo: 'saida',
+            referencia_id: saida.id,
+            data_acerto: new Date().toISOString().split('T')[0],
+            observacoes: `Comissão IBRAC (${taxaOperacaoDono}%) - ${codigo}`,
+            status: 'confirmado',
+            created_by: user?.id,
+          });
+        }
+
+        // Acerto: Repasse pendente ao dono
+        if (resultadoLiquidoDono > 0) {
+          await supabase.from("acertos_financeiros").insert({
+            tipo: 'divida', // IBRAC deve ao dono
+            valor: resultadoLiquidoDono,
+            dono_id: donoId,
+            referencia_tipo: 'saida',
+            referencia_id: saida.id,
+            data_acerto: new Date().toISOString().split('T')[0],
+            observacoes: `Repasse resultado operação - ${codigo}`,
+            status: 'pendente',
+            created_by: user?.id,
+          });
+        }
+      } else if (cenarioDetectado === 'industrializacao') {
+        // Cenário 2: Receita IBRAC = custos cobrados do cliente
+        if (custosTotaisCobrados > 0) {
+          await supabase.from("acertos_financeiros").insert({
+            tipo: 'receita',
+            valor: custosTotaisCobrados,
+            dono_id: null,
+            referencia_tipo: 'saida',
+            referencia_id: saida.id,
+            data_acerto: new Date().toISOString().split('T')[0],
+            observacoes: `Receita industrialização (MO + custos) - ${codigo}`,
+            status: 'confirmado',
+            created_by: user?.id,
+          });
+        }
+      }
+      // Cenário 1 (proprio): Não gera acerto financeiro automático, 
+      // pois é consumo interno sem transação com terceiros
+
       return saida;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["saidas"] });
       queryClient.invalidateQueries({ queryKey: ["sublotes_disponiveis_saida"] });
+      queryClient.invalidateQueries({ queryKey: ["acertos_financeiros"] });
       handleClose();
-      toast({ title: "Saída registrada!", description: `${selectedLotes.length} lote(s) vendido(s)` });
+      toast({ 
+        title: "Saída registrada!", 
+        description: `${selectedLotes.length} lote(s) - Cenário: ${cenarioDetectado ? formatCenarioLabel(cenarioDetectado) : 'N/A'}` 
+      });
     },
     onError: (error) => toast({ title: "Erro ao registrar saída", description: error.message, variant: "destructive" }),
   });
@@ -489,20 +622,42 @@ export default function Saida() {
                   </div>
 
                   {selectedLotes.length > 0 && (
-                    <Card className="bg-muted/30">
-                      <CardContent className="pt-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="font-medium">{selectedLotes.length} lote(s) selecionado(s)</p>
-                            <p className="text-2xl font-bold text-primary">{formatWeight(pesoTotal)}</p>
-                            <p className="text-sm text-muted-foreground">Custo MO/Benef: {formatCurrency(custoMOBeneficiamento)}</p>
+                    <div className="space-y-4">
+                      {/* Card resumo dos lotes */}
+                      <Card className="bg-muted/30">
+                        <CardContent className="pt-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium">{selectedLotes.length} lote(s) selecionado(s)</p>
+                                {cenarioDetectado && (
+                                  <Badge variant={getCenarioBadgeVariant(cenarioDetectado)}>
+                                    {formatCenarioLabel(cenarioDetectado)}
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-2xl font-bold text-primary">{formatWeight(pesoTotal)}</p>
+                              <p className="text-sm text-muted-foreground">
+                                Dono: {donoNome} | Custo MO/Benef: {formatCurrency(custoMOBeneficiamento)}
+                              </p>
+                            </div>
+                            <Button variant="outline" size="sm" onClick={() => setSelectedLotes([])}>
+                              <Trash2 className="h-4 w-4 mr-2" />Limpar
+                            </Button>
                           </div>
-                          <Button variant="outline" size="sm" onClick={() => setSelectedLotes([])}>
-                            <Trash2 className="h-4 w-4 mr-2" />Limpar
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
+                        </CardContent>
+                      </Card>
+
+                      {/* Preview do cenário */}
+                      {cenarioDetectado && (
+                        <CenarioPreview 
+                          cenario={cenarioDetectado} 
+                          donoNome={donoNome || undefined}
+                          pesoTotal={pesoTotal}
+                          custoMedio={custoMedioKg}
+                        />
+                      )}
+                    </div>
                   )}
 
                   <Button className="w-full" onClick={() => { sugerirTipoSaida(); setActiveTab("cliente"); }} disabled={selectedLotes.length === 0}>
@@ -566,6 +721,24 @@ export default function Saida() {
 
                 {/* Tab 3: Valores/Custos */}
                 <TabsContent value="custos" className="space-y-4 pt-4">
+                  {/* Banner do cenário detectado */}
+                  {cenarioDetectado && (
+                    <div className={`p-3 rounded-lg border ${
+                      cenarioDetectado === 'proprio' ? 'bg-primary/5 border-primary/30' :
+                      cenarioDetectado === 'industrializacao' ? 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800' :
+                      'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800'
+                    }`}>
+                      <p className="text-sm font-medium flex items-center gap-2">
+                        <Badge variant={getCenarioBadgeVariant(cenarioDetectado)}>
+                          {formatCenarioLabel(cenarioDetectado)}
+                        </Badge>
+                        <span className="text-muted-foreground">
+                          {CENARIOS_CONFIG[cenarioDetectado].descricao}
+                        </span>
+                      </p>
+                    </div>
+                  )}
+
                   <Card>
                     <CardHeader className="pb-3">
                       <CardTitle className="text-base flex items-center gap-2"><DollarSign className="h-4 w-4" />Valores</CardTitle>
@@ -597,36 +770,83 @@ export default function Saida() {
                     </CardContent>
                   </Card>
 
+                  {/* Resumo de cálculo por cenário */}
                   <Card className="border-primary">
                     <CardContent className="pt-4 space-y-2">
                       <div className="flex justify-between">
-                        <span>Valor Bruto:</span>
-                        <span>{formatCurrency(valorBruto)}</span>
+                        <span>Receita Bruta:</span>
+                        <span className="font-medium">{formatCurrency(valorBruto)}</span>
                       </div>
+                      
                       {tipoSelecionado?.cobra_custos && (
                         <>
                           <div className="flex justify-between text-sm text-muted-foreground">
-                            <span>- Perda ({formData.perda_cobrada_pct}%):</span>
+                            <span>(−) Perda ({formData.perda_cobrada_pct}%):</span>
                             <span>{formatCurrency(custoPerda)}</span>
                           </div>
                           <div className="flex justify-between text-sm text-muted-foreground">
-                            <span>- Custos Adicionais:</span>
+                            <span>(−) Custos Adicionais:</span>
                             <span>{formatCurrency(formData.custos_adicionais)}</span>
                           </div>
                           <div className="flex justify-between text-sm font-medium text-amber-600">
-                            <span>- Custo MO/Beneficiamento:</span>
+                            <span>(−) Custo MO/Beneficiamento:</span>
                             <span>{formatCurrency(custosAutomaticos)}</span>
                           </div>
                           <div className="flex justify-between text-sm border-t pt-1 mt-1">
-                            <span className="font-medium">Total Custos Cobrados:</span>
+                            <span className="font-medium">Total Custos:</span>
                             <span className="font-medium">{formatCurrency(custosTotaisCobrados)}</span>
                           </div>
                         </>
                       )}
-                      <div className="flex justify-between font-bold text-lg border-t pt-2 mt-2">
-                        <span>Valor Repasse Dono:</span>
-                        <span className="text-primary">{formatCurrency(valorFinal)}</span>
-                      </div>
+
+                      {/* Comissão IBRAC para cenário 3 */}
+                      {cenarioDetectado === 'operacao_terceiro' && comissaoIbrac > 0 && (
+                        <div className="flex justify-between text-sm font-medium text-amber-600 border-t pt-1 mt-1">
+                          <span>(−) Comissão IBRAC ({taxaOperacaoDono}%):</span>
+                          <span>{formatCurrency(comissaoIbrac)}</span>
+                        </div>
+                      )}
+
+                      <div className="h-px bg-border my-2" />
+
+                      {/* Resultado final baseado no cenário */}
+                      {cenarioDetectado === 'proprio' && (
+                        <div className="flex justify-between font-bold text-lg">
+                          <span>Custo Final IBRAC:</span>
+                          <span className="text-primary">{formatCurrency(custoMOBeneficiamento)}</span>
+                        </div>
+                      )}
+
+                      {cenarioDetectado === 'industrializacao' && (
+                        <>
+                          <div className="flex justify-between font-bold text-lg">
+                            <span>Receita IBRAC (Serviço):</span>
+                            <span className="text-success">{formatCurrency(custosTotaisCobrados)}</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">Material retorna ao cliente. IBRAC reconhece receita pelo serviço.</p>
+                        </>
+                      )}
+
+                      {cenarioDetectado === 'operacao_terceiro' && (
+                        <>
+                          <div className="flex justify-between text-sm">
+                            <span>Lucro IBRAC (Comissão):</span>
+                            <span className="text-success font-medium">{formatCurrency(comissaoIbrac)}</span>
+                          </div>
+                          <div className="flex justify-between font-bold text-lg">
+                            <span>Repasse ao Dono ({donoNome}):</span>
+                            <span className="text-primary">{formatCurrency(resultadoLiquidoDono)}</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">Acerto financeiro será criado automaticamente.</p>
+                        </>
+                      )}
+
+                      {!cenarioDetectado && (
+                        <div className="flex justify-between font-bold text-lg">
+                          <span>Valor Repasse Dono:</span>
+                          <span className="text-primary">{formatCurrency(valorFinal)}</span>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
 
@@ -669,7 +889,14 @@ export default function Saida() {
                   {/* Resumo */}
                   <Card className="bg-muted/30">
                     <CardHeader className="pb-3">
-                      <CardTitle className="text-base">Resumo da Saída</CardTitle>
+                      <CardTitle className="text-base flex items-center gap-2">
+                        Resumo da Saída
+                        {cenarioDetectado && (
+                          <Badge variant={getCenarioBadgeVariant(cenarioDetectado)} className="ml-auto">
+                            {formatCenarioLabel(cenarioDetectado)}
+                          </Badge>
+                        )}
+                      </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2 text-sm">
                       <div className="flex justify-between">
@@ -677,13 +904,35 @@ export default function Saida() {
                         <span className="font-bold">{selectedLotes.length}</span>
                       </div>
                       <div className="flex justify-between">
+                        <span>Dono:</span>
+                        <span className="font-bold">{donoNome}</span>
+                      </div>
+                      <div className="flex justify-between">
                         <span>Peso Total:</span>
                         <span className="font-bold">{formatWeight(pesoTotal)}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span>Valor Total:</span>
-                        <span className="font-bold text-primary">{formatCurrency(valorBruto)}</span>
+                        <span>Valor Bruto:</span>
+                        <span className="font-bold">{formatCurrency(valorBruto)}</span>
                       </div>
+                      {cenarioDetectado === 'operacao_terceiro' && (
+                        <>
+                          <div className="flex justify-between text-amber-600">
+                            <span>Comissão IBRAC:</span>
+                            <span className="font-medium">{formatCurrency(comissaoIbrac)}</span>
+                          </div>
+                          <div className="flex justify-between text-success">
+                            <span>Repasse ao Dono:</span>
+                            <span className="font-bold">{formatCurrency(resultadoLiquidoDono)}</span>
+                          </div>
+                        </>
+                      )}
+                      {cenarioDetectado === 'industrializacao' && (
+                        <div className="flex justify-between text-success">
+                          <span>Receita IBRAC:</span>
+                          <span className="font-bold">{formatCurrency(custosTotaisCobrados)}</span>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 </TabsContent>
