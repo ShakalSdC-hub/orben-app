@@ -1447,6 +1447,71 @@ export type Database = {
           },
         ]
       }
+      simulacoes_lme: {
+        Row: {
+          cobre_usd_t: number
+          created_at: string
+          created_by: string | null
+          custo_sucata_kg: number | null
+          data_simulacao: string
+          dolar_brl: number
+          economia_pct: number | null
+          fator_imposto: number | null
+          id: string
+          lme_semana_brl_kg: number | null
+          pct_lme_negociada: number | null
+          prazo_dias: number | null
+          preco_a_prazo: number | null
+          preco_a_vista: number | null
+          preco_com_imposto: number | null
+          resultado: string | null
+        }
+        Insert: {
+          cobre_usd_t: number
+          created_at?: string
+          created_by?: string | null
+          custo_sucata_kg?: number | null
+          data_simulacao?: string
+          dolar_brl: number
+          economia_pct?: number | null
+          fator_imposto?: number | null
+          id?: string
+          lme_semana_brl_kg?: number | null
+          pct_lme_negociada?: number | null
+          prazo_dias?: number | null
+          preco_a_prazo?: number | null
+          preco_a_vista?: number | null
+          preco_com_imposto?: number | null
+          resultado?: string | null
+        }
+        Update: {
+          cobre_usd_t?: number
+          created_at?: string
+          created_by?: string | null
+          custo_sucata_kg?: number | null
+          data_simulacao?: string
+          dolar_brl?: number
+          economia_pct?: number | null
+          fator_imposto?: number | null
+          id?: string
+          lme_semana_brl_kg?: number | null
+          pct_lme_negociada?: number | null
+          prazo_dias?: number | null
+          preco_a_prazo?: number | null
+          preco_a_vista?: number | null
+          preco_com_imposto?: number | null
+          resultado?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "simulacoes_lme_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tipos_saida: {
         Row: {
           ativo: boolean | null

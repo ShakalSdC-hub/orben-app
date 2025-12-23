@@ -16,15 +16,21 @@ import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
 import { formatWeight, formatCurrency } from "@/lib/kpis";
+import { EntradaC1Form } from "@/components/operacoes/EntradaC1Form";
+import { BeneficiamentoC1Form } from "@/components/operacoes/BeneficiamentoC1Form";
+import { SaidaC1Form } from "@/components/operacoes/SaidaC1Form";
 
 export default function OperacoesProprias() {
   const queryClient = useQueryClient();
   const { user, role } = useAuth();
   const canEdit = role === "admin" || role === "operacao";
   
-  const [activeTab, setActiveTab] = useState("operacoes");
+  const [activeTab, setActiveTab] = useState("entradas");
   const [isNewOperacao, setIsNewOperacao] = useState(false);
   const [selectedOperacao, setSelectedOperacao] = useState<string | null>(null);
+  const [showEntradaForm, setShowEntradaForm] = useState(false);
+  const [showBenefForm, setShowBenefForm] = useState(false);
+  const [showSaidaForm, setShowSaidaForm] = useState(false);
   
   // Formulários
   const [operacaoForm, setOperacaoForm] = useState({
@@ -371,7 +377,7 @@ export default function OperacoesProprias() {
                     <Card>
                       <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle>Entradas de Sucata</CardTitle>
-                        <Button size="sm" disabled={!canEdit}>
+                        <Button size="sm" disabled={!canEdit} onClick={() => setShowEntradaForm(true)}>
                           <Plus className="mr-2 h-4 w-4" /> Nova Entrada
                         </Button>
                       </CardHeader>
@@ -512,6 +518,32 @@ export default function OperacoesProprias() {
             )}
           </div>
         </div>
+
+        {/* Forms */}
+        {selectedOperacao && (
+          <>
+            <EntradaC1Form 
+              open={showEntradaForm} 
+              onOpenChange={setShowEntradaForm} 
+              operacaoId={selectedOperacao}
+              defaultPerdaMel={(operacaoSelecionada?.perda_mel_default || 0.05) * 100}
+              defaultPerdaMista={(operacaoSelecionada?.perda_mista_default || 0.10) * 100}
+            />
+            <BeneficiamentoC1Form 
+              open={showBenefForm} 
+              onOpenChange={setShowBenefForm} 
+              operacaoId={selectedOperacao}
+              kgDisponivel={totaisOperacao.kgDisponivel}
+            />
+            <SaidaC1Form 
+              open={showSaidaForm} 
+              onOpenChange={setShowSaidaForm} 
+              operacaoId={selectedOperacao}
+              kgDisponivel={totaisOperacao.kgDisponivelVenda}
+              benchmarkDefault={operacaoSelecionada?.benchmark_vergalhao_default || 0}
+            />
+          </>
+        )}
       </div>
     </MainLayout>
   );
