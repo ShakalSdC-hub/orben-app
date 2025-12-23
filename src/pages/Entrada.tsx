@@ -237,7 +237,7 @@ export default function Entrada() {
           <div className="flex gap-2">
             <ExcelImport
               title="Importar Entradas"
-              description="Importe entradas de material via planilha Excel. Códigos duplicados serão bloqueados."
+              description="Importe entradas de material via planilha Excel. Códigos duplicados serão bloqueados. Parceiro/Dono são buscados pelo nome."
               templateFilename="template_entradas"
               tableName="entradas"
               codeColumn="codigo"
@@ -249,6 +249,9 @@ export default function Entrada() {
                 { dbColumn: "peso_liquido_kg", excelColumn: "Peso Líquido (kg)", label: "Peso Líquido", required: true, type: "number" },
                 { dbColumn: "peso_nf_kg", excelColumn: "Peso NF (kg)", label: "Peso NF", required: false, type: "number" },
                 { dbColumn: "nota_fiscal", excelColumn: "Nota Fiscal", label: "Nota Fiscal", required: false, type: "string" },
+                { dbColumn: "parceiro_id", excelColumn: "Parceiro", label: "Parceiro", required: false, type: "lookup", lookup: { table: "parceiros", matchColumn: "razao_social", alternativeColumns: ["nome_fantasia"] } },
+                { dbColumn: "dono_id", excelColumn: "Dono", label: "Dono", required: false, type: "lookup", lookup: { table: "donos_material", matchColumn: "nome" } },
+                { dbColumn: "tipo_produto_id", excelColumn: "Tipo Produto", label: "Tipo Produto", required: false, type: "lookup", lookup: { table: "tipos_produto", matchColumn: "nome", alternativeColumns: ["codigo"] } },
                 { dbColumn: "teor_cobre", excelColumn: "Teor Cobre (%)", label: "Teor Cobre", required: false, type: "number" },
                 { dbColumn: "valor_unitario", excelColumn: "Valor Unitário (R$)", label: "Valor Unitário", required: false, type: "number" },
                 { dbColumn: "valor_total", excelColumn: "Valor Total (R$)", label: "Valor Total", required: false, type: "number" },
@@ -258,7 +261,7 @@ export default function Entrada() {
                 { dbColumn: "observacoes", excelColumn: "Observações", label: "Observações", required: false, type: "string" },
               ]}
               sampleData={[
-                { "Código": "ENT-001", "Data Entrada": "01/01/2025", "Tipo Material": "Cobre", "Peso Bruto (kg)": "1050", "Peso Líquido (kg)": "1000", "Peso NF (kg)": "1000", "Nota Fiscal": "12345", "Teor Cobre (%)": "98.5", "Valor Unitário (R$)": "45.00", "Valor Total (R$)": "45000", "Taxa Financeira (%)": "1.8", "Motorista": "João", "Placa Veículo": "ABC-1234", "Observações": "" },
+                { "Código": "ENT-001", "Data Entrada": "01/01/2025", "Tipo Material": "Cobre", "Peso Bruto (kg)": "1050", "Peso Líquido (kg)": "1000", "Peso NF (kg)": "1000", "Nota Fiscal": "12345", "Parceiro": "Nome Fornecedor", "Dono": "IBRAC", "Tipo Produto": "Fio de Cobre", "Teor Cobre (%)": "98.5", "Valor Unitário (R$)": "45.00", "Valor Total (R$)": "45000", "Taxa Financeira (%)": "1.8", "Motorista": "João", "Placa Veículo": "ABC-1234", "Observações": "" },
               ]}
               existingDataQuery={async () => {
                 const { data } = await supabase.from("entradas").select("*").order("data_entrada", { ascending: false });

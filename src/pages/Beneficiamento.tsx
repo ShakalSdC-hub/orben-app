@@ -863,7 +863,7 @@ export default function Beneficiamento() {
           <div className="flex gap-2">
             <ExcelImport
               title="Importar Beneficiamentos"
-              description="Importe beneficiamentos via planilha Excel. Códigos duplicados serão bloqueados."
+              description="Importe beneficiamentos via planilha Excel. Códigos duplicados serão bloqueados. Processo/Fornecedor são buscados pelo nome."
               templateFilename="template_beneficiamentos"
               tableName="beneficiamentos"
               codeColumn="codigo"
@@ -872,6 +872,9 @@ export default function Beneficiamento() {
                 { dbColumn: "data_inicio", excelColumn: "Data Início", label: "Data Início", required: true, type: "date" },
                 { dbColumn: "data_fim", excelColumn: "Data Fim", label: "Data Fim", required: false, type: "date" },
                 { dbColumn: "tipo_beneficiamento", excelColumn: "Tipo", label: "Tipo", required: false, type: "string" },
+                { dbColumn: "processo_id", excelColumn: "Processo", label: "Processo", required: false, type: "lookup", lookup: { table: "processos", matchColumn: "nome" } },
+                { dbColumn: "fornecedor_terceiro_id", excelColumn: "Fornecedor Terceiro", label: "Fornecedor", required: false, type: "lookup", lookup: { table: "parceiros", matchColumn: "razao_social", alternativeColumns: ["nome_fantasia"] } },
+                { dbColumn: "transportadora_id", excelColumn: "Transportadora", label: "Transportadora", required: false, type: "lookup", lookup: { table: "parceiros", matchColumn: "razao_social", alternativeColumns: ["nome_fantasia"] } },
                 { dbColumn: "peso_entrada_kg", excelColumn: "Peso Entrada (kg)", label: "Peso Entrada", required: true, type: "number" },
                 { dbColumn: "peso_saida_kg", excelColumn: "Peso Saída (kg)", label: "Peso Saída", required: false, type: "number" },
                 { dbColumn: "perda_real_pct", excelColumn: "Perda Real (%)", label: "Perda Real", required: false, type: "number" },
@@ -882,10 +885,12 @@ export default function Beneficiamento() {
                 { dbColumn: "custo_mo_ibrac", excelColumn: "Custo MO IBRAC (R$)", label: "MO IBRAC", required: false, type: "number" },
                 { dbColumn: "taxa_financeira_pct", excelColumn: "Taxa Financeira (%)", label: "Taxa Financeira", required: false, type: "number" },
                 { dbColumn: "lme_referencia_kg", excelColumn: "LME Referência (R$/kg)", label: "LME Ref", required: false, type: "number" },
+                { dbColumn: "motorista", excelColumn: "Motorista", label: "Motorista", required: false, type: "string" },
+                { dbColumn: "placa_veiculo", excelColumn: "Placa Veículo", label: "Placa", required: false, type: "string" },
                 { dbColumn: "observacoes", excelColumn: "Observações", label: "Observações", required: false, type: "string" },
               ]}
               sampleData={[
-                { "Código": "BEN-001", "Data Início": "01/01/2025", "Data Fim": "05/01/2025", "Tipo": "interno", "Peso Entrada (kg)": "1000", "Peso Saída (kg)": "950", "Perda Real (%)": "5", "Perda Cobrada (%)": "3", "Custo Frete Ida (R$)": "500", "Custo Frete Volta (R$)": "500", "Custo MO Terceiro (R$)": "0", "Custo MO IBRAC (R$)": "1000", "Taxa Financeira (%)": "1.8", "LME Referência (R$/kg)": "45", "Observações": "" },
+                { "Código": "BEN-001", "Data Início": "01/01/2025", "Data Fim": "05/01/2025", "Tipo": "interno", "Processo": "Granulação", "Fornecedor Terceiro": "", "Transportadora": "", "Peso Entrada (kg)": "1000", "Peso Saída (kg)": "950", "Perda Real (%)": "5", "Perda Cobrada (%)": "3", "Custo Frete Ida (R$)": "500", "Custo Frete Volta (R$)": "500", "Custo MO Terceiro (R$)": "0", "Custo MO IBRAC (R$)": "1000", "Taxa Financeira (%)": "1.8", "LME Referência (R$/kg)": "45", "Motorista": "João", "Placa Veículo": "ABC-1234", "Observações": "" },
               ]}
               existingDataQuery={async () => {
                 const { data } = await supabase.from("beneficiamentos").select("*").order("data_inicio", { ascending: false });

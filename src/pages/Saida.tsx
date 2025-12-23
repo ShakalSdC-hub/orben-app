@@ -511,7 +511,7 @@ export default function Saida() {
           <div className="flex gap-2">
             <ExcelImport
               title="Importar Saídas"
-              description="Importe saídas de material via planilha Excel. Códigos duplicados serão bloqueados."
+              description="Importe saídas de material via planilha Excel. Códigos duplicados serão bloqueados. Cliente é buscado pelo nome."
               templateFilename="template_saidas"
               tableName="saidas"
               codeColumn="codigo"
@@ -520,6 +520,7 @@ export default function Saida() {
                 { dbColumn: "data_saida", excelColumn: "Data Saída", label: "Data", required: true, type: "date" },
                 { dbColumn: "tipo_saida", excelColumn: "Tipo Saída", label: "Tipo", required: true, type: "string" },
                 { dbColumn: "peso_total_kg", excelColumn: "Peso Total (kg)", label: "Peso Total", required: true, type: "number" },
+                { dbColumn: "cliente_id", excelColumn: "Cliente", label: "Cliente", required: false, type: "lookup", lookup: { table: "clientes", matchColumn: "razao_social", alternativeColumns: ["nome_fantasia"] } },
                 { dbColumn: "valor_unitario", excelColumn: "Valor Unitário (R$)", label: "Valor Unitário", required: false, type: "number" },
                 { dbColumn: "valor_total", excelColumn: "Valor Total (R$)", label: "Valor Total", required: false, type: "number" },
                 { dbColumn: "custos_cobrados", excelColumn: "Custos Cobrados (R$)", label: "Custos Cobrados", required: false, type: "number" },
@@ -533,7 +534,7 @@ export default function Saida() {
                 { dbColumn: "observacoes", excelColumn: "Observações", label: "Observações", required: false, type: "string" },
               ]}
               sampleData={[
-                { "Código": "SAI-001", "Data Saída": "01/01/2025", "Tipo Saída": "Venda", "Peso Total (kg)": "1000", "Valor Unitário (R$)": "50", "Valor Total (R$)": "50000", "Custos Cobrados (R$)": "1000", "Repasse Dono (R$)": "49000", "Comissão IBRAC (R$)": "0", "Resultado Líquido (R$)": "49000", "Nota Fiscal": "12345", "Cenário": "proprio", "Motorista": "João", "Placa Veículo": "ABC-1234", "Observações": "" },
+                { "Código": "SAI-001", "Data Saída": "01/01/2025", "Tipo Saída": "Venda", "Peso Total (kg)": "1000", "Cliente": "Nome do Cliente", "Valor Unitário (R$)": "50", "Valor Total (R$)": "50000", "Custos Cobrados (R$)": "1000", "Repasse Dono (R$)": "49000", "Comissão IBRAC (R$)": "0", "Resultado Líquido (R$)": "49000", "Nota Fiscal": "12345", "Cenário": "proprio", "Motorista": "João", "Placa Veículo": "ABC-1234", "Observações": "" },
               ]}
               existingDataQuery={async () => {
                 const { data } = await supabase.from("saidas").select("*").order("data_saida", { ascending: false });
