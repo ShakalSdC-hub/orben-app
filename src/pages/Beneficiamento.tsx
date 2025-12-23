@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -523,7 +524,40 @@ export default function Beneficiamento() {
       }
 
       // Inserir documentos de entrada (para custo financeiro)
-      for (const doc of documentosEntrada) {
+      // Se documentosEntrada veio vazio do useMemo, buscar diretamente do banco
+      let docsParaInserir = documentosEntrada;
+      
+      if (docsParaInserir.length === 0 && selectedLotes.length > 0) {
+        // Buscar entradas diretamente dos sublotes selecionados
+        const subloteIds = selectedLotes.map(l => l.id);
+        const { data: sublotesComEntrada } = await supabase
+          .from("sublotes")
+          .select("id, entrada_id, entrada:entradas(id, codigo, valor_total)")
+          .in("id", subloteIds);
+        
+        // Consolidar por entrada única
+        const entradasMap = new Map<string, DocumentoEntrada>();
+        for (const s of sublotesComEntrada || []) {
+          const entradaData = s.entrada as any;
+          if (!s.entrada_id || !entradaData) continue;
+          
+          if (!entradasMap.has(s.entrada_id)) {
+            entradasMap.set(s.entrada_id, {
+              entrada_id: s.entrada_id,
+              codigo_entrada: entradaData.codigo || "N/A",
+              valor_total: entradaData.valor_total || 0,
+              taxa_financeira_pct: taxaFinanceiraGlobal,
+              taxa_financeira_valor: (entradaData.valor_total || 0) * (taxaFinanceiraGlobal / 100),
+              sublotes_count: 1,
+            });
+          } else {
+            entradasMap.get(s.entrada_id)!.sublotes_count += 1;
+          }
+        }
+        docsParaInserir = Array.from(entradasMap.values());
+      }
+      
+      for (const doc of docsParaInserir) {
         const { error: docError } = await supabase.from("beneficiamento_entradas").insert({
           beneficiamento_id: beneficiamento.id,
           entrada_id: doc.entrada_id,
@@ -1269,6 +1303,19 @@ export default function Beneficiamento() {
 
                 {/* Tab 3: Custos */}
                 <TabsContent value="custos" className="space-y-4 pt-4">
+                  {/* Alerta quando não há documentos fiscais */}
+                  {documentosEntrada.length === 0 && selectedLotes.length > 0 && (
+                    <Alert className="border-warning bg-warning/10">
+                      <AlertTriangle className="h-4 w-4 text-warning" />
+                      <AlertTitle className="text-warning">Atenção: Sem documentos fiscais</AlertTitle>
+                      <AlertDescription className="text-muted-foreground">
+                        Os lotes selecionados não possuem notas fiscais de entrada vinculadas. 
+                        O custo de aquisição pode não ser contabilizado corretamente. 
+                        Verifique se as entradas originais possuem valor total informado.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
                   <Card>
                     <CardHeader className="pb-3">
                       <CardTitle className="text-base flex items-center gap-2"><DollarSign className="h-4 w-4" />Custos de Frete (R$/kg)</CardTitle>
