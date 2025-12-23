@@ -16,6 +16,10 @@ import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
 import { formatWeight, formatCurrency } from "@/lib/kpis";
+import { EntradaTerceirosForm } from "@/components/operacoes/EntradaTerceirosForm";
+import { BeneficiamentoTerceirosForm } from "@/components/operacoes/BeneficiamentoTerceirosForm";
+import { SaidaTerceirosForm } from "@/components/operacoes/SaidaTerceirosForm";
+import { CobrancaTerceirosForm } from "@/components/operacoes/CobrancaTerceirosForm";
 
 export default function OperacoesTerceiros() {
   const queryClient = useQueryClient();
@@ -25,6 +29,10 @@ export default function OperacoesTerceiros() {
   const [activeTab, setActiveTab] = useState("operacoes");
   const [isNewOperacao, setIsNewOperacao] = useState(false);
   const [selectedOperacao, setSelectedOperacao] = useState<string | null>(null);
+  const [showEntradaForm, setShowEntradaForm] = useState(false);
+  const [showBenefForm, setShowBenefForm] = useState(false);
+  const [showSaidaForm, setShowSaidaForm] = useState(false);
+  const [showCobrancaForm, setShowCobrancaForm] = useState(false);
   
   const [operacaoForm, setOperacaoForm] = useState({
     nome: "",
@@ -363,7 +371,7 @@ export default function OperacoesTerceiros() {
                     <Card>
                       <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle>Recebimentos do Cliente</CardTitle>
-                        <Button size="sm" disabled={!canEdit}><Plus className="mr-2 h-4 w-4" /> Novo</Button>
+                        <Button size="sm" disabled={!canEdit} onClick={() => setShowEntradaForm(true)}><Plus className="mr-2 h-4 w-4" /> Novo</Button>
                       </CardHeader>
                       <CardContent>
                         {entradas.length === 0 ? (
@@ -402,7 +410,7 @@ export default function OperacoesTerceiros() {
                     <Card>
                       <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle>Beneficiamentos</CardTitle>
-                        <Button size="sm" disabled={!canEdit || totais.kgDisponivel === 0}><Plus className="mr-2 h-4 w-4" /> Novo</Button>
+                        <Button size="sm" disabled={!canEdit || totais.kgDisponivel === 0} onClick={() => setShowBenefForm(true)}><Plus className="mr-2 h-4 w-4" /> Novo</Button>
                       </CardHeader>
                       <CardContent>
                         {beneficiamentos.length === 0 ? (
@@ -443,7 +451,7 @@ export default function OperacoesTerceiros() {
                     <Card>
                       <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle>Devoluções ao Cliente</CardTitle>
-                        <Button size="sm" disabled={!canEdit || totais.kgDisponivelCliente === 0}><Plus className="mr-2 h-4 w-4" /> Nova</Button>
+                        <Button size="sm" disabled={!canEdit || totais.kgDisponivelCliente === 0} onClick={() => setShowSaidaForm(true)}><Plus className="mr-2 h-4 w-4" /> Nova</Button>
                       </CardHeader>
                       <CardContent>
                         {saidas.length === 0 ? (
@@ -478,7 +486,7 @@ export default function OperacoesTerceiros() {
                     <Card>
                       <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle>Cobranças de Serviço</CardTitle>
-                        <Button size="sm" disabled={!canEdit}><Plus className="mr-2 h-4 w-4" /> Nova</Button>
+                        <Button size="sm" disabled={!canEdit} onClick={() => setShowCobrancaForm(true)}><Plus className="mr-2 h-4 w-4" /> Nova</Button>
                       </CardHeader>
                       <CardContent>
                         {cobrancas.length === 0 ? (
@@ -513,6 +521,34 @@ export default function OperacoesTerceiros() {
             )}
           </div>
         </div>
+
+        {/* Forms */}
+        {selectedOperacao && (
+          <>
+            <EntradaTerceirosForm 
+              open={showEntradaForm} 
+              onOpenChange={setShowEntradaForm} 
+              operacaoId={selectedOperacao}
+            />
+            <BeneficiamentoTerceirosForm 
+              open={showBenefForm} 
+              onOpenChange={setShowBenefForm} 
+              operacaoId={selectedOperacao}
+              kgDisponivel={totais.kgDisponivel}
+            />
+            <SaidaTerceirosForm 
+              open={showSaidaForm} 
+              onOpenChange={setShowSaidaForm} 
+              operacaoId={selectedOperacao}
+              kgDisponivel={totais.kgDisponivelCliente}
+            />
+            <CobrancaTerceirosForm 
+              open={showCobrancaForm} 
+              onOpenChange={setShowCobrancaForm} 
+              operacaoId={selectedOperacao}
+            />
+          </>
+        )}
       </div>
     </MainLayout>
   );
