@@ -21,9 +21,29 @@ import {
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format, startOfMonth, endOfMonth, parseISO } from "date-fns";
+import { format, startOfMonth, endOfMonth, parseISO, isValid } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import * as XLSX from "xlsx";
+
+// Helper para formatar datas com segurança
+const safeFormatDate = (dateStr: string, formatStr: string = "dd/MM/yyyy"): string => {
+  if (!dateStr) return "—";
+  try {
+    const date = parseISO(dateStr);
+    return isValid(date) ? format(date, formatStr, { locale: ptBR }) : "—";
+  } catch {
+    return "—";
+  }
+};
+
+const formatPeriodo = (inicio: string, fim: string): string => {
+  const inicioStr = safeFormatDate(inicio);
+  const fimStr = safeFormatDate(fim);
+  if (inicioStr === "—" && fimStr === "—") return "Selecione o período";
+  if (inicioStr === "—") return `Até ${fimStr}`;
+  if (fimStr === "—") return `A partir de ${inicioStr}`;
+  return `${inicioStr} a ${fimStr}`;
+};
 import { toast } from "@/hooks/use-toast";
 import { GlobalFilters } from "@/components/filters/GlobalFilters";
 import { BeneficiamentoConsolidado } from "@/components/relatorios/BeneficiamentoConsolidado";
@@ -349,8 +369,7 @@ export default function Relatorios() {
                 <div>
                   <CardTitle>Relatório de Entradas</CardTitle>
                   <CardDescription>
-                    {format(parseISO(dataInicio), "dd/MM/yyyy")} a{" "}
-                    {format(parseISO(dataFim), "dd/MM/yyyy")}
+                    {formatPeriodo(dataInicio, dataFim)}
                   </CardDescription>
                 </div>
                 <Button
@@ -454,8 +473,7 @@ export default function Relatorios() {
                 <div>
                   <CardTitle>Relatório de Saídas</CardTitle>
                   <CardDescription>
-                    {format(parseISO(dataInicio), "dd/MM/yyyy")} a{" "}
-                    {format(parseISO(dataFim), "dd/MM/yyyy")}
+                    {formatPeriodo(dataInicio, dataFim)}
                   </CardDescription>
                 </div>
                 <Button
@@ -650,8 +668,7 @@ export default function Relatorios() {
                 <div>
                   <CardTitle>Custos de Beneficiamento</CardTitle>
                   <CardDescription>
-                    {format(parseISO(dataInicio), "dd/MM/yyyy")} a{" "}
-                    {format(parseISO(dataFim), "dd/MM/yyyy")}
+                    {formatPeriodo(dataInicio, dataFim)}
                   </CardDescription>
                 </div>
                 <Button
