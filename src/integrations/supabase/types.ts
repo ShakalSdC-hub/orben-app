@@ -65,6 +65,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "acertos_financeiros_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "acertos_financeiros_dono_id_fkey"
             columns: ["dono_id"]
             isOneToOne: false
@@ -413,6 +420,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "beneficiamentos_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "beneficiamentos_fornecedor_terceiro_id_fkey"
             columns: ["fornecedor_terceiro_id"]
             isOneToOne: false
@@ -636,6 +650,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "entradas_conferente_id_fkey"
+            columns: ["conferente_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "entradas_dono_id_fkey"
             columns: ["dono_id"]
             isOneToOne: false
@@ -787,7 +808,15 @@ export type Database = {
           taxa_financeira_pct?: number
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "lme_semana_config_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       locais_estoque: {
         Row: {
@@ -1261,7 +1290,15 @@ export type Database = {
           resultado?: string | null
           taxa_financeira_pct?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "simulacoes_lme_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sublotes: {
         Row: {
@@ -1493,6 +1530,13 @@ export type Database = {
           valor_acrescimo?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "transferencias_dono_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "transferencias_dono_dono_destino_id_fkey"
             columns: ["dono_destino_id"]
