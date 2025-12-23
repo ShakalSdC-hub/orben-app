@@ -94,7 +94,7 @@ export default function OperacoesIntermediacao() {
       if (!selectedOperacao) return [];
       const { data, error } = await supabase
         .from("vendas_intermediacao")
-        .select(`*, cliente:parceiros!vendas_intermediacao_cliente_venda_id_fkey(razao_social)`)
+        .select(`*, cliente:parceiros!vendas_intermediacao_cliente_id_fkey(razao_social)`)
         .eq("operacao_id", selectedOperacao)
         .eq("is_deleted", false)
         .order("dt", { ascending: false });
