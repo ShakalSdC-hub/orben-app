@@ -397,9 +397,9 @@ export default function Estoque() {
               columns={[
                 { dbColumn: "codigo", excelColumn: "Código", label: "Código", required: true, type: "string", isCodeColumn: true },
                 { dbColumn: "entrada_id", excelColumn: "Entrada", label: "Entrada", required: false, type: "lookup", lookup: { table: "entradas", matchColumn: "codigo" } },
-                { dbColumn: "dono_id", excelColumn: "Dono", label: "Dono", required: false, type: "lookup", lookup: { table: "donos_material", matchColumn: "nome" } },
-                { dbColumn: "tipo_produto_id", excelColumn: "Tipo Produto", label: "Tipo Produto", required: false, type: "lookup", lookup: { table: "tipos_produto", matchColumn: "nome", alternativeColumns: ["codigo"] } },
-                { dbColumn: "local_estoque_id", excelColumn: "Local Estoque", label: "Local", required: false, type: "lookup", lookup: { table: "locais_estoque", matchColumn: "nome" } },
+                { dbColumn: "dono_id", excelColumn: "Dono", label: "Dono", required: false, type: "lookup", lookup: { table: "donos_material", matchColumn: "nome", canCreate: true, createData: (value) => ({ nome: value, ativo: true }) } },
+                { dbColumn: "tipo_produto_id", excelColumn: "Tipo Produto", label: "Tipo Produto", required: false, type: "lookup", lookup: { table: "tipos_produto", matchColumn: "nome", alternativeColumns: ["codigo"], canCreate: true, createData: (value) => ({ nome: value, ativo: true }) } },
+                { dbColumn: "local_estoque_id", excelColumn: "Local Estoque", label: "Local", required: false, type: "lookup", lookup: { table: "locais_estoque", matchColumn: "nome", canCreate: true, createData: (value) => ({ nome: value, tipo: "interno", ativo: true }) } },
                 { dbColumn: "peso_kg", excelColumn: "Peso (kg)", label: "Peso", required: true, type: "number" },
                 { dbColumn: "teor_cobre", excelColumn: "Teor Cobre (%)", label: "Teor Cobre", required: false, type: "number" },
                 { dbColumn: "custo_unitario_total", excelColumn: "Custo Unitário (R$)", label: "Custo Unit.", required: false, type: "number" },
