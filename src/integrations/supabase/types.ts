@@ -672,6 +672,8 @@ export type Database = {
           ticket_num: string | null
           updated_at: string
           valor_ticket_rs: number | null
+          valor_unit_mel_rkg: number | null
+          valor_unit_mista_rkg: number | null
           valor_unit_sucata_rkg: number
         }
         Insert: {
@@ -704,6 +706,8 @@ export type Database = {
           ticket_num?: string | null
           updated_at?: string
           valor_ticket_rs?: number | null
+          valor_unit_mel_rkg?: number | null
+          valor_unit_mista_rkg?: number | null
           valor_unit_sucata_rkg: number
         }
         Update: {
@@ -736,6 +740,8 @@ export type Database = {
           ticket_num?: string | null
           updated_at?: string
           valor_ticket_rs?: number | null
+          valor_unit_mel_rkg?: number | null
+          valor_unit_mista_rkg?: number | null
           valor_unit_sucata_rkg?: number
         }
         Relationships: [
