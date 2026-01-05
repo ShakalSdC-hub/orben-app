@@ -61,12 +61,8 @@ serve(async (req) => {
     // Fallback para o valor spot caso o LME não esteja disponível
     const cobreUsdT = metals.lme_copper || metals.copper || null;
     const aluminioUsdT = metals.lme_aluminum || metals.aluminum || null;
-    const zincoUsdT = metals.lme_zinc || metals.zinc || null;
-    const chumboUsdT = metals.lme_lead || metals.lead || null;
-    const estanhoUsdT = metals.tin || null; // Não existe lme_tin na API
-    const niquelUsdT = metals.lme_nickel || metals.nickel || null;
     
-    console.log("Using LME prices - Cobre:", cobreUsdT, "Alumínio:", aluminioUsdT, "Zinco:", zincoUsdT);
+    console.log("Using LME prices - Cobre:", cobreUsdT, "Alumínio:", aluminioUsdT);
 
     // Get USD/BRL exchange rate (USD -> BRL)
     let dolarBrl = 5.40; // Default fallback
@@ -127,14 +123,11 @@ serve(async (req) => {
       );
     }
 
+    // Apenas colunas que ainda existem na tabela (removidas: chumbo, estanho, niquel, zinco)
     const recordData = {
       data: today,
       cobre_usd_t: cobreUsdT,
       aluminio_usd_t: aluminioUsdT,
-      zinco_usd_t: zincoUsdT,
-      chumbo_usd_t: chumboUsdT,
-      estanho_usd_t: estanhoUsdT,
-      niquel_usd_t: niquelUsdT,
       dolar_brl: dolarBrl,
       is_media_semanal: false,
       fonte: "api",
