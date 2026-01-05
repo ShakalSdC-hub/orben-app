@@ -31,7 +31,8 @@ export function EntradaC1Form({ open, onOpenChange, operacaoId, defaultPerdaMel 
     ticket_mista_kg: 0,
     perda_mel_pct: defaultPerdaMel,
     perda_mista_pct: defaultPerdaMista,
-    valor_unit_sucata_rkg: 0,
+    valor_unit_mel_rkg: 0,
+    valor_unit_mista_rkg: 0,
     moagem_val: 0,
     moagem_mode: "RKG",
     frete_ida_moagem_val: 0,
@@ -55,7 +56,9 @@ export function EntradaC1Form({ open, onOpenChange, operacaoId, defaultPerdaMel 
         ticket_mista_kg: form.ticket_mista_kg,
         perda_mel_pct: form.perda_mel_pct / 100,
         perda_mista_pct: form.perda_mista_pct / 100,
-        valor_unit_sucata_rkg: form.valor_unit_sucata_rkg,
+        valor_unit_mel_rkg: form.valor_unit_mel_rkg,
+        valor_unit_mista_rkg: form.valor_unit_mista_rkg,
+        valor_unit_sucata_rkg: (form.valor_unit_mel_rkg * form.ticket_mel_kg + form.valor_unit_mista_rkg * form.ticket_mista_kg) / (form.ticket_mel_kg + form.ticket_mista_kg) || 0,
         moagem_val: form.moagem_val,
         moagem_mode: form.moagem_mode,
         frete_ida_moagem_val: form.frete_ida_moagem_val,
@@ -147,10 +150,16 @@ export function EntradaC1Form({ open, onOpenChange, operacaoId, defaultPerdaMel 
             </div>
           </div>
 
-          {/* Valor Sucata */}
-          <div>
-            <Label>Valor Unit. Sucata (R$/kg)</Label>
-            <Input type="number" step="0.01" value={form.valor_unit_sucata_rkg} onChange={(e) => setForm({ ...form, valor_unit_sucata_rkg: Number(e.target.value) })} />
+          {/* Valor Sucata por Tipo */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Valor Unit. MEL (R$/kg)</Label>
+              <Input type="number" step="0.01" value={form.valor_unit_mel_rkg} onChange={(e) => setForm({ ...form, valor_unit_mel_rkg: Number(e.target.value) })} />
+            </div>
+            <div>
+              <Label>Valor Unit. Mista (R$/kg)</Label>
+              <Input type="number" step="0.01" value={form.valor_unit_mista_rkg} onChange={(e) => setForm({ ...form, valor_unit_mista_rkg: Number(e.target.value) })} />
+            </div>
           </div>
 
           {/* Custos PRÉ */}
