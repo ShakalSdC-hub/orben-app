@@ -122,7 +122,7 @@ export default function ExtratoDono() {
         .order("created_at", { ascending: false });
       
       if (selectedDono !== "todos") {
-        query = query.eq("dono_id", selectedDono);
+        query = query.eq("parceiro_id", selectedDono);
       }
       
       const { data, error } = await query;
