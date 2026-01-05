@@ -86,14 +86,12 @@ export function formatCurrency(value: number | null | undefined): string {
 
 export function formatWeight(kg: number | null | undefined): string {
   if (kg === null || kg === undefined) return "—";
-  if (kg >= 1000) return `${(kg / 1000).toFixed(2)} t`;
-  return `${kg.toFixed(0)} kg`;
+  return `${kg.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} kg`;
 }
 
 export function formatWeightCompact(kg: number | null | undefined): string {
   if (kg === null || kg === undefined) return "—";
-  if (kg >= 1000) return `${(kg / 1000).toFixed(1)}t`;
-  return `${kg.toFixed(0)}kg`;
+  return `${kg.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}kg`;
 }
 
 export function formatPercent(value: number | null | undefined, decimals: number = 1): string {

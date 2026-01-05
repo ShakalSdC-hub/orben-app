@@ -40,7 +40,7 @@ export function EntradaC1Form({ open, onOpenChange, operacaoId, defaultPerdaMel 
     frete_volta_moagem_val: 0,
     frete_volta_moagem_mode: "RKG",
     financeiro_val: 0,
-    financeiro_mode: "RKG",
+    financeiro_mode: "PCT",
   });
 
   const createMutation = useMutation({
@@ -234,8 +234,8 @@ export function EntradaC1Form({ open, onOpenChange, operacaoId, defaultPerdaMel 
                   <Select value={form.financeiro_mode} onValueChange={(v) => setForm({ ...form, financeiro_mode: v })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="RKG">R$/kg</SelectItem>
-                      <SelectItem value="TOTAL">Total</SelectItem>
+                      <SelectItem value="PCT">%</SelectItem>
+                      <SelectItem value="TOTAL">R$</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

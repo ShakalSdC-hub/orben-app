@@ -30,6 +30,7 @@ export function BeneficiamentoC1Form({ open, onOpenChange, operacaoId, kgDisponi
     frete_ida_mode: "RKG",
     frete_volta_val: 0,
     frete_volta_mode: "RKG",
+    benchmark_vergalhao_rkg: 0,
   });
 
   const createMutation = useMutation({
@@ -45,6 +46,7 @@ export function BeneficiamentoC1Form({ open, onOpenChange, operacaoId, kgDisponi
         frete_ida_mode: form.frete_ida_mode,
         frete_volta_val: form.frete_volta_val,
         frete_volta_mode: form.frete_volta_mode,
+        benchmark_vergalhao_rkg: form.benchmark_vergalhao_rkg || null,
       });
       if (error) throw error;
     },
@@ -144,6 +146,17 @@ export function BeneficiamentoC1Form({ open, onOpenChange, operacaoId, kgDisponi
                 </div>
               </div>
             </div>
+          </div>
+
+          <div>
+            <Label>Benchmark Vergalhão (R$/kg)</Label>
+            <Input 
+              type="number" 
+              step="0.01"
+              value={form.benchmark_vergalhao_rkg} 
+              onChange={(e) => setForm({ ...form, benchmark_vergalhao_rkg: Number(e.target.value) })}
+              placeholder="Preço referência para cálculo de receita"
+            />
           </div>
         </div>
         <DialogFooter>
