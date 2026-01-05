@@ -443,8 +443,10 @@ export default function OperacoesProprias() {
                               <TableRow>
                                 <TableHead>Ticket</TableHead>
                                 <TableHead>Data</TableHead>
-                                <TableHead className="text-right">Kg Ticket</TableHead>
-                                <TableHead className="text-right">Kg Líquido</TableHead>
+                                <TableHead className="text-right">Kg MEL</TableHead>
+                                <TableHead className="text-right">Kg Mista</TableHead>
+                                <TableHead className="text-right">Valor MEL</TableHead>
+                                <TableHead className="text-right">Valor Mista</TableHead>
                                 <TableHead className="text-right">Custo R$/kg</TableHead>
                                 <TableHead className="text-right">Custo Total</TableHead>
                                 <TableHead className="text-right">Saldo</TableHead>
@@ -452,12 +454,17 @@ export default function OperacoesProprias() {
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {entradas.map((e) => (
+                              {entradas.map((e) => {
+                                const valorMel = (e.ticket_mel_kg || 0) * (e.valor_unit_mel_rkg || 0);
+                                const valorMista = (e.ticket_mista_kg || 0) * (e.valor_unit_mista_rkg || 0);
+                                return (
                                 <TableRow key={e.id}>
                                   <TableCell className="font-medium">{e.ticket_num || e.nf_num || "-"}</TableCell>
                                   <TableCell>{format(new Date(e.dt_recebimento || e.created_at), "dd/MM/yy")}</TableCell>
-                                  <TableCell className="text-right">{formatWeight(e.kg_ticket || 0)}</TableCell>
-                                  <TableCell className="text-right">{formatWeight(e.kg_liquido_total || 0)}</TableCell>
+                                  <TableCell className="text-right">{formatWeight(e.ticket_mel_kg || 0)}</TableCell>
+                                  <TableCell className="text-right">{formatWeight(e.ticket_mista_kg || 0)}</TableCell>
+                                  <TableCell className="text-right">{formatCurrency(valorMel)}</TableCell>
+                                  <TableCell className="text-right">{formatCurrency(valorMista)}</TableCell>
                                   <TableCell className="text-right">{formatCurrency(e.custo_unit_pre_rkg || 0)}</TableCell>
                                   <TableCell className="text-right">{formatCurrency(e.custos_pre_total_rs || 0)}</TableCell>
                                   <TableCell className="text-right">
@@ -478,7 +485,7 @@ export default function OperacoesProprias() {
                                     </TableCell>
                                   )}
                                 </TableRow>
-                              ))}
+                              );})}
                             </TableBody>
                           </Table>
                         )}

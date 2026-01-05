@@ -81,6 +81,11 @@ export function EntradaC1Form({ open, onOpenChange, operacaoId, defaultPerdaMel 
   const kgTicket = form.ticket_mel_kg + form.ticket_mista_kg;
   const kgPerda = (form.ticket_mel_kg * form.perda_mel_pct / 100) + (form.ticket_mista_kg * form.perda_mista_pct / 100);
   const kgLiquido = kgTicket - kgPerda;
+  
+  // Valores totais por tipo de sucata
+  const valorTotalMel = form.ticket_mel_kg * form.valor_unit_mel_rkg;
+  const valorTotalMista = form.ticket_mista_kg * form.valor_unit_mista_rkg;
+  const valorTotalSucata = valorTotalMel + valorTotalMista;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -142,11 +147,16 @@ export function EntradaC1Form({ open, onOpenChange, operacaoId, defaultPerdaMel 
           </div>
 
           {/* Resumo */}
-          <div className="p-3 bg-muted rounded-lg">
+          <div className="p-3 bg-muted rounded-lg space-y-2">
             <div className="flex justify-between text-sm">
               <span>Kg Ticket: <strong>{kgTicket.toLocaleString()}</strong></span>
               <span>Perda: <strong>{kgPerda.toLocaleString()} kg</strong></span>
               <span>Kg Líquido: <strong>{kgLiquido.toLocaleString()}</strong></span>
+            </div>
+            <div className="flex justify-between text-sm border-t pt-2">
+              <span>Valor MEL: <strong className="text-primary">{valorTotalMel.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</strong></span>
+              <span>Valor Mista: <strong className="text-primary">{valorTotalMista.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</strong></span>
+              <span>Total Sucata: <strong className="text-primary">{valorTotalSucata.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</strong></span>
             </div>
           </div>
 
