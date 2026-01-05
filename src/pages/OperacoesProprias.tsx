@@ -35,6 +35,11 @@ export default function OperacoesProprias() {
   const [showSaidaForm, setShowSaidaForm] = useState(false);
   const [showImport, setShowImport] = useState(false);
   
+  // Edit state
+  const [editEntrada, setEditEntrada] = useState<any>(null);
+  const [editBenef, setEditBenef] = useState<any>(null);
+  const [editSaida, setEditSaida] = useState<any>(null);
+  
   // Delete confirmation state
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; type: string; id: string }>({ open: false, type: "", id: "" });
   
@@ -473,7 +478,17 @@ export default function OperacoesProprias() {
                                     </Badge>
                                   </TableCell>
                                   {canEdit && (
-                                    <TableCell>
+                                    <TableCell className="flex gap-1">
+                                      <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        onClick={() => {
+                                          setEditEntrada(e);
+                                          setShowEntradaForm(true);
+                                        }}
+                                      >
+                                        <Pencil className="h-4 w-4" />
+                                      </Button>
                                       <Button 
                                         variant="ghost" 
                                         size="icon" 
@@ -531,7 +546,17 @@ export default function OperacoesProprias() {
                                     </Badge>
                                   </TableCell>
                                   {canEdit && (
-                                    <TableCell>
+                                    <TableCell className="flex gap-1">
+                                      <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        onClick={() => {
+                                          setEditBenef(b);
+                                          setShowBenefForm(true);
+                                        }}
+                                      >
+                                        <Pencil className="h-4 w-4" />
+                                      </Button>
                                       <Button 
                                         variant="ghost" 
                                         size="icon" 
@@ -591,7 +616,17 @@ export default function OperacoesProprias() {
                                     </span>
                                   </TableCell>
                                   {canEdit && (
-                                    <TableCell>
+                                    <TableCell className="flex gap-1">
+                                      <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        onClick={() => {
+                                          setEditSaida(s);
+                                          setShowSaidaForm(true);
+                                        }}
+                                      >
+                                        <Pencil className="h-4 w-4" />
+                                      </Button>
                                       <Button variant="ghost" size="icon" onClick={() => setDeleteConfirm({ open: true, type: "saida", id: s.id })}>
                                         <Trash2 className="h-4 w-4 text-destructive" />
                                       </Button>
@@ -616,22 +651,34 @@ export default function OperacoesProprias() {
           <>
             <EntradaC1Form 
               open={showEntradaForm} 
-              onOpenChange={setShowEntradaForm} 
+              onOpenChange={(open) => {
+                setShowEntradaForm(open);
+                if (!open) setEditEntrada(null);
+              }} 
               operacaoId={selectedOperacao}
               defaultPerdaMel={(operacaoSelecionada?.perda_mel_default || 0.05) * 100}
               defaultPerdaMista={(operacaoSelecionada?.perda_mista_default || 0.10) * 100}
+              editData={editEntrada}
             />
             <BeneficiamentoC1Form 
               open={showBenefForm} 
-              onOpenChange={setShowBenefForm} 
+              onOpenChange={(open) => {
+                setShowBenefForm(open);
+                if (!open) setEditBenef(null);
+              }} 
               operacaoId={selectedOperacao}
               kgDisponivel={totaisOperacao.kgDisponivel}
+              editData={editBenef}
             />
             <SaidaC1Form 
               open={showSaidaForm} 
-              onOpenChange={setShowSaidaForm} 
+              onOpenChange={(open) => {
+                setShowSaidaForm(open);
+                if (!open) setEditSaida(null);
+              }} 
               operacaoId={selectedOperacao}
               kgDisponivel={totaisOperacao.kgDisponivelVenda}
+              editData={editSaida}
             />
           </>
         )}

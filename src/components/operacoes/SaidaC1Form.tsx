@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,15 +11,27 @@ import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { Loader2 } from "lucide-react";
 
+interface SaidaC1 {
+  id: string;
+  dt: string;
+  documento?: string | null;
+  tipo_saida: string;
+  kg_saida: number;
+  parceiro_destino_id?: string | null;
+  obs?: string | null;
+}
+
 interface SaidaC1FormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   operacaoId: string;
   kgDisponivel: number;
+  editData?: SaidaC1 | null;
 }
 
-export function SaidaC1Form({ open, onOpenChange, operacaoId, kgDisponivel }: SaidaC1FormProps) {
+export function SaidaC1Form({ open, onOpenChange, operacaoId, kgDisponivel, editData }: SaidaC1FormProps) {
   const queryClient = useQueryClient();
+  const isEditing = !!editData;
   
   const [form, setForm] = useState({
     dt: format(new Date(), "yyyy-MM-dd"),
@@ -29,6 +41,29 @@ export function SaidaC1Form({ open, onOpenChange, operacaoId, kgDisponivel }: Sa
     parceiro_destino_id: "",
     obs: "",
   });
+
+  // Reset form when dialog opens/closes or editData changes
+  useEffect(() => {
+    if (open && editData) {
+      setForm({
+        dt: editData.dt || format(new Date(), "yyyy-MM-dd"),
+        documento: editData.documento || "",
+        tipo_saida: editData.tipo_saida || "VENDA",
+        kg_saida: editData.kg_saida || 0,
+        parceiro_destino_id: editData.parceiro_destino_id || "",
+        obs: editData.obs || "",
+      });
+    } else if (open && !editData) {
+      setForm({
+        dt: format(new Date(), "yyyy-MM-dd"),
+        documento: "",
+        tipo_saida: "VENDA",
+        kg_saida: 0,
+        parceiro_destino_id: "",
+        obs: "",
+      });
+    }
+  }, [open, editData]);
 
   const { data: parceiros = [] } = useQuery({
     queryKey: ["parceiros_clientes"],
@@ -48,9 +83,12 @@ export function SaidaC1Form({ open, onOpenChange, operacaoId, kgDisponivel }: Sa
     },
   });
 
-  const createMutation = useMutation({
+  // Calcular kg máximo disponível para edição (considera o próprio registro)
+  const kgMaximo = isEditing && editData ? kgDisponivel + editData.kg_saida : kgDisponivel;
+
+  const saveMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("saidas_c1").insert({
+      const payload = {
         operacao_id: operacaoId,
         dt: form.dt,
         documento: form.documento || null,
@@ -58,14 +96,21 @@ export function SaidaC1Form({ open, onOpenChange, operacaoId, kgDisponivel }: Sa
         kg_saida: form.kg_saida,
         parceiro_destino_id: form.parceiro_destino_id || null,
         obs: form.obs || null,
-      });
-      if (error) throw error;
+      };
+
+      if (isEditing && editData) {
+        const { error } = await supabase.from("saidas_c1").update(payload).eq("id", editData.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("saidas_c1").insert(payload);
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["saidas_c1"] });
       queryClient.invalidateQueries({ queryKey: ["beneficiamentos_c1"] });
       onOpenChange(false);
-      toast({ title: "Saída registrada!" });
+      toast({ title: isEditing ? "Saída atualizada!" : "Saída registrada!" });
     },
     onError: (error) => toast({ title: "Erro", description: error.message, variant: "destructive" }),
   });
@@ -76,11 +121,11 @@ export function SaidaC1Form({ open, onOpenChange, operacaoId, kgDisponivel }: Sa
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Nova Saída</DialogTitle>
+          <DialogTitle>{isEditing ? "Editar Saída" : "Nova Saída"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div className="p-3 bg-muted rounded-lg text-sm">
-            Vergalhão disponível para saída: <strong>{kgDisponivel.toLocaleString()} kg</strong>
+            Vergalhão disponível para saída: <strong>{kgMaximo.toLocaleString()} kg</strong>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -115,9 +160,9 @@ export function SaidaC1Form({ open, onOpenChange, operacaoId, kgDisponivel }: Sa
               type="number" 
               value={form.kg_saida} 
               onChange={(e) => setForm({ ...form, kg_saida: Number(e.target.value) })}
-              max={kgDisponivel}
+              max={kgMaximo}
             />
-            {form.kg_saida > kgDisponivel && (
+            {form.kg_saida > kgMaximo && (
               <p className="text-xs text-destructive mt-1">Excede o saldo disponível</p>
             )}
           </div>
@@ -144,11 +189,11 @@ export function SaidaC1Form({ open, onOpenChange, operacaoId, kgDisponivel }: Sa
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
           <Button 
-            onClick={() => createMutation.mutate()} 
-            disabled={createMutation.isPending || form.kg_saida <= 0 || form.kg_saida > kgDisponivel || (isVenda && !form.parceiro_destino_id)}
+            onClick={() => saveMutation.mutate()} 
+            disabled={saveMutation.isPending || form.kg_saida <= 0 || form.kg_saida > kgMaximo || (isVenda && !form.parceiro_destino_id)}
           >
-            {createMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Registrar Saída
+            {saveMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isEditing ? "Salvar Alterações" : "Registrar Saída"}
           </Button>
         </DialogFooter>
       </DialogContent>
