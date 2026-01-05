@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,13 +9,22 @@ import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { Loader2 } from "lucide-react";
 
+interface EntradaTerceiros {
+  id: string;
+  dt: string;
+  documento: string | null;
+  kg_recebido: number;
+  valor_ref_rkg: number | null;
+}
+
 interface EntradaTerceirosFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   operacaoId: string;
+  editData?: EntradaTerceiros | null;
 }
 
-export function EntradaTerceirosForm({ open, onOpenChange, operacaoId }: EntradaTerceirosFormProps) {
+export function EntradaTerceirosForm({ open, onOpenChange, operacaoId, editData }: EntradaTerceirosFormProps) {
   const queryClient = useQueryClient();
   
   const [form, setForm] = useState({
@@ -25,22 +34,46 @@ export function EntradaTerceirosForm({ open, onOpenChange, operacaoId }: Entrada
     valor_ref_rkg: 0,
   });
 
-  const createMutation = useMutation({
+  useEffect(() => {
+    if (open) {
+      if (editData) {
+        setForm({
+          dt: editData.dt,
+          documento: editData.documento || "",
+          kg_recebido: editData.kg_recebido,
+          valor_ref_rkg: editData.valor_ref_rkg || 0,
+        });
+      } else {
+        setForm({ dt: format(new Date(), "yyyy-MM-dd"), documento: "", kg_recebido: 0, valor_ref_rkg: 0 });
+      }
+    }
+  }, [open, editData]);
+
+  const saveMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("entradas_terceiros").insert({
-        operacao_id: operacaoId,
-        dt: form.dt,
-        documento: form.documento || null,
-        kg_recebido: form.kg_recebido,
-        valor_ref_rkg: form.valor_ref_rkg || null,
-      });
-      if (error) throw error;
+      if (editData) {
+        const { error } = await supabase.from("entradas_terceiros").update({
+          dt: form.dt,
+          documento: form.documento || null,
+          kg_recebido: form.kg_recebido,
+          valor_ref_rkg: form.valor_ref_rkg || null,
+        }).eq("id", editData.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("entradas_terceiros").insert({
+          operacao_id: operacaoId,
+          dt: form.dt,
+          documento: form.documento || null,
+          kg_recebido: form.kg_recebido,
+          valor_ref_rkg: form.valor_ref_rkg || null,
+        });
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["entradas_terceiros"] });
       onOpenChange(false);
-      setForm({ dt: format(new Date(), "yyyy-MM-dd"), documento: "", kg_recebido: 0, valor_ref_rkg: 0 });
-      toast({ title: "Recebimento registrado!" });
+      toast({ title: editData ? "Recebimento atualizado!" : "Recebimento registrado!" });
     },
     onError: (error) => toast({ title: "Erro", description: error.message, variant: "destructive" }),
   });
@@ -49,7 +82,7 @@ export function EntradaTerceirosForm({ open, onOpenChange, operacaoId }: Entrada
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Novo Recebimento do Cliente</DialogTitle>
+          <DialogTitle>{editData ? "Editar Recebimento" : "Novo Recebimento do Cliente"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -75,9 +108,9 @@ export function EntradaTerceirosForm({ open, onOpenChange, operacaoId }: Entrada
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={() => createMutation.mutate()} disabled={createMutation.isPending || form.kg_recebido <= 0}>
-            {createMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Registrar
+          <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || form.kg_recebido <= 0}>
+            {saveMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {editData ? "Salvar" : "Registrar"}
           </Button>
         </DialogFooter>
       </DialogContent>

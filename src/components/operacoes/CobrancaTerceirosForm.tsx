@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,13 +10,24 @@ import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { Loader2 } from "lucide-react";
 
+interface CobrancaTerceiros {
+  id: string;
+  dt: string;
+  documento: string | null;
+  tipo: string | null;
+  val: number | null;
+  mode: string | null;
+  base_kg_mode: string | null;
+}
+
 interface CobrancaTerceirosFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   operacaoId: string;
+  editData?: CobrancaTerceiros | null;
 }
 
-export function CobrancaTerceirosForm({ open, onOpenChange, operacaoId }: CobrancaTerceirosFormProps) {
+export function CobrancaTerceirosForm({ open, onOpenChange, operacaoId, editData }: CobrancaTerceirosFormProps) {
   const queryClient = useQueryClient();
   
   const [form, setForm] = useState({
@@ -28,24 +39,46 @@ export function CobrancaTerceirosForm({ open, onOpenChange, operacaoId }: Cobran
     base_kg_mode: "DEVOLVIDO",
   });
 
-  const createMutation = useMutation({
+  useEffect(() => {
+    if (open) {
+      if (editData) {
+        setForm({
+          dt: editData.dt,
+          documento: editData.documento || "",
+          tipo: editData.tipo || "MO",
+          val: editData.val || 0,
+          mode: editData.mode || "RKG",
+          base_kg_mode: editData.base_kg_mode || "DEVOLVIDO",
+        });
+      } else {
+        resetForm();
+      }
+    }
+  }, [open, editData]);
+
+  const saveMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("cobrancas_servico_terceiros").insert({
-        operacao_id: operacaoId,
+      const payload = {
         dt: form.dt,
         documento: form.documento || null,
         tipo: form.tipo,
         val: form.val,
         mode: form.mode,
         base_kg_mode: form.base_kg_mode,
-      });
-      if (error) throw error;
+      };
+
+      if (editData) {
+        const { error } = await supabase.from("cobrancas_servico_terceiros").update(payload).eq("id", editData.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("cobrancas_servico_terceiros").insert({ ...payload, operacao_id: operacaoId });
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["cobrancas_terceiros"] });
-      toast({ title: "Cobrança registrada!" });
+      toast({ title: editData ? "Cobrança atualizada!" : "Cobrança registrada!" });
       onOpenChange(false);
-      resetForm();
     },
     onError: (error) => toast({ title: "Erro", description: error.message, variant: "destructive" }),
   });
@@ -65,7 +98,7 @@ export function CobrancaTerceirosForm({ open, onOpenChange, operacaoId }: Cobran
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Nova Cobrança de Serviço</DialogTitle>
+          <DialogTitle>{editData ? "Editar Cobrança" : "Nova Cobrança de Serviço"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -119,9 +152,9 @@ export function CobrancaTerceirosForm({ open, onOpenChange, operacaoId }: Cobran
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={() => createMutation.mutate()} disabled={createMutation.isPending || form.val <= 0}>
-            {createMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Salvar
+          <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || form.val <= 0}>
+            {saveMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {editData ? "Salvar" : "Registrar"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,13 +11,25 @@ import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { Loader2 } from "lucide-react";
 
+interface CustoInterm {
+  id: string;
+  dt: string;
+  categoria: string;
+  documento: string | null;
+  val: number;
+  mode: string | null;
+  base_kg_mode: string | null;
+  obs: string | null;
+}
+
 interface CustoIntermFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   operacaoId: string;
+  editData?: CustoInterm | null;
 }
 
-export function CustoIntermForm({ open, onOpenChange, operacaoId }: CustoIntermFormProps) {
+export function CustoIntermForm({ open, onOpenChange, operacaoId, editData }: CustoIntermFormProps) {
   const queryClient = useQueryClient();
   
   const [form, setForm] = useState({
@@ -30,10 +42,27 @@ export function CustoIntermForm({ open, onOpenChange, operacaoId }: CustoIntermF
     obs: "",
   });
 
-  const createMutation = useMutation({
+  useEffect(() => {
+    if (open) {
+      if (editData) {
+        setForm({
+          dt: editData.dt,
+          categoria: editData.categoria,
+          documento: editData.documento || "",
+          val: editData.val,
+          mode: editData.mode || "TOTAL",
+          base_kg_mode: editData.base_kg_mode || "COMPRADO",
+          obs: editData.obs || "",
+        });
+      } else {
+        setForm({ dt: format(new Date(), "yyyy-MM-dd"), categoria: "OUTROS", documento: "", val: 0, mode: "TOTAL", base_kg_mode: "COMPRADO", obs: "" });
+      }
+    }
+  }, [open, editData]);
+
+  const saveMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("custos_intermediacao").insert({
-        operacao_id: operacaoId,
+      const payload = {
         dt: form.dt,
         categoria: form.categoria,
         documento: form.documento || null,
@@ -41,14 +70,20 @@ export function CustoIntermForm({ open, onOpenChange, operacaoId }: CustoIntermF
         mode: form.mode,
         base_kg_mode: form.base_kg_mode,
         obs: form.obs || null,
-      });
-      if (error) throw error;
+      };
+
+      if (editData) {
+        const { error } = await supabase.from("custos_intermediacao").update(payload).eq("id", editData.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("custos_intermediacao").insert({ ...payload, operacao_id: operacaoId });
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["custos_intermediacao"] });
       onOpenChange(false);
-      setForm({ dt: format(new Date(), "yyyy-MM-dd"), categoria: "OUTROS", documento: "", val: 0, mode: "TOTAL", base_kg_mode: "COMPRADO", obs: "" });
-      toast({ title: "Custo registrado!" });
+      toast({ title: editData ? "Custo atualizado!" : "Custo registrado!" });
     },
     onError: (error) => toast({ title: "Erro", description: error.message, variant: "destructive" }),
   });
@@ -57,7 +92,7 @@ export function CustoIntermForm({ open, onOpenChange, operacaoId }: CustoIntermF
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Novo Custo da Operação</DialogTitle>
+          <DialogTitle>{editData ? "Editar Custo" : "Novo Custo da Operação"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
@@ -123,9 +158,9 @@ export function CustoIntermForm({ open, onOpenChange, operacaoId }: CustoIntermF
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={() => createMutation.mutate()} disabled={createMutation.isPending || form.val <= 0}>
-            {createMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Registrar
+          <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || form.val <= 0}>
+            {saveMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {editData ? "Salvar" : "Registrar"}
           </Button>
         </DialogFooter>
       </DialogContent>
