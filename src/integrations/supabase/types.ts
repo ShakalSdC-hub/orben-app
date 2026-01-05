@@ -240,6 +240,7 @@ export type Database = {
       }
       beneficiamentos_c1: {
         Row: {
+          benchmark_vergalhao_rkg: number | null
           created_at: string
           custo_pre_alocado_rs: number | null
           custo_real_rkg: number | null
@@ -261,6 +262,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          benchmark_vergalhao_rkg?: number | null
           created_at?: string
           custo_pre_alocado_rs?: number | null
           custo_real_rkg?: number | null
@@ -282,6 +284,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          benchmark_vergalhao_rkg?: number | null
           created_at?: string
           custo_pre_alocado_rs?: number | null
           custo_real_rkg?: number | null

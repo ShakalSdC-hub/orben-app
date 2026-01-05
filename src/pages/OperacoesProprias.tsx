@@ -632,7 +632,6 @@ export default function OperacoesProprias() {
               onOpenChange={setShowSaidaForm} 
               operacaoId={selectedOperacao}
               kgDisponivel={totaisOperacao.kgDisponivelVenda}
-              benchmarkDefault={operacaoSelecionada?.benchmark_vergalhao_default || 0}
             />
           </>
         )}

@@ -16,10 +16,9 @@ interface SaidaC1FormProps {
   onOpenChange: (open: boolean) => void;
   operacaoId: string;
   kgDisponivel: number;
-  benchmarkDefault?: number;
 }
 
-export function SaidaC1Form({ open, onOpenChange, operacaoId, kgDisponivel, benchmarkDefault = 0 }: SaidaC1FormProps) {
+export function SaidaC1Form({ open, onOpenChange, operacaoId, kgDisponivel }: SaidaC1FormProps) {
   const queryClient = useQueryClient();
   
   const [form, setForm] = useState({
@@ -28,7 +27,6 @@ export function SaidaC1Form({ open, onOpenChange, operacaoId, kgDisponivel, benc
     tipo_saida: "VENDA",
     kg_saida: 0,
     parceiro_destino_id: "",
-    benchmark_vergalhao_rkg: benchmarkDefault,
     obs: "",
   });
 
@@ -59,7 +57,6 @@ export function SaidaC1Form({ open, onOpenChange, operacaoId, kgDisponivel, benc
         tipo_saida: form.tipo_saida,
         kg_saida: form.kg_saida,
         parceiro_destino_id: form.parceiro_destino_id || null,
-        benchmark_vergalhao_rkg: form.benchmark_vergalhao_rkg || null,
         obs: form.obs || null,
       });
       if (error) throw error;
@@ -74,7 +71,6 @@ export function SaidaC1Form({ open, onOpenChange, operacaoId, kgDisponivel, benc
   });
 
   const isVenda = form.tipo_saida === "VENDA";
-  const receitaSimulada = form.kg_saida * form.benchmark_vergalhao_rkg;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -127,33 +123,17 @@ export function SaidaC1Form({ open, onOpenChange, operacaoId, kgDisponivel, benc
           </div>
 
           {isVenda && (
-            <>
-              <div>
-                <Label>Cliente</Label>
-                <Select value={form.parceiro_destino_id} onValueChange={(v) => setForm({ ...form, parceiro_destino_id: v })}>
-                  <SelectTrigger><SelectValue placeholder="Selecione o cliente..." /></SelectTrigger>
-                  <SelectContent>
-                    {parceiros.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>{p.nome_fantasia || p.razao_social}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Benchmark Vergalhão (R$/kg)</Label>
-                <Input 
-                  type="number" 
-                  step="0.01"
-                  value={form.benchmark_vergalhao_rkg} 
-                  onChange={(e) => setForm({ ...form, benchmark_vergalhao_rkg: Number(e.target.value) })}
-                />
-                {receitaSimulada > 0 && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Receita simulada: R$ {receitaSimulada.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-                  </p>
-                )}
-              </div>
-            </>
+            <div>
+              <Label>Cliente</Label>
+              <Select value={form.parceiro_destino_id} onValueChange={(v) => setForm({ ...form, parceiro_destino_id: v })}>
+                <SelectTrigger><SelectValue placeholder="Selecione o cliente..." /></SelectTrigger>
+                <SelectContent>
+                  {parceiros.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>{p.nome_fantasia || p.razao_social}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           )}
 
           <div>
