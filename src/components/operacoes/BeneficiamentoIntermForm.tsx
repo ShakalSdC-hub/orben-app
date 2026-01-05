@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,14 +10,28 @@ import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { Loader2 } from "lucide-react";
 
+interface BeneficiamentoInterm {
+  id: string;
+  dt: string;
+  documento: string | null;
+  kg_retornado: number;
+  mo_benef_val: number | null;
+  mo_benef_mode: string | null;
+  frete_ida_val: number | null;
+  frete_ida_mode: string | null;
+  frete_volta_val: number | null;
+  frete_volta_mode: string | null;
+}
+
 interface BeneficiamentoIntermFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   operacaoId: string;
   kgDisponivel: number;
+  editData?: BeneficiamentoInterm | null;
 }
 
-export function BeneficiamentoIntermForm({ open, onOpenChange, operacaoId, kgDisponivel }: BeneficiamentoIntermFormProps) {
+export function BeneficiamentoIntermForm({ open, onOpenChange, operacaoId, kgDisponivel, editData }: BeneficiamentoIntermFormProps) {
   const queryClient = useQueryClient();
   
   const [form, setForm] = useState({
@@ -32,10 +46,41 @@ export function BeneficiamentoIntermForm({ open, onOpenChange, operacaoId, kgDis
     frete_volta_mode: "TOTAL",
   });
 
-  const createMutation = useMutation({
+  useEffect(() => {
+    if (open) {
+      if (editData) {
+        setForm({
+          dt: editData.dt,
+          documento: editData.documento || "",
+          kg_retornado: editData.kg_retornado,
+          mo_benef_val: editData.mo_benef_val || 0,
+          mo_benef_mode: editData.mo_benef_mode || "TOTAL",
+          frete_ida_val: editData.frete_ida_val || 0,
+          frete_ida_mode: editData.frete_ida_mode || "TOTAL",
+          frete_volta_val: editData.frete_volta_val || 0,
+          frete_volta_mode: editData.frete_volta_mode || "TOTAL",
+        });
+      } else {
+        setForm({
+          dt: format(new Date(), "yyyy-MM-dd"),
+          documento: "",
+          kg_retornado: 0,
+          mo_benef_val: 0,
+          mo_benef_mode: "TOTAL",
+          frete_ida_val: 0,
+          frete_ida_mode: "TOTAL",
+          frete_volta_val: 0,
+          frete_volta_mode: "TOTAL",
+        });
+      }
+    }
+  }, [open, editData]);
+
+  const kgMaximo = editData ? kgDisponivel + editData.kg_retornado : kgDisponivel;
+
+  const saveMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("beneficiamentos_intermediacao").insert({
-        operacao_id: operacaoId,
+      const payload = {
         dt: form.dt,
         documento: form.documento || null,
         kg_retornado: form.kg_retornado,
@@ -45,14 +90,21 @@ export function BeneficiamentoIntermForm({ open, onOpenChange, operacaoId, kgDis
         frete_ida_mode: form.frete_ida_mode,
         frete_volta_val: form.frete_volta_val,
         frete_volta_mode: form.frete_volta_mode,
-      });
-      if (error) throw error;
+      };
+
+      if (editData) {
+        const { error } = await supabase.from("beneficiamentos_intermediacao").update(payload).eq("id", editData.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("beneficiamentos_intermediacao").insert({ ...payload, operacao_id: operacaoId });
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["beneficiamentos_intermediacao"] });
       queryClient.invalidateQueries({ queryKey: ["compras_intermediacao"] });
       onOpenChange(false);
-      toast({ title: "Beneficiamento registrado!" });
+      toast({ title: editData ? "Beneficiamento atualizado!" : "Beneficiamento registrado!" });
     },
     onError: (error) => toast({ title: "Erro", description: error.message, variant: "destructive" }),
   });
@@ -61,11 +113,11 @@ export function BeneficiamentoIntermForm({ open, onOpenChange, operacaoId, kgDis
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Novo Beneficiamento</DialogTitle>
+          <DialogTitle>{editData ? "Editar Beneficiamento" : "Novo Beneficiamento"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div className="p-3 bg-muted rounded-lg text-sm">
-            Material disponível: <strong>{kgDisponivel.toLocaleString()} kg</strong>
+            Material disponível: <strong>{kgMaximo.toLocaleString()} kg</strong>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -85,9 +137,9 @@ export function BeneficiamentoIntermForm({ open, onOpenChange, operacaoId, kgDis
               type="number" 
               value={form.kg_retornado} 
               onChange={(e) => setForm({ ...form, kg_retornado: Number(e.target.value) })}
-              max={kgDisponivel}
+              max={kgMaximo}
             />
-            {form.kg_retornado > kgDisponivel && (
+            {form.kg_retornado > kgMaximo && (
               <p className="text-xs text-destructive mt-1">Excede disponível</p>
             )}
           </div>
@@ -149,11 +201,11 @@ export function BeneficiamentoIntermForm({ open, onOpenChange, operacaoId, kgDis
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
           <Button 
-            onClick={() => createMutation.mutate()} 
-            disabled={createMutation.isPending || form.kg_retornado <= 0 || form.kg_retornado > kgDisponivel}
+            onClick={() => saveMutation.mutate()} 
+            disabled={saveMutation.isPending || form.kg_retornado <= 0 || form.kg_retornado > kgMaximo}
           >
-            {createMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Registrar
+            {saveMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {editData ? "Salvar" : "Registrar"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,14 +10,30 @@ import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { Loader2 } from "lucide-react";
 
+interface BeneficiamentoTerceiros {
+  id: string;
+  dt: string;
+  documento: string | null;
+  kg_retornado: number;
+  mo_terceiro_val: number | null;
+  mo_terceiro_mode: string | null;
+  mo_ibrac_val: number | null;
+  mo_ibrac_mode: string | null;
+  frete_ida_val: number | null;
+  frete_ida_mode: string | null;
+  frete_volta_val: number | null;
+  frete_volta_mode: string | null;
+}
+
 interface BeneficiamentoTerceirosFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   operacaoId: string;
   kgDisponivel: number;
+  editData?: BeneficiamentoTerceiros | null;
 }
 
-export function BeneficiamentoTerceirosForm({ open, onOpenChange, operacaoId, kgDisponivel }: BeneficiamentoTerceirosFormProps) {
+export function BeneficiamentoTerceirosForm({ open, onOpenChange, operacaoId, kgDisponivel, editData }: BeneficiamentoTerceirosFormProps) {
   const queryClient = useQueryClient();
   
   const [form, setForm] = useState({
@@ -34,13 +50,36 @@ export function BeneficiamentoTerceirosForm({ open, onOpenChange, operacaoId, kg
     frete_volta_mode: "RKG",
   });
 
-  const createMutation = useMutation({
-    mutationFn: async () => {
-      if (form.kg_retornado > kgDisponivel) {
-        throw new Error(`Kg retornado não pode exceder saldo disponível (${kgDisponivel} kg)`);
+  useEffect(() => {
+    if (open) {
+      if (editData) {
+        setForm({
+          dt: editData.dt,
+          documento: editData.documento || "",
+          kg_retornado: editData.kg_retornado,
+          mo_terceiro_val: editData.mo_terceiro_val || 0,
+          mo_terceiro_mode: editData.mo_terceiro_mode || "RKG",
+          mo_ibrac_val: editData.mo_ibrac_val || 0,
+          mo_ibrac_mode: editData.mo_ibrac_mode || "RKG",
+          frete_ida_val: editData.frete_ida_val || 0,
+          frete_ida_mode: editData.frete_ida_mode || "RKG",
+          frete_volta_val: editData.frete_volta_val || 0,
+          frete_volta_mode: editData.frete_volta_mode || "RKG",
+        });
+      } else {
+        resetForm();
       }
-      const { error } = await supabase.from("beneficiamentos_terceiros").insert({
-        operacao_id: operacaoId,
+    }
+  }, [open, editData]);
+
+  const kgMaximo = editData ? kgDisponivel + editData.kg_retornado : kgDisponivel;
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (form.kg_retornado > kgMaximo) {
+        throw new Error(`Kg retornado não pode exceder saldo disponível (${kgMaximo} kg)`);
+      }
+      const payload = {
         dt: form.dt,
         documento: form.documento || null,
         kg_retornado: form.kg_retornado,
@@ -52,15 +91,21 @@ export function BeneficiamentoTerceirosForm({ open, onOpenChange, operacaoId, kg
         frete_ida_mode: form.frete_ida_mode,
         frete_volta_val: form.frete_volta_val,
         frete_volta_mode: form.frete_volta_mode,
-      });
-      if (error) throw error;
+      };
+
+      if (editData) {
+        const { error } = await supabase.from("beneficiamentos_terceiros").update(payload).eq("id", editData.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("beneficiamentos_terceiros").insert({ ...payload, operacao_id: operacaoId });
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["beneficiamentos_terceiros"] });
       queryClient.invalidateQueries({ queryKey: ["entradas_terceiros"] });
-      toast({ title: "Beneficiamento registrado!" });
+      toast({ title: editData ? "Beneficiamento atualizado!" : "Beneficiamento registrado!" });
       onOpenChange(false);
-      resetForm();
     },
     onError: (error) => toast({ title: "Erro", description: error.message, variant: "destructive" }),
   });
@@ -85,7 +130,7 @@ export function BeneficiamentoTerceirosForm({ open, onOpenChange, operacaoId, kg
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Novo Beneficiamento (Terceiros)</DialogTitle>
+          <DialogTitle>{editData ? "Editar Beneficiamento" : "Novo Beneficiamento (Terceiros)"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
           <div className="grid grid-cols-2 gap-4">
@@ -99,7 +144,7 @@ export function BeneficiamentoTerceirosForm({ open, onOpenChange, operacaoId, kg
             </div>
           </div>
           <div>
-            <Label>Kg Retornado (máx: {kgDisponivel.toLocaleString("pt-BR")} kg)</Label>
+            <Label>Kg Retornado (máx: {kgMaximo.toLocaleString("pt-BR")} kg)</Label>
             <Input type="number" value={form.kg_retornado} onChange={(e) => setForm({ ...form, kg_retornado: Number(e.target.value) })} />
           </div>
           
@@ -175,9 +220,9 @@ export function BeneficiamentoTerceirosForm({ open, onOpenChange, operacaoId, kg
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={() => createMutation.mutate()} disabled={createMutation.isPending || form.kg_retornado <= 0}>
-            {createMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Salvar
+          <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || form.kg_retornado <= 0 || form.kg_retornado > kgMaximo}>
+            {saveMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {editData ? "Salvar" : "Registrar"}
           </Button>
         </DialogFooter>
       </DialogContent>

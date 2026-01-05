@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Loader2, FileText, Cog, TrendingUp, Users } from "lucide-react";
+import { Plus, Loader2, FileText, Cog, TrendingUp, Users, Pencil } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -33,6 +33,12 @@ export default function OperacoesTerceiros() {
   const [showBenefForm, setShowBenefForm] = useState(false);
   const [showSaidaForm, setShowSaidaForm] = useState(false);
   const [showCobrancaForm, setShowCobrancaForm] = useState(false);
+  
+  // Edit states
+  const [editEntrada, setEditEntrada] = useState<any>(null);
+  const [editBenef, setEditBenef] = useState<any>(null);
+  const [editSaida, setEditSaida] = useState<any>(null);
+  const [editCobranca, setEditCobranca] = useState<any>(null);
   
   const [operacaoForm, setOperacaoForm] = useState({
     nome: "",
@@ -163,7 +169,6 @@ export default function OperacoesTerceiros() {
   });
 
   // Totais
-  const operacaoSelecionada = operacoes.find(o => o.id === selectedOperacao);
   const totais = {
     kgRecebido: entradas.reduce((acc, e) => acc + (e.kg_recebido || 0), 0),
     kgDisponivel: entradas.reduce((acc, e) => acc + (e.kg_disponivel || 0), 0),
@@ -172,6 +177,26 @@ export default function OperacoesTerceiros() {
     custoServico: beneficiamentos.reduce((acc, b) => acc + (b.custos_servico_total_rs || 0), 0),
     kgDevolvido: saidas.reduce((acc, s) => acc + (s.kg_devolvido || 0), 0),
     receitaServico: cobrancas.reduce((acc, c) => acc + (c.val || 0), 0),
+  };
+
+  const handleEditEntrada = (entrada: any) => {
+    setEditEntrada(entrada);
+    setShowEntradaForm(true);
+  };
+
+  const handleEditBenef = (benef: any) => {
+    setEditBenef(benef);
+    setShowBenefForm(true);
+  };
+
+  const handleEditSaida = (saida: any) => {
+    setEditSaida(saida);
+    setShowSaidaForm(true);
+  };
+
+  const handleEditCobranca = (cobranca: any) => {
+    setEditCobranca(cobranca);
+    setShowCobrancaForm(true);
   };
 
   return (
@@ -371,7 +396,7 @@ export default function OperacoesTerceiros() {
                     <Card>
                       <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle>Recebimentos do Cliente</CardTitle>
-                        <Button size="sm" disabled={!canEdit} onClick={() => setShowEntradaForm(true)}><Plus className="mr-2 h-4 w-4" /> Novo</Button>
+                        <Button size="sm" disabled={!canEdit} onClick={() => { setEditEntrada(null); setShowEntradaForm(true); }}><Plus className="mr-2 h-4 w-4" /> Novo</Button>
                       </CardHeader>
                       <CardContent>
                         {entradas.length === 0 ? (
@@ -384,6 +409,7 @@ export default function OperacoesTerceiros() {
                                 <TableHead>Documento</TableHead>
                                 <TableHead className="text-right">Kg Recebido</TableHead>
                                 <TableHead className="text-right">Saldo</TableHead>
+                                <TableHead className="w-10"></TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -396,6 +422,13 @@ export default function OperacoesTerceiros() {
                                     <Badge variant={e.kg_disponivel > 0 ? "default" : "secondary"}>
                                       {formatWeight(e.kg_disponivel || 0)}
                                     </Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    {canEdit && (
+                                      <Button variant="ghost" size="icon" onClick={() => handleEditEntrada(e)}>
+                                        <Pencil className="h-4 w-4" />
+                                      </Button>
+                                    )}
                                   </TableCell>
                                 </TableRow>
                               ))}
@@ -410,7 +443,7 @@ export default function OperacoesTerceiros() {
                     <Card>
                       <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle>Beneficiamentos</CardTitle>
-                        <Button size="sm" disabled={!canEdit || totais.kgDisponivel === 0} onClick={() => setShowBenefForm(true)}><Plus className="mr-2 h-4 w-4" /> Novo</Button>
+                        <Button size="sm" disabled={!canEdit || totais.kgDisponivel === 0} onClick={() => { setEditBenef(null); setShowBenefForm(true); }}><Plus className="mr-2 h-4 w-4" /> Novo</Button>
                       </CardHeader>
                       <CardContent>
                         {beneficiamentos.length === 0 ? (
@@ -424,6 +457,7 @@ export default function OperacoesTerceiros() {
                                 <TableHead className="text-right">Kg Retornado</TableHead>
                                 <TableHead className="text-right">Custo Serviço</TableHead>
                                 <TableHead className="text-right">Saldo Cliente</TableHead>
+                                <TableHead className="w-10"></TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -438,6 +472,13 @@ export default function OperacoesTerceiros() {
                                       {formatWeight(b.kg_disponivel_cliente || 0)}
                                     </Badge>
                                   </TableCell>
+                                  <TableCell>
+                                    {canEdit && (
+                                      <Button variant="ghost" size="icon" onClick={() => handleEditBenef(b)}>
+                                        <Pencil className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                  </TableCell>
                                 </TableRow>
                               ))}
                             </TableBody>
@@ -451,7 +492,7 @@ export default function OperacoesTerceiros() {
                     <Card>
                       <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle>Devoluções ao Cliente</CardTitle>
-                        <Button size="sm" disabled={!canEdit || totais.kgDisponivelCliente === 0} onClick={() => setShowSaidaForm(true)}><Plus className="mr-2 h-4 w-4" /> Nova</Button>
+                        <Button size="sm" disabled={!canEdit || totais.kgDisponivelCliente === 0} onClick={() => { setEditSaida(null); setShowSaidaForm(true); }}><Plus className="mr-2 h-4 w-4" /> Nova</Button>
                       </CardHeader>
                       <CardContent>
                         {saidas.length === 0 ? (
@@ -464,6 +505,7 @@ export default function OperacoesTerceiros() {
                                 <TableHead>Documento</TableHead>
                                 <TableHead className="text-right">Kg Devolvido</TableHead>
                                 <TableHead className="text-right">Custo Serviço</TableHead>
+                                <TableHead className="w-10"></TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -473,6 +515,13 @@ export default function OperacoesTerceiros() {
                                   <TableCell>{s.documento || "-"}</TableCell>
                                   <TableCell className="text-right">{formatWeight(s.kg_devolvido)}</TableCell>
                                   <TableCell className="text-right">{formatCurrency(s.custo_servico_saida_rs || 0)}</TableCell>
+                                  <TableCell>
+                                    {canEdit && (
+                                      <Button variant="ghost" size="icon" onClick={() => handleEditSaida(s)}>
+                                        <Pencil className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                  </TableCell>
                                 </TableRow>
                               ))}
                             </TableBody>
@@ -486,7 +535,7 @@ export default function OperacoesTerceiros() {
                     <Card>
                       <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle>Cobranças de Serviço</CardTitle>
-                        <Button size="sm" disabled={!canEdit} onClick={() => setShowCobrancaForm(true)}><Plus className="mr-2 h-4 w-4" /> Nova</Button>
+                        <Button size="sm" disabled={!canEdit} onClick={() => { setEditCobranca(null); setShowCobrancaForm(true); }}><Plus className="mr-2 h-4 w-4" /> Nova</Button>
                       </CardHeader>
                       <CardContent>
                         {cobrancas.length === 0 ? (
@@ -499,6 +548,7 @@ export default function OperacoesTerceiros() {
                                 <TableHead>Tipo</TableHead>
                                 <TableHead>Documento</TableHead>
                                 <TableHead className="text-right">Valor</TableHead>
+                                <TableHead className="w-10"></TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -508,6 +558,13 @@ export default function OperacoesTerceiros() {
                                   <TableCell><Badge variant="outline">{c.tipo}</Badge></TableCell>
                                   <TableCell>{c.documento || "-"}</TableCell>
                                   <TableCell className="text-right">{formatCurrency(c.val || 0)}</TableCell>
+                                  <TableCell>
+                                    {canEdit && (
+                                      <Button variant="ghost" size="icon" onClick={() => handleEditCobranca(c)}>
+                                        <Pencil className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                  </TableCell>
                                 </TableRow>
                               ))}
                             </TableBody>
@@ -527,25 +584,29 @@ export default function OperacoesTerceiros() {
           <>
             <EntradaTerceirosForm 
               open={showEntradaForm} 
-              onOpenChange={setShowEntradaForm} 
+              onOpenChange={(open) => { setShowEntradaForm(open); if (!open) setEditEntrada(null); }} 
               operacaoId={selectedOperacao}
+              editData={editEntrada}
             />
             <BeneficiamentoTerceirosForm 
               open={showBenefForm} 
-              onOpenChange={setShowBenefForm} 
+              onOpenChange={(open) => { setShowBenefForm(open); if (!open) setEditBenef(null); }} 
               operacaoId={selectedOperacao}
               kgDisponivel={totais.kgDisponivel}
+              editData={editBenef}
             />
             <SaidaTerceirosForm 
               open={showSaidaForm} 
-              onOpenChange={setShowSaidaForm} 
+              onOpenChange={(open) => { setShowSaidaForm(open); if (!open) setEditSaida(null); }} 
               operacaoId={selectedOperacao}
               kgDisponivel={totais.kgDisponivelCliente}
+              editData={editSaida}
             />
             <CobrancaTerceirosForm 
               open={showCobrancaForm} 
-              onOpenChange={setShowCobrancaForm} 
+              onOpenChange={(open) => { setShowCobrancaForm(open); if (!open) setEditCobranca(null); }} 
               operacaoId={selectedOperacao}
+              editData={editCobranca}
             />
           </>
         )}

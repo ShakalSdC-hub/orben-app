@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Loader2, ShoppingCart, Cog, TrendingUp, DollarSign, Handshake } from "lucide-react";
+import { Plus, Loader2, ShoppingCart, Cog, TrendingUp, DollarSign, Handshake, Pencil } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -33,6 +33,12 @@ export default function OperacoesIntermediacao() {
   const [showBenefForm, setShowBenefForm] = useState(false);
   const [showVendaForm, setShowVendaForm] = useState(false);
   const [showCustoForm, setShowCustoForm] = useState(false);
+  
+  // Edit states
+  const [editCompra, setEditCompra] = useState<any>(null);
+  const [editBenef, setEditBenef] = useState<any>(null);
+  const [editVenda, setEditVenda] = useState<any>(null);
+  const [editCusto, setEditCusto] = useState<any>(null);
   
   const [operacaoForm, setOperacaoForm] = useState({
     nome: "",
@@ -178,6 +184,26 @@ export default function OperacoesIntermediacao() {
     comissaoIbrac: vendas.reduce((acc, v) => acc + (v.comissao_ibrac_rs || 0), 0),
     repasseDono: vendas.reduce((acc, v) => acc + (v.saldo_repassar_rs || 0), 0),
     outrosCustos: custos.reduce((acc, c) => acc + (c.val || 0), 0),
+  };
+
+  const handleEditCompra = (compra: any) => {
+    setEditCompra(compra);
+    setShowCompraForm(true);
+  };
+
+  const handleEditBenef = (benef: any) => {
+    setEditBenef(benef);
+    setShowBenefForm(true);
+  };
+
+  const handleEditVenda = (venda: any) => {
+    setEditVenda(venda);
+    setShowVendaForm(true);
+  };
+
+  const handleEditCusto = (custo: any) => {
+    setEditCusto(custo);
+    setShowCustoForm(true);
   };
 
   return (
@@ -384,7 +410,7 @@ export default function OperacoesIntermediacao() {
                     <Card>
                       <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle>Compras de Material</CardTitle>
-                        <Button size="sm" disabled={!canEdit} onClick={() => setShowCompraForm(true)}><Plus className="mr-2 h-4 w-4" /> Nova</Button>
+                        <Button size="sm" disabled={!canEdit} onClick={() => { setEditCompra(null); setShowCompraForm(true); }}><Plus className="mr-2 h-4 w-4" /> Nova</Button>
                       </CardHeader>
                       <CardContent>
                         {compras.length === 0 ? (
@@ -400,6 +426,7 @@ export default function OperacoesIntermediacao() {
                                 <TableHead className="text-right">R$/kg</TableHead>
                                 <TableHead className="text-right">Valor</TableHead>
                                 <TableHead className="text-right">Saldo</TableHead>
+                                <TableHead className="w-10"></TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -416,6 +443,13 @@ export default function OperacoesIntermediacao() {
                                       {formatWeight(c.kg_disponivel_compra || 0)}
                                     </Badge>
                                   </TableCell>
+                                  <TableCell>
+                                    {canEdit && (
+                                      <Button variant="ghost" size="icon" onClick={() => handleEditCompra(c)}>
+                                        <Pencil className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                  </TableCell>
                                 </TableRow>
                               ))}
                             </TableBody>
@@ -429,7 +463,7 @@ export default function OperacoesIntermediacao() {
                     <Card>
                       <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle>Beneficiamentos</CardTitle>
-                        <Button size="sm" disabled={!canEdit || totais.kgDisponivelCompra === 0} onClick={() => setShowBenefForm(true)}><Plus className="mr-2 h-4 w-4" /> Novo</Button>
+                        <Button size="sm" disabled={!canEdit || totais.kgDisponivelCompra === 0} onClick={() => { setEditBenef(null); setShowBenefForm(true); }}><Plus className="mr-2 h-4 w-4" /> Novo</Button>
                       </CardHeader>
                       <CardContent>
                         {beneficiamentos.length === 0 ? (
@@ -443,6 +477,7 @@ export default function OperacoesIntermediacao() {
                                 <TableHead className="text-right">Kg Retornado</TableHead>
                                 <TableHead className="text-right">Custos Benef.</TableHead>
                                 <TableHead className="text-right">Saldo Venda</TableHead>
+                                <TableHead className="w-10"></TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -457,6 +492,13 @@ export default function OperacoesIntermediacao() {
                                       {formatWeight(b.kg_disponivel_venda || 0)}
                                     </Badge>
                                   </TableCell>
+                                  <TableCell>
+                                    {canEdit && (
+                                      <Button variant="ghost" size="icon" onClick={() => handleEditBenef(b)}>
+                                        <Pencil className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                  </TableCell>
                                 </TableRow>
                               ))}
                             </TableBody>
@@ -470,7 +512,7 @@ export default function OperacoesIntermediacao() {
                     <Card>
                       <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle>Vendas</CardTitle>
-                        <Button size="sm" disabled={!canEdit || totais.kgDisponivelVenda === 0} onClick={() => setShowVendaForm(true)}><Plus className="mr-2 h-4 w-4" /> Nova</Button>
+                        <Button size="sm" disabled={!canEdit || totais.kgDisponivelVenda === 0} onClick={() => { setEditVenda(null); setShowVendaForm(true); }}><Plus className="mr-2 h-4 w-4" /> Nova</Button>
                       </CardHeader>
                       <CardContent>
                         {vendas.length === 0 ? (
@@ -485,6 +527,7 @@ export default function OperacoesIntermediacao() {
                                 <TableHead className="text-right">Receita</TableHead>
                                 <TableHead className="text-right">Comissão</TableHead>
                                 <TableHead className="text-right">Repasse</TableHead>
+                                <TableHead className="w-10"></TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -496,6 +539,13 @@ export default function OperacoesIntermediacao() {
                                   <TableCell className="text-right">{formatCurrency(v.valor_venda_rs || 0)}</TableCell>
                                   <TableCell className="text-right text-success">{formatCurrency(v.comissao_ibrac_rs || 0)}</TableCell>
                                   <TableCell className="text-right">{formatCurrency(v.saldo_repassar_rs || 0)}</TableCell>
+                                  <TableCell>
+                                    {canEdit && (
+                                      <Button variant="ghost" size="icon" onClick={() => handleEditVenda(v)}>
+                                        <Pencil className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                  </TableCell>
                                 </TableRow>
                               ))}
                             </TableBody>
@@ -509,7 +559,7 @@ export default function OperacoesIntermediacao() {
                     <Card>
                       <CardHeader className="flex flex-row items-center justify-between">
                         <CardTitle>Outros Custos</CardTitle>
-                        <Button size="sm" disabled={!canEdit} onClick={() => setShowCustoForm(true)}><Plus className="mr-2 h-4 w-4" /> Novo</Button>
+                        <Button size="sm" disabled={!canEdit} onClick={() => { setEditCusto(null); setShowCustoForm(true); }}><Plus className="mr-2 h-4 w-4" /> Novo</Button>
                       </CardHeader>
                       <CardContent>
                         {custos.length === 0 ? (
@@ -522,6 +572,7 @@ export default function OperacoesIntermediacao() {
                                 <TableHead>Categoria</TableHead>
                                 <TableHead>Documento</TableHead>
                                 <TableHead className="text-right">Valor</TableHead>
+                                <TableHead className="w-10"></TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -531,6 +582,13 @@ export default function OperacoesIntermediacao() {
                                   <TableCell><Badge variant="outline">{c.categoria}</Badge></TableCell>
                                   <TableCell>{c.documento || "-"}</TableCell>
                                   <TableCell className="text-right">{formatCurrency(c.val)}</TableCell>
+                                  <TableCell>
+                                    {canEdit && (
+                                      <Button variant="ghost" size="icon" onClick={() => handleEditCusto(c)}>
+                                        <Pencil className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                  </TableCell>
                                 </TableRow>
                               ))}
                             </TableBody>
@@ -550,25 +608,29 @@ export default function OperacoesIntermediacao() {
           <>
             <CompraIntermForm 
               open={showCompraForm} 
-              onOpenChange={setShowCompraForm} 
+              onOpenChange={(open) => { setShowCompraForm(open); if (!open) setEditCompra(null); }} 
               operacaoId={selectedOperacao}
+              editData={editCompra}
             />
             <BeneficiamentoIntermForm 
               open={showBenefForm} 
-              onOpenChange={setShowBenefForm} 
+              onOpenChange={(open) => { setShowBenefForm(open); if (!open) setEditBenef(null); }} 
               operacaoId={selectedOperacao}
               kgDisponivel={totais.kgDisponivelCompra}
+              editData={editBenef}
             />
             <VendaIntermForm 
               open={showVendaForm} 
-              onOpenChange={setShowVendaForm} 
+              onOpenChange={(open) => { setShowVendaForm(open); if (!open) setEditVenda(null); }} 
               operacaoId={selectedOperacao}
               kgDisponivel={totais.kgDisponivelVenda}
+              editData={editVenda}
             />
             <CustoIntermForm 
               open={showCustoForm} 
-              onOpenChange={setShowCustoForm} 
+              onOpenChange={(open) => { setShowCustoForm(open); if (!open) setEditCusto(null); }} 
               operacaoId={selectedOperacao}
+              editData={editCusto}
             />
           </>
         )}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,14 +10,24 @@ import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { Loader2 } from "lucide-react";
 
+interface VendaInterm {
+  id: string;
+  dt: string;
+  cliente_id: string | null;
+  nf_venda: string | null;
+  kg_vendido: number;
+  preco_venda_rkg: number;
+}
+
 interface VendaIntermFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   operacaoId: string;
   kgDisponivel: number;
+  editData?: VendaInterm | null;
 }
 
-export function VendaIntermForm({ open, onOpenChange, operacaoId, kgDisponivel }: VendaIntermFormProps) {
+export function VendaIntermForm({ open, onOpenChange, operacaoId, kgDisponivel, editData }: VendaIntermFormProps) {
   const queryClient = useQueryClient();
   
   const [form, setForm] = useState({
@@ -28,6 +38,24 @@ export function VendaIntermForm({ open, onOpenChange, operacaoId, kgDisponivel }
     preco_venda_rkg: 0,
   });
 
+  useEffect(() => {
+    if (open) {
+      if (editData) {
+        setForm({
+          dt: editData.dt,
+          cliente_id: editData.cliente_id || "",
+          nf_venda: editData.nf_venda || "",
+          kg_vendido: editData.kg_vendido,
+          preco_venda_rkg: editData.preco_venda_rkg,
+        });
+      } else {
+        setForm({ dt: format(new Date(), "yyyy-MM-dd"), cliente_id: "", nf_venda: "", kg_vendido: 0, preco_venda_rkg: 0 });
+      }
+    }
+  }, [open, editData]);
+
+  const kgMaximo = editData ? kgDisponivel + editData.kg_vendido : kgDisponivel;
+
   const { data: clientes = [] } = useQuery({
     queryKey: ["parceiros_clientes"],
     queryFn: async () => {
@@ -37,23 +65,29 @@ export function VendaIntermForm({ open, onOpenChange, operacaoId, kgDisponivel }
     },
   });
 
-  const createMutation = useMutation({
+  const saveMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("vendas_intermediacao").insert({
-        operacao_id: operacaoId,
+      const payload = {
         dt: form.dt,
         cliente_id: form.cliente_id || null,
         nf_venda: form.nf_venda || null,
         kg_vendido: form.kg_vendido,
         preco_venda_rkg: form.preco_venda_rkg,
-      });
-      if (error) throw error;
+      };
+
+      if (editData) {
+        const { error } = await supabase.from("vendas_intermediacao").update(payload).eq("id", editData.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("vendas_intermediacao").insert({ ...payload, operacao_id: operacaoId });
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["vendas_intermediacao"] });
       queryClient.invalidateQueries({ queryKey: ["beneficiamentos_intermediacao"] });
       onOpenChange(false);
-      toast({ title: "Venda registrada!" });
+      toast({ title: editData ? "Venda atualizada!" : "Venda registrada!" });
     },
     onError: (error) => toast({ title: "Erro", description: error.message, variant: "destructive" }),
   });
@@ -64,11 +98,11 @@ export function VendaIntermForm({ open, onOpenChange, operacaoId, kgDisponivel }
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Nova Venda</DialogTitle>
+          <DialogTitle>{editData ? "Editar Venda" : "Nova Venda"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div className="p-3 bg-muted rounded-lg text-sm">
-            Vergalhão disponível: <strong>{kgDisponivel.toLocaleString()} kg</strong>
+            Vergalhão disponível: <strong>{kgMaximo.toLocaleString()} kg</strong>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -101,9 +135,9 @@ export function VendaIntermForm({ open, onOpenChange, operacaoId, kgDisponivel }
                 type="number" 
                 value={form.kg_vendido} 
                 onChange={(e) => setForm({ ...form, kg_vendido: Number(e.target.value) })}
-                max={kgDisponivel}
+                max={kgMaximo}
               />
-              {form.kg_vendido > kgDisponivel && (
+              {form.kg_vendido > kgMaximo && (
                 <p className="text-xs text-destructive mt-1">Excede disponível</p>
               )}
             </div>
@@ -122,11 +156,11 @@ export function VendaIntermForm({ open, onOpenChange, operacaoId, kgDisponivel }
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
           <Button 
-            onClick={() => createMutation.mutate()} 
-            disabled={createMutation.isPending || form.kg_vendido <= 0 || form.kg_vendido > kgDisponivel || form.preco_venda_rkg <= 0}
+            onClick={() => saveMutation.mutate()} 
+            disabled={saveMutation.isPending || form.kg_vendido <= 0 || form.kg_vendido > kgMaximo || form.preco_venda_rkg <= 0}
           >
-            {createMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Registrar
+            {saveMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {editData ? "Salvar" : "Registrar"}
           </Button>
         </DialogFooter>
       </DialogContent>
