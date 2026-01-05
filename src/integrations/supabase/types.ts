@@ -20,12 +20,9 @@ export type Database = {
           created_by: string | null
           data_acerto: string | null
           data_pagamento: string | null
-          dono_id: string | null
           id: string
           observacoes: string | null
           parceiro_id: string | null
-          referencia_id: string | null
-          referencia_tipo: string | null
           status: string | null
           tipo: string
           updated_at: string
@@ -36,12 +33,9 @@ export type Database = {
           created_by?: string | null
           data_acerto?: string | null
           data_pagamento?: string | null
-          dono_id?: string | null
           id?: string
           observacoes?: string | null
           parceiro_id?: string | null
-          referencia_id?: string | null
-          referencia_tipo?: string | null
           status?: string | null
           tipo: string
           updated_at?: string
@@ -52,12 +46,9 @@ export type Database = {
           created_by?: string | null
           data_acerto?: string | null
           data_pagamento?: string | null
-          dono_id?: string | null
           id?: string
           observacoes?: string | null
           parceiro_id?: string | null
-          referencia_id?: string | null
-          referencia_tipo?: string | null
           status?: string | null
           tipo?: string
           updated_at?: string
@@ -652,7 +643,6 @@ export type Database = {
       }
       entradas_c1: {
         Row: {
-          benchmark_sucata_rkg: number | null
           created_at: string
           custo_unit_pre_rkg: number | null
           custos_pre_total_rs: number | null
@@ -685,7 +675,6 @@ export type Database = {
           valor_unit_sucata_rkg: number
         }
         Insert: {
-          benchmark_sucata_rkg?: number | null
           created_at?: string
           custo_unit_pre_rkg?: number | null
           custos_pre_total_rs?: number | null
@@ -718,7 +707,6 @@ export type Database = {
           valor_unit_sucata_rkg: number
         }
         Update: {
-          benchmark_sucata_rkg?: number | null
           created_at?: string
           custo_unit_pre_rkg?: number | null
           custos_pre_total_rs?: number | null
@@ -852,56 +840,44 @@ export type Database = {
         Row: {
           aluminio_brl_kg: number | null
           aluminio_usd_t: number | null
-          chumbo_usd_t: number | null
           cobre_brl_kg: number | null
           cobre_usd_t: number | null
           created_at: string
           data: string
           dolar_brl: number | null
-          estanho_usd_t: number | null
           fonte: string | null
           id: string
           is_media_semanal: boolean | null
-          niquel_usd_t: number | null
           semana_numero: number | null
           updated_at: string
-          zinco_usd_t: number | null
         }
         Insert: {
           aluminio_brl_kg?: number | null
           aluminio_usd_t?: number | null
-          chumbo_usd_t?: number | null
           cobre_brl_kg?: number | null
           cobre_usd_t?: number | null
           created_at?: string
           data: string
           dolar_brl?: number | null
-          estanho_usd_t?: number | null
           fonte?: string | null
           id?: string
           is_media_semanal?: boolean | null
-          niquel_usd_t?: number | null
           semana_numero?: number | null
           updated_at?: string
-          zinco_usd_t?: number | null
         }
         Update: {
           aluminio_brl_kg?: number | null
           aluminio_usd_t?: number | null
-          chumbo_usd_t?: number | null
           cobre_brl_kg?: number | null
           cobre_usd_t?: number | null
           created_at?: string
           data?: string
           dolar_brl?: number | null
-          estanho_usd_t?: number | null
           fonte?: string | null
           id?: string
           is_media_semanal?: boolean | null
-          niquel_usd_t?: number | null
           semana_numero?: number | null
           updated_at?: string
-          zinco_usd_t?: number | null
         }
         Relationships: []
       }
@@ -913,10 +889,8 @@ export type Database = {
           data_fim: string
           data_inicio: string
           dolar_brl: number
-          fator_total: number | null
           icms_pct: number
           id: string
-          lme_base_brl_kg: number | null
           lme_cobre_usd_t: number
           lme_final_brl_kg: number | null
           observacoes: string | null
@@ -932,10 +906,8 @@ export type Database = {
           data_fim: string
           data_inicio: string
           dolar_brl?: number
-          fator_total?: number | null
           icms_pct?: number
           id?: string
-          lme_base_brl_kg?: number | null
           lme_cobre_usd_t?: number
           lme_final_brl_kg?: number | null
           observacoes?: string | null
@@ -951,10 +923,8 @@ export type Database = {
           data_fim?: string
           data_inicio?: string
           dolar_brl?: number
-          fator_total?: number | null
           icms_pct?: number
           id?: string
-          lme_base_brl_kg?: number | null
           lme_cobre_usd_t?: number
           lme_final_brl_kg?: number | null
           observacoes?: string | null
@@ -1452,55 +1422,43 @@ export type Database = {
           cobre_usd_t: number
           created_at: string
           created_by: string | null
-          custo_sucata_kg: number | null
           data_simulacao: string
           dolar_brl: number
-          economia_pct: number | null
           fator_imposto: number | null
           id: string
           lme_semana_brl_kg: number | null
           pct_lme_negociada: number | null
-          prazo_dias: number | null
           preco_a_prazo: number | null
           preco_a_vista: number | null
           preco_com_imposto: number | null
-          resultado: string | null
         }
         Insert: {
           cobre_usd_t: number
           created_at?: string
           created_by?: string | null
-          custo_sucata_kg?: number | null
           data_simulacao?: string
           dolar_brl: number
-          economia_pct?: number | null
           fator_imposto?: number | null
           id?: string
           lme_semana_brl_kg?: number | null
           pct_lme_negociada?: number | null
-          prazo_dias?: number | null
           preco_a_prazo?: number | null
           preco_a_vista?: number | null
           preco_com_imposto?: number | null
-          resultado?: string | null
         }
         Update: {
           cobre_usd_t?: number
           created_at?: string
           created_by?: string | null
-          custo_sucata_kg?: number | null
           data_simulacao?: string
           dolar_brl?: number
-          economia_pct?: number | null
           fator_imposto?: number | null
           id?: string
           lme_semana_brl_kg?: number | null
           pct_lme_negociada?: number | null
-          prazo_dias?: number | null
           preco_a_prazo?: number | null
           preco_a_vista?: number | null
           preco_com_imposto?: number | null
-          resultado?: string | null
         }
         Relationships: [
           {
@@ -1552,7 +1510,6 @@ export type Database = {
           id: string
           observacoes: string | null
           peso_kg: number
-          sublote_id: string | null
           valor_acrescimo: number | null
         }
         Insert: {
@@ -1564,7 +1521,6 @@ export type Database = {
           id?: string
           observacoes?: string | null
           peso_kg: number
-          sublote_id?: string | null
           valor_acrescimo?: number | null
         }
         Update: {
@@ -1576,7 +1532,6 @@ export type Database = {
           id?: string
           observacoes?: string | null
           peso_kg?: number
-          sublote_id?: string | null
           valor_acrescimo?: number | null
         }
         Relationships: [
