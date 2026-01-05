@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,16 +10,41 @@ import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { Loader2 } from "lucide-react";
 
+interface EntradaC1 {
+  id: string;
+  ticket_num?: string | null;
+  nf_num?: string | null;
+  procedencia?: string | null;
+  dt_emissao?: string | null;
+  dt_recebimento?: string | null;
+  ticket_mel_kg?: number | null;
+  ticket_mista_kg?: number | null;
+  perda_mel_pct: number;
+  perda_mista_pct: number;
+  valor_unit_mel_rkg?: number | null;
+  valor_unit_mista_rkg?: number | null;
+  moagem_val?: number | null;
+  moagem_mode?: string | null;
+  frete_ida_moagem_val?: number | null;
+  frete_ida_moagem_mode?: string | null;
+  frete_volta_moagem_val?: number | null;
+  frete_volta_moagem_mode?: string | null;
+  financeiro_val?: number | null;
+  financeiro_mode?: string | null;
+}
+
 interface EntradaC1FormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   operacaoId: string;
   defaultPerdaMel?: number;
   defaultPerdaMista?: number;
+  editData?: EntradaC1 | null;
 }
 
-export function EntradaC1Form({ open, onOpenChange, operacaoId, defaultPerdaMel = 5, defaultPerdaMista = 10 }: EntradaC1FormProps) {
+export function EntradaC1Form({ open, onOpenChange, operacaoId, defaultPerdaMel = 5, defaultPerdaMista = 10, editData }: EntradaC1FormProps) {
   const queryClient = useQueryClient();
+  const isEditing = !!editData;
   
   const [form, setForm] = useState({
     ticket_num: "",
@@ -43,9 +68,58 @@ export function EntradaC1Form({ open, onOpenChange, operacaoId, defaultPerdaMel 
     financeiro_mode: "PCT",
   });
 
-  const createMutation = useMutation({
+  // Reset form when dialog opens/closes or editData changes
+  useEffect(() => {
+    if (open && editData) {
+      setForm({
+        ticket_num: editData.ticket_num || "",
+        nf_num: editData.nf_num || "",
+        procedencia: editData.procedencia || "",
+        dt_emissao: editData.dt_emissao || format(new Date(), "yyyy-MM-dd"),
+        dt_recebimento: editData.dt_recebimento || format(new Date(), "yyyy-MM-dd"),
+        ticket_mel_kg: editData.ticket_mel_kg || 0,
+        ticket_mista_kg: editData.ticket_mista_kg || 0,
+        perda_mel_pct: (editData.perda_mel_pct || 0) * 100,
+        perda_mista_pct: (editData.perda_mista_pct || 0) * 100,
+        valor_unit_mel_rkg: editData.valor_unit_mel_rkg || 0,
+        valor_unit_mista_rkg: editData.valor_unit_mista_rkg || 0,
+        moagem_val: editData.moagem_val || 0,
+        moagem_mode: editData.moagem_mode || "RKG",
+        frete_ida_moagem_val: editData.frete_ida_moagem_val || 0,
+        frete_ida_moagem_mode: editData.frete_ida_moagem_mode || "RKG",
+        frete_volta_moagem_val: editData.frete_volta_moagem_val || 0,
+        frete_volta_moagem_mode: editData.frete_volta_moagem_mode || "RKG",
+        financeiro_val: editData.financeiro_val || 0,
+        financeiro_mode: editData.financeiro_mode || "PCT",
+      });
+    } else if (open && !editData) {
+      setForm({
+        ticket_num: "",
+        nf_num: "",
+        procedencia: "",
+        dt_emissao: format(new Date(), "yyyy-MM-dd"),
+        dt_recebimento: format(new Date(), "yyyy-MM-dd"),
+        ticket_mel_kg: 0,
+        ticket_mista_kg: 0,
+        perda_mel_pct: defaultPerdaMel,
+        perda_mista_pct: defaultPerdaMista,
+        valor_unit_mel_rkg: 0,
+        valor_unit_mista_rkg: 0,
+        moagem_val: 0,
+        moagem_mode: "RKG",
+        frete_ida_moagem_val: 0,
+        frete_ida_moagem_mode: "RKG",
+        frete_volta_moagem_val: 0,
+        frete_volta_moagem_mode: "RKG",
+        financeiro_val: 0,
+        financeiro_mode: "PCT",
+      });
+    }
+  }, [open, editData, defaultPerdaMel, defaultPerdaMista]);
+
+  const saveMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("entradas_c1").insert({
+      const payload = {
         operacao_id: operacaoId,
         ticket_num: form.ticket_num || null,
         nf_num: form.nf_num || null,
@@ -67,13 +141,20 @@ export function EntradaC1Form({ open, onOpenChange, operacaoId, defaultPerdaMel 
         frete_volta_moagem_mode: form.frete_volta_moagem_mode,
         financeiro_val: form.financeiro_val,
         financeiro_mode: form.financeiro_mode,
-      });
-      if (error) throw error;
+      };
+
+      if (isEditing && editData) {
+        const { error } = await supabase.from("entradas_c1").update(payload).eq("id", editData.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("entradas_c1").insert(payload);
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["entradas_c1"] });
       onOpenChange(false);
-      toast({ title: "Entrada registrada com sucesso!" });
+      toast({ title: isEditing ? "Entrada atualizada!" : "Entrada registrada com sucesso!" });
     },
     onError: (error) => toast({ title: "Erro", description: error.message, variant: "destructive" }),
   });
@@ -91,7 +172,7 @@ export function EntradaC1Form({ open, onOpenChange, operacaoId, defaultPerdaMel 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Nova Entrada de Sucata</DialogTitle>
+          <DialogTitle>{isEditing ? "Editar Entrada de Sucata" : "Nova Entrada de Sucata"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           {/* Identificação */}
@@ -245,9 +326,9 @@ export function EntradaC1Form({ open, onOpenChange, operacaoId, defaultPerdaMel 
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={() => createMutation.mutate()} disabled={createMutation.isPending || kgTicket <= 0}>
-            {createMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Registrar Entrada
+          <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || kgTicket <= 0}>
+            {saveMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isEditing ? "Salvar Alterações" : "Registrar Entrada"}
           </Button>
         </DialogFooter>
       </DialogContent>

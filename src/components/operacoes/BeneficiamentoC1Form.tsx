@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,15 +10,31 @@ import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { Loader2 } from "lucide-react";
 
+interface BeneficiamentoC1 {
+  id: string;
+  dt: string;
+  documento?: string | null;
+  kg_retornado: number;
+  mo_benef_val?: number | null;
+  mo_benef_mode?: string | null;
+  frete_ida_val?: number | null;
+  frete_ida_mode?: string | null;
+  frete_volta_val?: number | null;
+  frete_volta_mode?: string | null;
+  benchmark_vergalhao_rkg?: number | null;
+}
+
 interface BeneficiamentoC1FormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   operacaoId: string;
   kgDisponivel: number;
+  editData?: BeneficiamentoC1 | null;
 }
 
-export function BeneficiamentoC1Form({ open, onOpenChange, operacaoId, kgDisponivel }: BeneficiamentoC1FormProps) {
+export function BeneficiamentoC1Form({ open, onOpenChange, operacaoId, kgDisponivel, editData }: BeneficiamentoC1FormProps) {
   const queryClient = useQueryClient();
+  const isEditing = !!editData;
   
   const [form, setForm] = useState({
     dt: format(new Date(), "yyyy-MM-dd"),
@@ -33,9 +49,43 @@ export function BeneficiamentoC1Form({ open, onOpenChange, operacaoId, kgDisponi
     benchmark_vergalhao_rkg: 0,
   });
 
-  const createMutation = useMutation({
+  // Reset form when dialog opens/closes or editData changes
+  useEffect(() => {
+    if (open && editData) {
+      setForm({
+        dt: editData.dt || format(new Date(), "yyyy-MM-dd"),
+        documento: editData.documento || "",
+        kg_retornado: editData.kg_retornado || 0,
+        mo_benef_val: editData.mo_benef_val || 0,
+        mo_benef_mode: editData.mo_benef_mode || "RKG",
+        frete_ida_val: editData.frete_ida_val || 0,
+        frete_ida_mode: editData.frete_ida_mode || "RKG",
+        frete_volta_val: editData.frete_volta_val || 0,
+        frete_volta_mode: editData.frete_volta_mode || "RKG",
+        benchmark_vergalhao_rkg: editData.benchmark_vergalhao_rkg || 0,
+      });
+    } else if (open && !editData) {
+      setForm({
+        dt: format(new Date(), "yyyy-MM-dd"),
+        documento: "",
+        kg_retornado: 0,
+        mo_benef_val: 0,
+        mo_benef_mode: "RKG",
+        frete_ida_val: 0,
+        frete_ida_mode: "RKG",
+        frete_volta_val: 0,
+        frete_volta_mode: "RKG",
+        benchmark_vergalhao_rkg: 0,
+      });
+    }
+  }, [open, editData]);
+
+  // Calcular kg máximo disponível para edição (considera o próprio registro)
+  const kgMaximo = isEditing && editData ? kgDisponivel + editData.kg_retornado : kgDisponivel;
+
+  const saveMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("beneficiamentos_c1").insert({
+      const payload = {
         operacao_id: operacaoId,
         dt: form.dt,
         documento: form.documento || null,
@@ -47,14 +97,22 @@ export function BeneficiamentoC1Form({ open, onOpenChange, operacaoId, kgDisponi
         frete_volta_val: form.frete_volta_val,
         frete_volta_mode: form.frete_volta_mode,
         benchmark_vergalhao_rkg: form.benchmark_vergalhao_rkg || null,
-      });
-      if (error) throw error;
+      };
+
+      if (isEditing && editData) {
+        const { error } = await supabase.from("beneficiamentos_c1").update(payload).eq("id", editData.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("beneficiamentos_c1").insert(payload);
+        if (error) throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["beneficiamentos_c1"] });
       queryClient.invalidateQueries({ queryKey: ["entradas_c1"] });
+      queryClient.invalidateQueries({ queryKey: ["saidas_c1"] });
       onOpenChange(false);
-      toast({ title: "Beneficiamento registrado!" });
+      toast({ title: isEditing ? "Beneficiamento atualizado!" : "Beneficiamento registrado!" });
     },
     onError: (error) => toast({ title: "Erro", description: error.message, variant: "destructive" }),
   });
@@ -63,11 +121,11 @@ export function BeneficiamentoC1Form({ open, onOpenChange, operacaoId, kgDisponi
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Novo Beneficiamento</DialogTitle>
+          <DialogTitle>{isEditing ? "Editar Beneficiamento" : "Novo Beneficiamento"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div className="p-3 bg-muted rounded-lg text-sm">
-            Kg disponível para beneficiamento: <strong>{kgDisponivel.toLocaleString()} kg</strong>
+            Kg disponível para beneficiamento: <strong>{kgMaximo.toLocaleString()} kg</strong>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -87,9 +145,9 @@ export function BeneficiamentoC1Form({ open, onOpenChange, operacaoId, kgDisponi
               type="number" 
               value={form.kg_retornado} 
               onChange={(e) => setForm({ ...form, kg_retornado: Number(e.target.value) })}
-              max={kgDisponivel}
+              max={kgMaximo}
             />
-            {form.kg_retornado > kgDisponivel && (
+            {form.kg_retornado > kgMaximo && (
               <p className="text-xs text-destructive mt-1">Excede o saldo disponível</p>
             )}
           </div>
@@ -157,16 +215,19 @@ export function BeneficiamentoC1Form({ open, onOpenChange, operacaoId, kgDisponi
               onChange={(e) => setForm({ ...form, benchmark_vergalhao_rkg: Number(e.target.value) })}
               placeholder="Preço referência para cálculo de receita"
             />
+            <p className="text-xs text-muted-foreground mt-1">
+              Ao alterar, as saídas vinculadas serão recalculadas automaticamente.
+            </p>
           </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
           <Button 
-            onClick={() => createMutation.mutate()} 
-            disabled={createMutation.isPending || form.kg_retornado <= 0 || form.kg_retornado > kgDisponivel}
+            onClick={() => saveMutation.mutate()} 
+            disabled={saveMutation.isPending || form.kg_retornado <= 0 || form.kg_retornado > kgMaximo}
           >
-            {createMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Registrar
+            {saveMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isEditing ? "Salvar Alterações" : "Registrar"}
           </Button>
         </DialogFooter>
       </DialogContent>
