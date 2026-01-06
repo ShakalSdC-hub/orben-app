@@ -3,7 +3,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -14,6 +15,7 @@ interface SaidaTerceiros {
   dt: string;
   documento: string | null;
   kg_devolvido: number;
+  beneficiamento_id: string | null;
 }
 
 interface SaidaTerceirosFormProps {
@@ -31,7 +33,26 @@ export function SaidaTerceirosForm({ open, onOpenChange, operacaoId, kgDisponive
     dt: format(new Date(), "yyyy-MM-dd"),
     documento: "",
     kg_devolvido: 0,
+    beneficiamento_id: "",
   });
+
+  // Fetch beneficiamentos disponíveis
+  const { data: beneficiamentos = [] } = useQuery({
+    queryKey: ["beneficiamentos_terceiros", operacaoId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("beneficiamentos_terceiros")
+        .select("id, dt, documento, kg_retornado, kg_disponivel_cliente")
+        .eq("operacao_id", operacaoId)
+        .eq("is_deleted", false)
+        .order("dt", { ascending: true });
+      if (error) throw error;
+      return data;
+    },
+    enabled: open,
+  });
+
+  const beneficiamentosDisponiveis = beneficiamentos.filter(b => (b.kg_disponivel_cliente || 0) > 0);
 
   useEffect(() => {
     if (open) {
@@ -40,6 +61,7 @@ export function SaidaTerceirosForm({ open, onOpenChange, operacaoId, kgDisponive
           dt: editData.dt,
           documento: editData.documento || "",
           kg_devolvido: editData.kg_devolvido,
+          beneficiamento_id: editData.beneficiamento_id || "",
         });
       } else {
         resetForm();
@@ -47,7 +69,22 @@ export function SaidaTerceirosForm({ open, onOpenChange, operacaoId, kgDisponive
     }
   }, [open, editData]);
 
-  const kgMaximo = editData ? kgDisponivel + editData.kg_devolvido : kgDisponivel;
+  // Quando seleciona beneficiamento, atualizar kg sugerido
+  useEffect(() => {
+    if (form.beneficiamento_id && !editData) {
+      const benef = beneficiamentos.find(b => b.id === form.beneficiamento_id);
+      if (benef && form.kg_devolvido === 0) {
+        setForm(prev => ({ ...prev, kg_devolvido: benef.kg_disponivel_cliente || 0 }));
+      }
+    }
+  }, [form.beneficiamento_id, beneficiamentos, editData]);
+
+  const selectedBenef = beneficiamentos.find(b => b.id === form.beneficiamento_id);
+  const kgMaximo = editData 
+    ? kgDisponivel + editData.kg_devolvido 
+    : selectedBenef 
+      ? selectedBenef.kg_disponivel_cliente || 0
+      : kgDisponivel;
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -60,6 +97,7 @@ export function SaidaTerceirosForm({ open, onOpenChange, operacaoId, kgDisponive
           dt: form.dt,
           documento: form.documento || null,
           kg_devolvido: form.kg_devolvido,
+          beneficiamento_id: form.beneficiamento_id || null,
         }).eq("id", editData.id);
         if (error) throw error;
       } else {
@@ -68,6 +106,7 @@ export function SaidaTerceirosForm({ open, onOpenChange, operacaoId, kgDisponive
           dt: form.dt,
           documento: form.documento || null,
           kg_devolvido: form.kg_devolvido,
+          beneficiamento_id: form.beneficiamento_id || null,
         });
         if (error) throw error;
       }
@@ -86,6 +125,7 @@ export function SaidaTerceirosForm({ open, onOpenChange, operacaoId, kgDisponive
       dt: format(new Date(), "yyyy-MM-dd"),
       documento: "",
       kg_devolvido: 0,
+      beneficiamento_id: "",
     });
   };
 
@@ -96,6 +136,25 @@ export function SaidaTerceirosForm({ open, onOpenChange, operacaoId, kgDisponive
           <DialogTitle>{editData ? "Editar Devolução" : "Nova Devolução ao Cliente"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
+          <div>
+            <Label>Documento de Beneficiamento</Label>
+            <Select 
+              value={form.beneficiamento_id} 
+              onValueChange={(v) => setForm({ ...form, beneficiamento_id: v })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o beneficiamento..." />
+              </SelectTrigger>
+              <SelectContent>
+                {beneficiamentosDisponiveis.map((b) => (
+                  <SelectItem key={b.id} value={b.id}>
+                    {format(new Date(b.dt), "dd/MM/yy")} - {b.documento || "S/Doc"} ({(b.kg_disponivel_cliente || 0).toLocaleString("pt-BR")} kg disp.)
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Data</Label>

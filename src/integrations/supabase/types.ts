@@ -328,10 +328,15 @@ export type Database = {
           id: string
           is_deleted: boolean | null
           kg_disponivel_venda: number | null
+          kg_mel_entrada: number | null
+          kg_mista_entrada: number | null
           kg_retornado: number
           mo_benef_mode: string | null
           mo_benef_val: number | null
           operacao_id: string
+          perda_mel_pct: number | null
+          perda_mista_pct: number | null
+          perda_total_kg: number | null
           updated_at: string
         }
         Insert: {
@@ -346,10 +351,15 @@ export type Database = {
           id?: string
           is_deleted?: boolean | null
           kg_disponivel_venda?: number | null
+          kg_mel_entrada?: number | null
+          kg_mista_entrada?: number | null
           kg_retornado: number
           mo_benef_mode?: string | null
           mo_benef_val?: number | null
           operacao_id: string
+          perda_mel_pct?: number | null
+          perda_mista_pct?: number | null
+          perda_total_kg?: number | null
           updated_at?: string
         }
         Update: {
@@ -364,10 +374,15 @@ export type Database = {
           id?: string
           is_deleted?: boolean | null
           kg_disponivel_venda?: number | null
+          kg_mel_entrada?: number | null
+          kg_mista_entrada?: number | null
           kg_retornado?: number
           mo_benef_mode?: string | null
           mo_benef_val?: number | null
           operacao_id?: string
+          perda_mel_pct?: number | null
+          perda_mista_pct?: number | null
+          perda_total_kg?: number | null
           updated_at?: string
         }
         Relationships: [
@@ -393,12 +408,17 @@ export type Database = {
           id: string
           is_deleted: boolean | null
           kg_disponivel_cliente: number | null
+          kg_mel_entrada: number | null
+          kg_mista_entrada: number | null
           kg_retornado: number
           mo_ibrac_mode: string | null
           mo_ibrac_val: number | null
           mo_terceiro_mode: string | null
           mo_terceiro_val: number | null
           operacao_id: string
+          perda_mel_pct: number | null
+          perda_mista_pct: number | null
+          perda_total_kg: number | null
           updated_at: string
         }
         Insert: {
@@ -413,12 +433,17 @@ export type Database = {
           id?: string
           is_deleted?: boolean | null
           kg_disponivel_cliente?: number | null
+          kg_mel_entrada?: number | null
+          kg_mista_entrada?: number | null
           kg_retornado: number
           mo_ibrac_mode?: string | null
           mo_ibrac_val?: number | null
           mo_terceiro_mode?: string | null
           mo_terceiro_val?: number | null
           operacao_id: string
+          perda_mel_pct?: number | null
+          perda_mista_pct?: number | null
+          perda_total_kg?: number | null
           updated_at?: string
         }
         Update: {
@@ -433,12 +458,17 @@ export type Database = {
           id?: string
           is_deleted?: boolean | null
           kg_disponivel_cliente?: number | null
+          kg_mel_entrada?: number | null
+          kg_mista_entrada?: number | null
           kg_retornado?: number
           mo_ibrac_mode?: string | null
           mo_ibrac_val?: number | null
           mo_terceiro_mode?: string | null
           mo_terceiro_val?: number | null
           operacao_id?: string
+          perda_mel_pct?: number | null
+          perda_mista_pct?: number | null
+          perda_total_kg?: number | null
           updated_at?: string
         }
         Relationships: [
@@ -459,11 +489,14 @@ export type Database = {
           dt: string
           id: string
           is_deleted: boolean | null
+          kg_cobre_recebido: number | null
           mode: string | null
           operacao_id: string
           tipo: string | null
+          tipo_pagamento: string | null
           updated_at: string
           val: number | null
+          valor_ref_cobre_rkg: number | null
         }
         Insert: {
           base_kg_mode?: string | null
@@ -472,11 +505,14 @@ export type Database = {
           dt: string
           id?: string
           is_deleted?: boolean | null
+          kg_cobre_recebido?: number | null
           mode?: string | null
           operacao_id: string
           tipo?: string | null
+          tipo_pagamento?: string | null
           updated_at?: string
           val?: number | null
+          valor_ref_cobre_rkg?: number | null
         }
         Update: {
           base_kg_mode?: string | null
@@ -485,11 +521,14 @@ export type Database = {
           dt?: string
           id?: string
           is_deleted?: boolean | null
+          kg_cobre_recebido?: number | null
           mode?: string | null
           operacao_id?: string
           tipo?: string | null
+          tipo_pagamento?: string | null
           updated_at?: string
           val?: number | null
+          valor_ref_cobre_rkg?: number | null
         }
         Relationships: [
           {
@@ -513,6 +552,7 @@ export type Database = {
           nf_compra: string | null
           operacao_id: string
           preco_compra_rkg: number
+          tipo_material: string | null
           updated_at: string
           valor_compra_rs: number | null
         }
@@ -527,6 +567,7 @@ export type Database = {
           nf_compra?: string | null
           operacao_id: string
           preco_compra_rkg: number
+          tipo_material?: string | null
           updated_at?: string
           valor_compra_rs?: number | null
         }
@@ -541,6 +582,7 @@ export type Database = {
           nf_compra?: string | null
           operacao_id?: string
           preco_compra_rkg?: number
+          tipo_material?: string | null
           updated_at?: string
           valor_compra_rs?: number | null
         }
@@ -898,8 +940,10 @@ export type Database = {
           data_fim: string
           data_inicio: string
           dolar_brl: number
+          fator_imposto: number | null
           icms_pct: number
           id: string
+          lme_base_brl_kg: number | null
           lme_cobre_usd_t: number
           lme_final_brl_kg: number | null
           observacoes: string | null
@@ -915,8 +959,10 @@ export type Database = {
           data_fim: string
           data_inicio: string
           dolar_brl?: number
+          fator_imposto?: number | null
           icms_pct?: number
           id?: string
+          lme_base_brl_kg?: number | null
           lme_cobre_usd_t?: number
           lme_final_brl_kg?: number | null
           observacoes?: string | null
@@ -932,8 +978,10 @@ export type Database = {
           data_fim?: string
           data_inicio?: string
           dolar_brl?: number
+          fator_imposto?: number | null
           icms_pct?: number
           id?: string
+          lme_base_brl_kg?: number | null
           lme_cobre_usd_t?: number
           lme_final_brl_kg?: number | null
           observacoes?: string | null
@@ -1384,6 +1432,7 @@ export type Database = {
       }
       saidas_terceiros: {
         Row: {
+          beneficiamento_id: string | null
           created_at: string
           custo_servico_saida_rs: number | null
           documento: string | null
@@ -1395,6 +1444,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          beneficiamento_id?: string | null
           created_at?: string
           custo_servico_saida_rs?: number | null
           documento?: string | null
@@ -1406,6 +1456,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          beneficiamento_id?: string | null
           created_at?: string
           custo_servico_saida_rs?: number | null
           documento?: string | null
@@ -1417,6 +1468,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "saidas_terceiros_beneficiamento_id_fkey"
+            columns: ["beneficiamento_id"]
+            isOneToOne: false
+            referencedRelation: "beneficiamentos_terceiros"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "saidas_terceiros_operacao_id_fkey"
             columns: ["operacao_id"]

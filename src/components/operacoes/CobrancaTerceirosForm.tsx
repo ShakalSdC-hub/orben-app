@@ -18,6 +18,9 @@ interface CobrancaTerceiros {
   val: number | null;
   mode: string | null;
   base_kg_mode: string | null;
+  tipo_pagamento: string | null;
+  kg_cobre_recebido: number | null;
+  valor_ref_cobre_rkg: number | null;
 }
 
 interface CobrancaTerceirosFormProps {
@@ -37,6 +40,9 @@ export function CobrancaTerceirosForm({ open, onOpenChange, operacaoId, editData
     val: 0,
     mode: "RKG",
     base_kg_mode: "DEVOLVIDO",
+    tipo_pagamento: "DINHEIRO",
+    kg_cobre_recebido: 0,
+    valor_ref_cobre_rkg: 0,
   });
 
   useEffect(() => {
@@ -49,12 +55,17 @@ export function CobrancaTerceirosForm({ open, onOpenChange, operacaoId, editData
           val: editData.val || 0,
           mode: editData.mode || "RKG",
           base_kg_mode: editData.base_kg_mode || "DEVOLVIDO",
+          tipo_pagamento: editData.tipo_pagamento || "DINHEIRO",
+          kg_cobre_recebido: editData.kg_cobre_recebido || 0,
+          valor_ref_cobre_rkg: editData.valor_ref_cobre_rkg || 0,
         });
       } else {
         resetForm();
       }
     }
   }, [open, editData]);
+
+  const valorCobreEquivalente = form.kg_cobre_recebido * form.valor_ref_cobre_rkg;
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -65,6 +76,9 @@ export function CobrancaTerceirosForm({ open, onOpenChange, operacaoId, editData
         val: form.val,
         mode: form.mode,
         base_kg_mode: form.base_kg_mode,
+        tipo_pagamento: form.tipo_pagamento,
+        kg_cobre_recebido: form.tipo_pagamento === "COBRE" ? form.kg_cobre_recebido : 0,
+        valor_ref_cobre_rkg: form.tipo_pagamento === "COBRE" ? form.valor_ref_cobre_rkg : 0,
       };
 
       if (editData) {
@@ -91,6 +105,9 @@ export function CobrancaTerceirosForm({ open, onOpenChange, operacaoId, editData
       val: 0,
       mode: "RKG",
       base_kg_mode: "DEVOLVIDO",
+      tipo_pagamento: "DINHEIRO",
+      kg_cobre_recebido: 0,
+      valor_ref_cobre_rkg: 0,
     });
   };
 
@@ -149,6 +166,48 @@ export function CobrancaTerceirosForm({ open, onOpenChange, operacaoId, editData
               </SelectContent>
             </Select>
           </div>
+
+          <div className="border-t pt-4">
+            <Label>Tipo de Pagamento</Label>
+            <Select value={form.tipo_pagamento} onValueChange={(v) => setForm({ ...form, tipo_pagamento: v })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="DINHEIRO">Dinheiro (R$)</SelectItem>
+                <SelectItem value="COBRE">Cobre (Material)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {form.tipo_pagamento === "COBRE" && (
+            <div className="space-y-3 p-3 bg-muted rounded-lg">
+              <h4 className="font-medium text-sm">Pagamento em Cobre</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Kg Cobre Recebido</Label>
+                  <Input 
+                    type="number" 
+                    step="0.01" 
+                    value={form.kg_cobre_recebido} 
+                    onChange={(e) => setForm({ ...form, kg_cobre_recebido: Number(e.target.value) })} 
+                  />
+                </div>
+                <div>
+                  <Label>Valor Ref. (R$/kg)</Label>
+                  <Input 
+                    type="number" 
+                    step="0.01" 
+                    value={form.valor_ref_cobre_rkg} 
+                    onChange={(e) => setForm({ ...form, valor_ref_cobre_rkg: Number(e.target.value) })} 
+                  />
+                </div>
+              </div>
+              {valorCobreEquivalente > 0 && (
+                <p className="text-sm">
+                  Valor equivalente: <strong>R$ {valorCobreEquivalente.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong>
+                </p>
+              )}
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>

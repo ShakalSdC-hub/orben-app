@@ -526,20 +526,34 @@ export default function OperacoesProprias() {
                                 <TableHead>Data</TableHead>
                                 <TableHead>Documento</TableHead>
                                 <TableHead className="text-right">Kg Retornado</TableHead>
+                                <TableHead className="text-right">Custo Pré</TableHead>
                                 <TableHead className="text-right">Custo Benef.</TableHead>
                                 <TableHead className="text-right">Custo Real/kg</TableHead>
+                                <TableHead className="text-right">Benchmark</TableHead>
+                                <TableHead className="text-right">Resultado</TableHead>
                                 <TableHead className="text-right">Saldo</TableHead>
                                 {canEdit && <TableHead className="w-[80px]">Ações</TableHead>}
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {beneficiamentos.map((b) => (
+                              {beneficiamentos.map((b) => {
+                                const benchmark = b.benchmark_vergalhao_rkg || operacaoSelecionada?.benchmark_vergalhao_default || 0;
+                                const custoReal = b.custo_real_rkg || 0;
+                                const resultadoSimulado = benchmark > 0 ? (benchmark - custoReal) * b.kg_retornado : 0;
+                                return (
                                 <TableRow key={b.id}>
                                   <TableCell>{format(new Date(b.dt), "dd/MM/yy")}</TableCell>
                                   <TableCell>{b.documento || "-"}</TableCell>
                                   <TableCell className="text-right">{formatWeight(b.kg_retornado)}</TableCell>
+                                  <TableCell className="text-right">{formatCurrency(b.custo_pre_alocado_rs || 0)}</TableCell>
                                   <TableCell className="text-right">{formatCurrency(b.custos_benef_total_rs || 0)}</TableCell>
-                                  <TableCell className="text-right">{formatCurrency(b.custo_real_rkg || 0)}</TableCell>
+                                  <TableCell className="text-right font-medium">{formatCurrency(custoReal)}</TableCell>
+                                  <TableCell className="text-right text-primary">{formatCurrency(benchmark)}</TableCell>
+                                  <TableCell className="text-right">
+                                    <span className={resultadoSimulado >= 0 ? "text-success font-medium" : "text-destructive font-medium"}>
+                                      {formatCurrency(resultadoSimulado)}
+                                    </span>
+                                  </TableCell>
                                   <TableCell className="text-right">
                                     <Badge variant={b.kg_disponivel > 0 ? "default" : "secondary"}>
                                       {formatWeight(b.kg_disponivel || 0)}
@@ -568,7 +582,7 @@ export default function OperacoesProprias() {
                                     </TableCell>
                                   )}
                                 </TableRow>
-                              ))}
+                              );})}
                             </TableBody>
                           </Table>
                         )}
