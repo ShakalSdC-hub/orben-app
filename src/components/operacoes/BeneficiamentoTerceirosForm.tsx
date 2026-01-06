@@ -15,6 +15,11 @@ interface BeneficiamentoTerceiros {
   dt: string;
   documento: string | null;
   kg_retornado: number;
+  kg_mel_entrada: number | null;
+  kg_mista_entrada: number | null;
+  perda_mel_pct: number | null;
+  perda_mista_pct: number | null;
+  perda_total_kg: number | null;
   mo_terceiro_val: number | null;
   mo_terceiro_mode: string | null;
   mo_ibrac_val: number | null;
@@ -39,6 +44,10 @@ export function BeneficiamentoTerceirosForm({ open, onOpenChange, operacaoId, kg
   const [form, setForm] = useState({
     dt: format(new Date(), "yyyy-MM-dd"),
     documento: "",
+    kg_mel_entrada: 0,
+    kg_mista_entrada: 0,
+    perda_mel_pct: 5,
+    perda_mista_pct: 10,
     kg_retornado: 0,
     mo_terceiro_val: 0,
     mo_terceiro_mode: "RKG",
@@ -56,6 +65,10 @@ export function BeneficiamentoTerceirosForm({ open, onOpenChange, operacaoId, kg
         setForm({
           dt: editData.dt,
           documento: editData.documento || "",
+          kg_mel_entrada: editData.kg_mel_entrada || 0,
+          kg_mista_entrada: editData.kg_mista_entrada || 0,
+          perda_mel_pct: (editData.perda_mel_pct || 0) * 100,
+          perda_mista_pct: (editData.perda_mista_pct || 0) * 100,
           kg_retornado: editData.kg_retornado,
           mo_terceiro_val: editData.mo_terceiro_val || 0,
           mo_terceiro_mode: editData.mo_terceiro_mode || "RKG",
@@ -72,16 +85,29 @@ export function BeneficiamentoTerceirosForm({ open, onOpenChange, operacaoId, kg
     }
   }, [open, editData]);
 
-  const kgMaximo = editData ? kgDisponivel + editData.kg_retornado : kgDisponivel;
+  // Calcular kg total entrada e perda
+  const kgTotalEntrada = form.kg_mel_entrada + form.kg_mista_entrada;
+  const perdaMelKg = form.kg_mel_entrada * (form.perda_mel_pct / 100);
+  const perdaMistaKg = form.kg_mista_entrada * (form.perda_mista_pct / 100);
+  const perdaTotalKg = perdaMelKg + perdaMistaKg;
+  const kgRetornadoEsperado = kgTotalEntrada - perdaTotalKg;
+
+  const kgMaximo = editData 
+    ? kgDisponivel + (editData.kg_mel_entrada || 0) + (editData.kg_mista_entrada || 0)
+    : kgDisponivel;
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      if (form.kg_retornado > kgMaximo) {
-        throw new Error(`Kg retornado não pode exceder saldo disponível (${kgMaximo} kg)`);
+      if (kgTotalEntrada > kgMaximo) {
+        throw new Error(`Kg entrada não pode exceder saldo disponível (${kgMaximo} kg)`);
       }
       const payload = {
         dt: form.dt,
         documento: form.documento || null,
+        kg_mel_entrada: form.kg_mel_entrada,
+        kg_mista_entrada: form.kg_mista_entrada,
+        perda_mel_pct: form.perda_mel_pct / 100,
+        perda_mista_pct: form.perda_mista_pct / 100,
         kg_retornado: form.kg_retornado,
         mo_terceiro_val: form.mo_terceiro_val,
         mo_terceiro_mode: form.mo_terceiro_mode,
@@ -114,6 +140,10 @@ export function BeneficiamentoTerceirosForm({ open, onOpenChange, operacaoId, kg
     setForm({
       dt: format(new Date(), "yyyy-MM-dd"),
       documento: "",
+      kg_mel_entrada: 0,
+      kg_mista_entrada: 0,
+      perda_mel_pct: 5,
+      perda_mista_pct: 10,
       kg_retornado: 0,
       mo_terceiro_val: 0,
       mo_terceiro_mode: "RKG",
@@ -126,13 +156,20 @@ export function BeneficiamentoTerceirosForm({ open, onOpenChange, operacaoId, kg
     });
   };
 
+  // Auto-fill kg_retornado quando entrada muda
+  useEffect(() => {
+    if (kgRetornadoEsperado > 0 && form.kg_retornado === 0) {
+      setForm(prev => ({ ...prev, kg_retornado: Math.round(kgRetornadoEsperado * 100) / 100 }));
+    }
+  }, [kgRetornadoEsperado]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>{editData ? "Editar Beneficiamento" : "Novo Beneficiamento (Terceiros)"}</DialogTitle>
         </DialogHeader>
-        <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+        <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Data</Label>
@@ -143,9 +180,76 @@ export function BeneficiamentoTerceirosForm({ open, onOpenChange, operacaoId, kg
               <Input value={form.documento} onChange={(e) => setForm({ ...form, documento: e.target.value })} placeholder="NF, CT-e, etc." />
             </div>
           </div>
+
+          <div className="border-t pt-4">
+            <h4 className="font-medium mb-3">Entrada de Material (máx: {kgMaximo.toLocaleString("pt-BR")} kg)</h4>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Kg Mel</Label>
+                <Input 
+                  type="number" 
+                  value={form.kg_mel_entrada} 
+                  onChange={(e) => setForm({ ...form, kg_mel_entrada: Number(e.target.value) })} 
+                />
+              </div>
+              <div>
+                <Label>Kg Mista</Label>
+                <Input 
+                  type="number" 
+                  value={form.kg_mista_entrada} 
+                  onChange={(e) => setForm({ ...form, kg_mista_entrada: Number(e.target.value) })} 
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t pt-4">
+            <h4 className="font-medium mb-3">Perdas de Processo</h4>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Perda Mel (%)</Label>
+                <Input 
+                  type="number" 
+                  step="0.1"
+                  value={form.perda_mel_pct} 
+                  onChange={(e) => setForm({ ...form, perda_mel_pct: Number(e.target.value) })} 
+                />
+                <p className="text-xs text-muted-foreground mt-1">Perda: {perdaMelKg.toFixed(2)} kg</p>
+              </div>
+              <div>
+                <Label>Perda Mista (%)</Label>
+                <Input 
+                  type="number" 
+                  step="0.1"
+                  value={form.perda_mista_pct} 
+                  onChange={(e) => setForm({ ...form, perda_mista_pct: Number(e.target.value) })} 
+                />
+                <p className="text-xs text-muted-foreground mt-1">Perda: {perdaMistaKg.toFixed(2)} kg</p>
+              </div>
+            </div>
+            <div className="mt-3 p-3 bg-muted rounded-lg text-sm">
+              <div className="flex justify-between">
+                <span>Total Entrada:</span>
+                <strong>{kgTotalEntrada.toLocaleString("pt-BR")} kg</strong>
+              </div>
+              <div className="flex justify-between">
+                <span>Perda Total:</span>
+                <strong className="text-destructive">{perdaTotalKg.toFixed(2)} kg</strong>
+              </div>
+              <div className="flex justify-between">
+                <span>Retornado Esperado:</span>
+                <strong className="text-primary">{kgRetornadoEsperado.toFixed(2)} kg</strong>
+              </div>
+            </div>
+          </div>
+
           <div>
-            <Label>Kg Retornado (máx: {kgMaximo.toLocaleString("pt-BR")} kg)</Label>
-            <Input type="number" value={form.kg_retornado} onChange={(e) => setForm({ ...form, kg_retornado: Number(e.target.value) })} />
+            <Label>Kg Retornado (real)</Label>
+            <Input 
+              type="number" 
+              value={form.kg_retornado} 
+              onChange={(e) => setForm({ ...form, kg_retornado: Number(e.target.value) })} 
+            />
           </div>
           
           <div className="border-t pt-4">
@@ -220,7 +324,7 @@ export function BeneficiamentoTerceirosForm({ open, onOpenChange, operacaoId, kg
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || form.kg_retornado <= 0 || form.kg_retornado > kgMaximo}>
+          <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || form.kg_retornado <= 0 || kgTotalEntrada > kgMaximo}>
             {saveMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {editData ? "Salvar" : "Registrar"}
           </Button>

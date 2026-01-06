@@ -36,6 +36,21 @@ export default function Index() {
     },
   });
 
+  // Fetch último LME Semana configurado (Benchmark)
+  const { data: lmeSemana } = useQuery({
+    queryKey: ["dashboard-lme-semana"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("lme_semana_config")
+        .select("*")
+        .order("ano", { ascending: false })
+        .order("semana", { ascending: false })
+        .limit(1);
+      if (error) throw error;
+      return data?.[0] || null;
+    },
+  });
+
   // Fetch operações dos 3 cenários
   const { data: operacoesProprias = [] } = useQuery({
     queryKey: ["dashboard-op-proprias"],
@@ -128,6 +143,21 @@ export default function Index() {
             </CardContent>
           </Card>
 
+          <Card className="border-primary/30 bg-primary/5">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Benchmark Semana</CardTitle>
+              <TrendingUp className="h-4 w-4 text-primary" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-primary">
+                {lmeSemana?.lme_final_brl_kg ? formatCurrency(Number(lmeSemana.lme_final_brl_kg)) : "—"}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {lmeSemana ? `S${lmeSemana.semana}/${lmeSemana.ano} (c/ impostos)` : "Não configurado"}
+              </p>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Operações Abertas</CardTitle>
@@ -138,19 +168,6 @@ export default function Index() {
               <p className="text-xs text-muted-foreground">
                 Nos 3 cenários
               </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Operações</CardTitle>
-              <Factory className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {operacoesProprias.length + operacoesTerceiros.length + operacoesIntermediacao.length}
-              </div>
-              <p className="text-xs text-muted-foreground">Todas as operações</p>
             </CardContent>
           </Card>
 
