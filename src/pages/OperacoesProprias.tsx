@@ -145,6 +145,24 @@ export default function OperacoesProprias() {
     },
   });
 
+  // Buscar benchmark semanal (LME Final mais recente)
+  const { data: lmeSemanaAtual } = useQuery({
+    queryKey: ["lme_semana_atual"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("lme_semana_config")
+        .select("lme_final_brl_kg")
+        .order("ano", { ascending: false })
+        .order("semana", { ascending: false })
+        .limit(1)
+        .single();
+      if (error) return null;
+      return data;
+    },
+  });
+
+  const benchmarkSemanal = Number(lmeSemanaAtual?.lme_final_brl_kg) || 0;
+
   const beneficiadores = parceiros.filter(p => p.tipo === "BENEFICIADOR" || p.is_fornecedor);
 
   // Mutations
@@ -537,7 +555,8 @@ export default function OperacoesProprias() {
                             </TableHeader>
                             <TableBody>
                               {beneficiamentos.map((b) => {
-                                const benchmark = b.benchmark_vergalhao_rkg || operacaoSelecionada?.benchmark_vergalhao_default || 0;
+                                // Prioridade: benchmark do benef > benchmark da operação > LME semanal
+                                const benchmark = b.benchmark_vergalhao_rkg || operacaoSelecionada?.benchmark_vergalhao_default || benchmarkSemanal;
                                 const custoReal = b.custo_real_rkg || 0;
                                 const resultadoSimulado = benchmark > 0 ? (benchmark - custoReal) * b.kg_retornado : 0;
                                 return (

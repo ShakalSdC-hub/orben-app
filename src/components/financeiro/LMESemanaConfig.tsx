@@ -12,8 +12,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { format, startOfWeek, endOfWeek, getWeek, getYear } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { useAuth } from "@/contexts/AuthContext";
+import { formatCurrency, formatNumber } from "@/lib/kpis";
 
 interface LMESemanaFormData {
   ano: number;
@@ -23,13 +23,8 @@ interface LMESemanaFormData {
   lme_cobre_usd_t: number;
   dolar_brl: number;
   fator_imposto: number;
-  icms_pct: number;
-  pis_cofins_pct: number;
-  taxa_financeira_pct: number;
   observacoes: string;
 }
-
-import { formatCurrency, formatNumber } from "@/lib/kpis";
 
 export function LMESemanaConfig() {
   const queryClient = useQueryClient();
@@ -47,9 +42,6 @@ export function LMESemanaConfig() {
     lme_cobre_usd_t: 9000,
     dolar_brl: 6.0,
     fator_imposto: 0.7986,
-    icms_pct: 7.0,
-    pis_cofins_pct: 1.65,
-    taxa_financeira_pct: 4.3,
     observacoes: "",
   });
 
@@ -72,6 +64,9 @@ export function LMESemanaConfig() {
     mutationFn: async (data: LMESemanaFormData) => {
       const { error } = await supabase.from("lme_semana_config").insert({
         ...data,
+        icms_pct: 0,
+        pis_cofins_pct: 0,
+        taxa_financeira_pct: 0,
         created_by: user?.id,
       });
       if (error) throw error;
@@ -92,7 +87,12 @@ export function LMESemanaConfig() {
     mutationFn: async ({ id, data }: { id: string; data: LMESemanaFormData }) => {
       const { error } = await supabase
         .from("lme_semana_config")
-        .update(data)
+        .update({
+          ...data,
+          icms_pct: 0,
+          pis_cofins_pct: 0,
+          taxa_financeira_pct: 0,
+        })
         .eq("id", id);
       if (error) throw error;
     },
@@ -132,9 +132,6 @@ export function LMESemanaConfig() {
       lme_cobre_usd_t: 9000,
       dolar_brl: 6.0,
       fator_imposto: 0.7986,
-      icms_pct: 7.0,
-      pis_cofins_pct: 1.65,
-      taxa_financeira_pct: 4.3,
       observacoes: "",
     });
     setEditingId(null);
@@ -149,9 +146,6 @@ export function LMESemanaConfig() {
       lme_cobre_usd_t: Number(config.lme_cobre_usd_t),
       dolar_brl: Number(config.dolar_brl),
       fator_imposto: Number(config.fator_imposto) || 0.7986,
-      icms_pct: Number(config.icms_pct),
-      pis_cofins_pct: Number(config.pis_cofins_pct),
-      taxa_financeira_pct: Number(config.taxa_financeira_pct),
       observacoes: config.observacoes || "",
     });
     setEditingId(config.id);
@@ -166,11 +160,9 @@ export function LMESemanaConfig() {
     }
   };
 
-  // Calculate preview values - using fator_imposto like Simulador
+  // Calculate preview values - simplified formula: LME Final = LME Base ÷ Fator Imposto
   const lmeBase = (formData.lme_cobre_usd_t * formData.dolar_brl) / 1000;
-  const lmeComFator = lmeBase / formData.fator_imposto;
-  const fatorTotal = (1 + formData.icms_pct / 100) * (1 + formData.pis_cofins_pct / 100) * (1 + formData.taxa_financeira_pct / 100);
-  const lmeFinal = lmeComFator * fatorTotal;
+  const lmeFinal = formData.fator_imposto > 0 ? lmeBase / formData.fator_imposto : lmeBase;
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
 
@@ -194,7 +186,7 @@ export function LMESemanaConfig() {
               LME Semana - Configuração
             </CardTitle>
             <CardDescription>
-              Configure os valores LME por semana incluindo impostos e custos financeiros para cálculo do custo de referência
+              Configure os valores LME por semana para cálculo do benchmark de custo
             </CardDescription>
           </div>
           <Dialog open={isDialogOpen} onOpenChange={(open) => {
@@ -207,7 +199,7 @@ export function LMESemanaConfig() {
                 Nova Semana
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-lg">
               <DialogHeader>
                 <DialogTitle>
                   {editingId ? "Editar Configuração LME" : "Nova Configuração LME Semanal"}
@@ -254,7 +246,7 @@ export function LMESemanaConfig() {
                 </div>
 
                 {/* LME Values */}
-                <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-4 md:grid-cols-3">
                   <div className="space-y-2">
                     <Label>LME Cobre (USD/t)</Label>
                     <Input
@@ -273,50 +265,15 @@ export function LMESemanaConfig() {
                       onChange={(e) => setFormData({ ...formData, dolar_brl: parseFloat(e.target.value) || 0 })}
                     />
                   </div>
-                </div>
-
-                {/* Fator Imposto */}
-                <div className="grid gap-4 md:grid-cols-1">
                   <div className="space-y-2">
-                    <Label>Fator Imposto (similar ao Simulador)</Label>
+                    <Label>Fator Imposto</Label>
                     <Input
                       type="number"
                       step="0.0001"
                       value={formData.fator_imposto}
                       onChange={(e) => setFormData({ ...formData, fator_imposto: parseFloat(e.target.value) || 0.7986 })}
                     />
-                    <p className="text-xs text-muted-foreground">Fator de desconto fiscal (padrão: 0.7986)</p>
-                  </div>
-                </div>
-
-                {/* Taxes and Costs */}
-                <div className="grid gap-4 md:grid-cols-3">
-                  <div className="space-y-2">
-                    <Label>ICMS (%)</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={formData.icms_pct}
-                      onChange={(e) => setFormData({ ...formData, icms_pct: parseFloat(e.target.value) || 0 })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>PIS/COFINS (%)</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={formData.pis_cofins_pct}
-                      onChange={(e) => setFormData({ ...formData, pis_cofins_pct: parseFloat(e.target.value) || 0 })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Taxa Financeira (%)</Label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={formData.taxa_financeira_pct}
-                      onChange={(e) => setFormData({ ...formData, taxa_financeira_pct: parseFloat(e.target.value) || 0 })}
-                    />
+                    <p className="text-xs text-muted-foreground">Padrão: 0.7986 (~25% impostos)</p>
                   </div>
                 </div>
 
@@ -325,34 +282,23 @@ export function LMESemanaConfig() {
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm flex items-center gap-2">
                       <Calculator className="h-4 w-4" />
-                      Cálculo Prévia
+                      Cálculo
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    <div className="grid gap-4 md:grid-cols-2 text-sm">
+                    <div className="grid gap-4 text-sm">
                       <div>
-                        <span className="text-muted-foreground">LME Base (USD→BRL):</span>
+                        <span className="text-muted-foreground">LME Base:</span>
                         <p className="font-medium">
-                          {formatNumber(formData.lme_cobre_usd_t)} × {formatNumber(formData.dolar_brl, 4)} ÷ 1000 = <strong>R$ {formatNumber(lmeBase)}/kg</strong>
-                        </p>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Com Fator Imposto:</span>
-                        <p className="font-medium">
-                          {formatNumber(lmeBase)} ÷ {formatNumber(formData.fator_imposto, 4)} = <strong>R$ {formatNumber(lmeComFator)}/kg</strong>
-                        </p>
-                      </div>
-                    </div>
-                    <div className="grid gap-4 md:grid-cols-2 text-sm">
-                      <div>
-                        <span className="text-muted-foreground">Fator Custos:</span>
-                        <p className="font-medium">
-                          (1+{formatNumber(formData.icms_pct)}%) × (1+{formatNumber(formData.pis_cofins_pct)}%) × (1+{formatNumber(formData.taxa_financeira_pct)}%) = <strong>{formatNumber(fatorTotal, 4)}</strong>
+                          ({formatNumber(formData.lme_cobre_usd_t)} × {formatNumber(formData.dolar_brl, 4)}) ÷ 1000 = <strong>R$ {formatNumber(lmeBase)}/kg</strong>
                         </p>
                       </div>
                       <div className="bg-primary/10 p-3 rounded-lg">
                         <span className="text-muted-foreground">LME Final (Benchmark):</span>
-                        <p className="text-xl font-bold text-primary">
+                        <p className="font-medium">
+                          R$ {formatNumber(lmeBase)} ÷ {formatNumber(formData.fator_imposto, 4)} = 
+                        </p>
+                        <p className="text-2xl font-bold text-primary">
                           R$ {formatNumber(lmeFinal)}/kg
                         </p>
                       </div>
@@ -432,8 +378,8 @@ export function LMESemanaConfig() {
                       <TableCell className="text-right font-mono font-bold text-primary">
                         R$ {formatNumber(Number(config.lme_final_brl_kg))}
                       </TableCell>
-                      <TableCell>
-                        <div className="flex items-center justify-center gap-1">
+                      <TableCell className="text-center">
+                        <div className="flex justify-center gap-1">
                           <Button
                             variant="ghost"
                             size="icon"
@@ -460,22 +406,6 @@ export function LMESemanaConfig() {
               </Table>
             </div>
           )}
-        </CardContent>
-      </Card>
-
-      {/* Formula explanation */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">Fórmula de Cálculo</CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm text-muted-foreground space-y-2">
-          <p><strong>LME Base (R$/kg)</strong> = LME Cobre (USD/t) × Dólar (R$) ÷ 1000</p>
-          <p><strong>Fator Total</strong> = (1 + ICMS%) × (1 + PIS/COFINS%) × (1 + Taxa Financeira%)</p>
-          <p><strong>LME Final (R$/kg)</strong> = LME Base × Fator Total</p>
-          <p className="pt-2 border-t">
-            Este valor representa o custo de referência do cobre considerando impostos e custos financeiros, 
-            usado para calcular a economia vs LME nos beneficiamentos.
-          </p>
         </CardContent>
       </Card>
     </div>
