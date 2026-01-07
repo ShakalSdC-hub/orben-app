@@ -17,6 +17,7 @@ interface CompraInterm {
   nf_compra: string | null;
   kg_comprado: number;
   preco_compra_rkg: number;
+  tipo_material: string | null;
 }
 
 interface CompraIntermFormProps {
@@ -35,6 +36,7 @@ export function CompraIntermForm({ open, onOpenChange, operacaoId, editData }: C
     nf_compra: "",
     kg_comprado: 0,
     preco_compra_rkg: 0,
+    tipo_material: "MEL",
   });
 
   useEffect(() => {
@@ -46,9 +48,10 @@ export function CompraIntermForm({ open, onOpenChange, operacaoId, editData }: C
           nf_compra: editData.nf_compra || "",
           kg_comprado: editData.kg_comprado,
           preco_compra_rkg: editData.preco_compra_rkg,
+          tipo_material: editData.tipo_material || "MEL",
         });
       } else {
-        setForm({ dt: format(new Date(), "yyyy-MM-dd"), fornecedor_compra_id: "", nf_compra: "", kg_comprado: 0, preco_compra_rkg: 0 });
+        setForm({ dt: format(new Date(), "yyyy-MM-dd"), fornecedor_compra_id: "", nf_compra: "", kg_comprado: 0, preco_compra_rkg: 0, tipo_material: "MEL" });
       }
     }
   }, [open, editData]);
@@ -70,6 +73,7 @@ export function CompraIntermForm({ open, onOpenChange, operacaoId, editData }: C
         nf_compra: form.nf_compra || null,
         kg_comprado: form.kg_comprado,
         preco_compra_rkg: form.preco_compra_rkg,
+        tipo_material: form.tipo_material,
       };
 
       if (editData) {
@@ -116,6 +120,17 @@ export function CompraIntermForm({ open, onOpenChange, operacaoId, editData }: C
                 {fornecedores.map((f) => (
                   <SelectItem key={f.id} value={f.id}>{f.nome_fantasia || f.razao_social}</SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label>Tipo de Material</Label>
+            <Select value={form.tipo_material} onValueChange={(v) => setForm({ ...form, tipo_material: v })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="MEL">Cobre Mel</SelectItem>
+                <SelectItem value="MISTA">Mista</SelectItem>
               </SelectContent>
             </Select>
           </div>

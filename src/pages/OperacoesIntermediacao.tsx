@@ -422,6 +422,7 @@ export default function OperacoesIntermediacao() {
                                 <TableHead>Data</TableHead>
                                 <TableHead>Fornecedor</TableHead>
                                 <TableHead>NF</TableHead>
+                                <TableHead>Tipo</TableHead>
                                 <TableHead className="text-right">Kg</TableHead>
                                 <TableHead className="text-right">R$/kg</TableHead>
                                 <TableHead className="text-right">Valor</TableHead>
@@ -435,6 +436,11 @@ export default function OperacoesIntermediacao() {
                                   <TableCell>{format(new Date(c.dt), "dd/MM/yy")}</TableCell>
                                   <TableCell>{c.fornecedor?.razao_social || "-"}</TableCell>
                                   <TableCell>{c.nf_compra || "-"}</TableCell>
+                                  <TableCell>
+                                    <Badge variant={c.tipo_material === "MEL" ? "default" : "secondary"}>
+                                      {c.tipo_material || "MEL"}
+                                    </Badge>
+                                  </TableCell>
                                   <TableCell className="text-right">{formatWeight(c.kg_comprado)}</TableCell>
                                   <TableCell className="text-right">{formatCurrency(c.preco_compra_rkg)}</TableCell>
                                   <TableCell className="text-right">{formatCurrency(c.valor_compra_rs || 0)}</TableCell>
@@ -474,33 +480,54 @@ export default function OperacoesIntermediacao() {
                               <TableRow>
                                 <TableHead>Data</TableHead>
                                 <TableHead>Documento</TableHead>
-                                <TableHead className="text-right">Kg Retornado</TableHead>
-                                <TableHead className="text-right">Custos Benef.</TableHead>
-                                <TableHead className="text-right">Saldo Venda</TableHead>
+                                <TableHead className="text-right">Entrada</TableHead>
+                                <TableHead className="text-right">Perda</TableHead>
+                                <TableHead className="text-right">Retornado</TableHead>
+                                <TableHead className="text-right">Custos</TableHead>
+                                <TableHead className="text-right">Saldo</TableHead>
                                 <TableHead className="w-10"></TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {beneficiamentos.map((b) => (
-                                <TableRow key={b.id}>
-                                  <TableCell>{format(new Date(b.dt), "dd/MM/yy")}</TableCell>
-                                  <TableCell>{b.documento || "-"}</TableCell>
-                                  <TableCell className="text-right">{formatWeight(b.kg_retornado)}</TableCell>
-                                  <TableCell className="text-right">{formatCurrency(b.custos_benef_total_rs || 0)}</TableCell>
-                                  <TableCell className="text-right">
-                                    <Badge variant={b.kg_disponivel_venda > 0 ? "default" : "secondary"}>
-                                      {formatWeight(b.kg_disponivel_venda || 0)}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell>
-                                    {canEdit && (
-                                      <Button variant="ghost" size="icon" onClick={() => handleEditBenef(b)}>
-                                        <Pencil className="h-4 w-4" />
-                                      </Button>
-                                    )}
-                                  </TableCell>
-                                </TableRow>
-                              ))}
+                              {beneficiamentos.map((b) => {
+                                const kgEntrada = (b.kg_mel_entrada || 0) + (b.kg_mista_entrada || 0);
+                                return (
+                                  <TableRow key={b.id}>
+                                    <TableCell>{format(new Date(b.dt), "dd/MM/yy")}</TableCell>
+                                    <TableCell>{b.documento || "-"}</TableCell>
+                                    <TableCell className="text-right text-sm">
+                                      <div>{formatWeight(kgEntrada)}</div>
+                                      <div className="text-xs text-muted-foreground">
+                                        {b.kg_mel_entrada > 0 && `Mel: ${formatWeight(b.kg_mel_entrada || 0)}`}
+                                        {b.kg_mel_entrada > 0 && b.kg_mista_entrada > 0 && " | "}
+                                        {b.kg_mista_entrada > 0 && `Mista: ${formatWeight(b.kg_mista_entrada || 0)}`}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="text-right text-destructive text-sm">
+                                      -{formatWeight(b.perda_total_kg || 0)}
+                                      <div className="text-xs text-muted-foreground">
+                                        {b.perda_mel_pct != null && `Mel: ${((b.perda_mel_pct || 0) * 100).toFixed(1)}%`}
+                                        {b.perda_mel_pct != null && b.perda_mista_pct != null && " | "}
+                                        {b.perda_mista_pct != null && `Mista: ${((b.perda_mista_pct || 0) * 100).toFixed(1)}%`}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="text-right font-medium">{formatWeight(b.kg_retornado)}</TableCell>
+                                    <TableCell className="text-right">{formatCurrency(b.custos_benef_total_rs || 0)}</TableCell>
+                                    <TableCell className="text-right">
+                                      <Badge variant={b.kg_disponivel_venda > 0 ? "default" : "secondary"}>
+                                        {formatWeight(b.kg_disponivel_venda || 0)}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                      {canEdit && (
+                                        <Button variant="ghost" size="icon" onClick={() => handleEditBenef(b)}>
+                                          <Pencil className="h-4 w-4" />
+                                        </Button>
+                                      )}
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
                             </TableBody>
                           </Table>
                         )}
