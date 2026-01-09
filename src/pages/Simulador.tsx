@@ -94,41 +94,33 @@ export default function Simulador() {
     },
   });
 
-  // Buscar médias semanais OFICIAIS do banco de dados (is_media_semanal = true)
-  const { data: mediasSemanaisOficiais = [] } = useQuery({
-    queryKey: ["historico_lme_medias_simulador"],
+  // Buscar médias semanais da tabela lme_semana_config (fonte oficial)
+  const { data: semanasConfig = [] } = useQuery({
+    queryKey: ["lme_semana_config_simulador"],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("historico_lme")
+        .from("lme_semana_config")
         .select("*")
-        .eq("is_media_semanal", true)
-        .order("data", { ascending: false })
-        .limit(100);
+        .order("ano", { ascending: false })
+        .order("semana", { ascending: false });
       if (error) throw error;
       return data;
     },
   });
 
-  // Transformar médias oficiais para o formato esperado pelo componente
-  const mediasSemanais = mediasSemanaisOficiais.map((m: any) => {
-    const dataRegistro = parseISO(m.data);
-    const semana = m.semana_numero || getISOWeek(dataRegistro);
-    const ano = getISOWeekYear(dataRegistro);
-    const key = ano * 100 + semana;
-    
-    return {
-      semana_numero: semana,
-      ano,
-      key,
-      cobre_brl_kg: m.cobre_brl_kg,
-      aluminio_brl_kg: m.aluminio_brl_kg,
-      dolar_brl: m.dolar_brl,
-      cobre_usd_t: m.cobre_usd_t,
-      registros_count: 5,
-      data_original: m.data,
-      fonte: m.fonte
-    };
-  }).sort((a: any, b: any) => b.key - a.key);
+  // Transformar para o formato esperado pelo componente
+  const mediasSemanais = semanasConfig.map((config: any) => ({
+    semana_numero: config.semana,
+    ano: config.ano,
+    key: config.ano * 100 + config.semana,
+    cobre_brl_kg: config.lme_base_brl_kg,
+    dolar_brl: config.dolar_brl,
+    cobre_usd_t: config.lme_cobre_usd_t,
+    lme_final: config.lme_final_brl_kg,
+    data_inicio: config.data_inicio,
+    data_fim: config.data_fim,
+    registros_count: 5,
+  })).sort((a: any, b: any) => b.key - a.key);
 
   // Buscar histórico de simulações
   const { data: historicoSimulacoes = [] } = useQuery({
