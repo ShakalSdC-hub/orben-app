@@ -76,8 +76,8 @@ export default function Indicadores() {
     },
   });
 
-  // Fetch médias semanais OFICIAIS do banco de dados (is_media_semanal = true)
-  const { data: mediasSemanaisOficiais = [], isLoading: isLoadingMedias } = useQuery({
+  // Fetch médias semanais do histórico (is_media_semanal = true)
+  const { data: mediasSemanaisHistorico = [], isLoading: isLoadingMediasHistorico } = useQuery({
     queryKey: ["historico_lme_medias"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -91,29 +91,72 @@ export default function Indicadores() {
     },
   });
 
-  // Estado de carregamento combinado
-  const isLoading = isLoadingHistorico || isLoadingMedias;
+  // Fetch configurações semanais (fonte primária para 2026+)
+  const { data: semanasConfig = [], isLoading: isLoadingConfig } = useQuery({
+    queryKey: ["lme_semana_config_indicadores"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("lme_semana_config")
+        .select("*")
+        .order("ano", { ascending: false })
+        .order("semana", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
 
-  // Transformar médias oficiais para o formato esperado pelo componente
-  const mediasSemanais = mediasSemanaisOficiais.map((m: any) => {
-    const dataRegistro = parseISO(m.data);
-    const semana = m.semana_numero || getISOWeek(dataRegistro);
-    const ano = getISOWeekYear(dataRegistro);
-    const key = ano * 100 + semana;
-    
-    return {
-      semana_numero: semana,
-      ano,
-      key,
-      cobre_brl_kg: m.cobre_brl_kg,
-      aluminio_brl_kg: m.aluminio_brl_kg,
-      dolar_brl: m.dolar_brl,
-      cobre_usd_t: m.cobre_usd_t,
-      registros_count: 5, // Médias oficiais são baseadas em 5 dias úteis
-      data_original: m.data,
-      fonte: m.fonte
-    };
-  }).sort((a: any, b: any) => b.key - a.key);
+  // Estado de carregamento combinado
+  const isLoading = isLoadingHistorico || isLoadingMediasHistorico || isLoadingConfig;
+
+  // Combinar dados de lme_semana_config (prioridade) com historico_lme
+  const mediasSemanais = (() => {
+    // Transformar lme_semana_config para o formato esperado
+    const mediasDeConfig = semanasConfig.map((config: any) => {
+      const key = config.ano * 100 + config.semana;
+      return {
+        semana_numero: config.semana,
+        ano: config.ano,
+        key,
+        cobre_brl_kg: config.lme_base_brl_kg,
+        aluminio_brl_kg: 0, // Config não tem alumínio
+        dolar_brl: config.dolar_brl,
+        cobre_usd_t: config.lme_cobre_usd_t,
+        registros_count: 5,
+        data_original: config.data_fim,
+        fonte: "lme_semana_config"
+      };
+    });
+
+    // Criar set de keys já existentes em lme_semana_config
+    const keysConfig = new Set(mediasDeConfig.map((m: any) => m.key));
+
+    // Adicionar médias do historico_lme que não existem em lme_semana_config
+    const mediasDoHistorico: any[] = [];
+    mediasSemanaisHistorico.forEach((m: any) => {
+      const dataRegistro = parseISO(m.data);
+      const semana = m.semana_numero || getISOWeek(dataRegistro);
+      const ano = getISOWeekYear(dataRegistro);
+      const key = ano * 100 + semana;
+      
+      if (!keysConfig.has(key)) {
+        mediasDoHistorico.push({
+          semana_numero: semana,
+          ano,
+          key,
+          cobre_brl_kg: m.cobre_brl_kg,
+          aluminio_brl_kg: m.aluminio_brl_kg,
+          dolar_brl: m.dolar_brl,
+          cobre_usd_t: m.cobre_usd_t,
+          registros_count: 5,
+          data_original: m.data,
+          fonte: "historico_lme"
+        });
+      }
+    });
+
+    // Combinar e ordenar por key decrescente (mais recente primeiro)
+    return [...mediasDeConfig, ...mediasDoHistorico].sort((a: any, b: any) => b.key - a.key);
+  })();
 
   // Mutation para forçar atualização via API
   const updateLmeMutation = useMutation({
