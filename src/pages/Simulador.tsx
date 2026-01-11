@@ -77,6 +77,8 @@ export default function Simulador() {
   const [pctLmeSucata, setPctLmeSucata] = useState(97);
   const [custoCompraKg, setCustoCompraKg] = useState(66.09);
   const [custoMO, setCustoMO] = useState(3.40);
+  const [custoFinanceiroMode, setCustoFinanceiroMode] = useState<"pct" | "rs">("pct");
+  const [custoFinanceiroVal, setCustoFinanceiroVal] = useState(2);
   const [pesoKg, setPesoKg] = useState(10000);
 
   // Buscar histórico diário
@@ -242,9 +244,16 @@ export default function Simulador() {
   const valorVendaSucata = precoFinalKg * pesoKg;
   const valorCompra = custoCompraKg * pesoKg;
   const valorMO = custoMO * pesoKg;
+  
+  // Cálculo do custo financeiro
+  const custoFinanceiroRsKg = custoFinanceiroMode === "pct" 
+    ? custoCompraKg * (custoFinanceiroVal / 100) 
+    : custoFinanceiroVal;
+  const valorFinanceiro = custoFinanceiroRsKg * pesoKg;
+  
   const difOperacoes = valorCompra - valorVendaSucata;
-  const saldoOperacao = valorVendaSucata - valorCompra - valorMO;
-  const precoIndustrializado = custoCompraKg + custoMO + (difOperacoes > 0 ? difOperacoes / pesoKg : 0);
+  const saldoOperacao = valorVendaSucata - valorCompra - valorMO - valorFinanceiro;
+  const precoIndustrializado = custoCompraKg + custoMO + custoFinanceiroRsKg + (difOperacoes > 0 ? difOperacoes / pesoKg : 0);
 
   // === COMPARATIVO ===
   const diferenca = precoAVista - precoIndustrializado;
@@ -717,7 +726,7 @@ export default function Simulador() {
                     <CardDescription>Compare venda da sucata vs compra + industrialização</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    <div className="grid gap-6 md:grid-cols-3">
+                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
                       <div className="space-y-2">
                         <Label>Peso (kg)</Label>
                         <Input
@@ -743,6 +752,33 @@ export default function Simulador() {
                           value={custoMO}
                           onChange={(e) => setCustoMO(Number(e.target.value))}
                         />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Custo Financeiro</Label>
+                        <div className="flex gap-2">
+                          <Select 
+                            value={custoFinanceiroMode} 
+                            onValueChange={(v: "pct" | "rs") => setCustoFinanceiroMode(v)}
+                          >
+                            <SelectTrigger className="w-20">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="pct">%</SelectItem>
+                              <SelectItem value="rs">R$</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={custoFinanceiroVal}
+                            onChange={(e) => setCustoFinanceiroVal(Number(e.target.value))}
+                            className="flex-1"
+                          />
+                        </div>
+                        <span className="text-xs text-muted-foreground">
+                          = {formatCurrency(custoFinanceiroRsKg)}/kg
+                        </span>
                       </div>
                     </div>
 
@@ -780,6 +816,14 @@ export default function Simulador() {
                             <TableCell className="text-right">{formatCurrency(custoMO)}/kg</TableCell>
                             <TableCell className="text-right font-bold text-destructive">
                               {formatCurrency(valorMO)}
+                            </TableCell>
+                          </TableRow>
+                          <TableRow>
+                            <TableCell className="font-medium">(-) Financeiro</TableCell>
+                            <TableCell className="text-right">{pesoKg.toLocaleString("pt-BR")} kg</TableCell>
+                            <TableCell className="text-right">{formatCurrency(custoFinanceiroRsKg)}/kg</TableCell>
+                            <TableCell className="text-right font-bold text-destructive">
+                              {formatCurrency(valorFinanceiro)}
                             </TableCell>
                           </TableRow>
                           <TableRow className="bg-primary/10">
