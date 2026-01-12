@@ -176,7 +176,22 @@ export default function OperacoesTerceiros() {
     kgDisponivelCliente: beneficiamentos.reduce((acc, b) => acc + (b.kg_disponivel_cliente || 0), 0),
     custoServico: beneficiamentos.reduce((acc, b) => acc + (b.custos_servico_total_rs || 0), 0),
     kgDevolvido: saidas.reduce((acc, s) => acc + (s.kg_devolvido || 0), 0),
-    receitaServico: cobrancas.reduce((acc, c) => acc + (c.val || 0), 0),
+    receitaServico: saidas.reduce((acc, s) => acc + (s.custo_servico_saida_rs || 0), 0),
+  };
+
+  // Função para calcular valor total de uma cobrança
+  const calcularTotalCobranca = (c: any) => {
+    const val = c.val || 0;
+    if (c.mode === 'TOTAL') return val;
+    
+    // mode === 'RKG' - valor por kg
+    let baseKg = 0;
+    if (c.base_kg_mode === 'DEVOLVIDO') baseKg = totais.kgDevolvido;
+    else if (c.base_kg_mode === 'RECEBIDO') baseKg = totais.kgRecebido;
+    else if (c.base_kg_mode === 'BENEFICIADO') baseKg = totais.kgBeneficiado;
+    else baseKg = totais.kgDevolvido; // default
+    
+    return val * baseKg;
   };
 
   const handleEditEntrada = (entrada: any) => {
@@ -547,26 +562,46 @@ export default function OperacoesTerceiros() {
                                 <TableHead>Data</TableHead>
                                 <TableHead>Tipo</TableHead>
                                 <TableHead>Documento</TableHead>
-                                <TableHead className="text-right">Valor</TableHead>
+                                <TableHead className="text-right">Valor Unit.</TableHead>
+                                <TableHead>Modo/Base</TableHead>
+                                <TableHead className="text-right">Total</TableHead>
                                 <TableHead className="w-10"></TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {cobrancas.map((c) => (
-                                <TableRow key={c.id}>
-                                  <TableCell>{format(new Date(c.dt), "dd/MM/yy")}</TableCell>
-                                  <TableCell><Badge variant="outline">{c.tipo}</Badge></TableCell>
-                                  <TableCell>{c.documento || "-"}</TableCell>
-                                  <TableCell className="text-right">{formatCurrency(c.val || 0)}</TableCell>
-                                  <TableCell>
-                                    {canEdit && (
-                                      <Button variant="ghost" size="icon" onClick={() => handleEditCobranca(c)}>
-                                        <Pencil className="h-4 w-4" />
-                                      </Button>
-                                    )}
-                                  </TableCell>
-                                </TableRow>
-                              ))}
+                              {cobrancas.map((c) => {
+                                const totalCalculado = calcularTotalCobranca(c);
+                                const modoLabel = c.mode === 'RKG' ? 'R$/kg' : 'Total';
+                                const baseLabel = c.mode === 'RKG' ? (c.base_kg_mode || 'DEVOLVIDO') : '-';
+                                
+                                return (
+                                  <TableRow key={c.id}>
+                                    <TableCell>{format(new Date(c.dt), "dd/MM/yy")}</TableCell>
+                                    <TableCell><Badge variant="outline">{c.tipo}</Badge></TableCell>
+                                    <TableCell>{c.documento || "-"}</TableCell>
+                                    <TableCell className="text-right">
+                                      {c.mode === 'RKG' 
+                                        ? `${formatCurrency(c.val || 0)}/kg` 
+                                        : formatCurrency(c.val || 0)}
+                                    </TableCell>
+                                    <TableCell>
+                                      <span className="text-xs text-muted-foreground">
+                                        {modoLabel}{c.mode === 'RKG' && ` × ${baseLabel.toLowerCase()}`}
+                                      </span>
+                                    </TableCell>
+                                    <TableCell className="text-right font-semibold text-success">
+                                      {formatCurrency(totalCalculado)}
+                                    </TableCell>
+                                    <TableCell>
+                                      {canEdit && (
+                                        <Button variant="ghost" size="icon" onClick={() => handleEditCobranca(c)}>
+                                          <Pencil className="h-4 w-4" />
+                                        </Button>
+                                      )}
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
                             </TableBody>
                           </Table>
                         )}
