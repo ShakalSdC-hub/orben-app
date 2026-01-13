@@ -1491,13 +1491,21 @@ export type Database = {
           created_by: string | null
           data_simulacao: string
           dolar_brl: number
+          economia_pct_new: number | null
           fator_imposto: number | null
           id: string
           lme_semana_brl_kg: number | null
+          parcelas_json: Json | null
           pct_lme_negociada: number | null
+          pct_lme_sucata: number | null
+          prazo_sucata_dias: number | null
           preco_a_prazo: number | null
           preco_a_vista: number | null
           preco_com_imposto: number | null
+          preco_final_prazo: number | null
+          resultado_new: string | null
+          taxa_financeira_mensal: number | null
+          total_juros_lme: number | null
         }
         Insert: {
           cobre_usd_t: number
@@ -1505,13 +1513,21 @@ export type Database = {
           created_by?: string | null
           data_simulacao?: string
           dolar_brl: number
+          economia_pct_new?: number | null
           fator_imposto?: number | null
           id?: string
           lme_semana_brl_kg?: number | null
+          parcelas_json?: Json | null
           pct_lme_negociada?: number | null
+          pct_lme_sucata?: number | null
+          prazo_sucata_dias?: number | null
           preco_a_prazo?: number | null
           preco_a_vista?: number | null
           preco_com_imposto?: number | null
+          preco_final_prazo?: number | null
+          resultado_new?: string | null
+          taxa_financeira_mensal?: number | null
+          total_juros_lme?: number | null
         }
         Update: {
           cobre_usd_t?: number
@@ -1519,13 +1535,21 @@ export type Database = {
           created_by?: string | null
           data_simulacao?: string
           dolar_brl?: number
+          economia_pct_new?: number | null
           fator_imposto?: number | null
           id?: string
           lme_semana_brl_kg?: number | null
+          parcelas_json?: Json | null
           pct_lme_negociada?: number | null
+          pct_lme_sucata?: number | null
+          prazo_sucata_dias?: number | null
           preco_a_prazo?: number | null
           preco_a_vista?: number | null
           preco_com_imposto?: number | null
+          preco_final_prazo?: number | null
+          resultado_new?: string | null
+          taxa_financeira_mensal?: number | null
+          total_juros_lme?: number | null
         }
         Relationships: [
           {

@@ -3,7 +3,6 @@ import { MainLayout } from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Slider } from "@/components/ui/slider";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -31,14 +30,17 @@ import {
   Plus,
   Trash2,
   CalendarDays,
+  FileText,
+  Percent,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { format, addDays, parseISO, getISOWeek, getISOWeekYear, isWithinInterval, startOfMonth, endOfMonth } from "date-fns";
+import { format, addDays, parseISO, isWithinInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Cell, LabelList } from "recharts";
 
 interface Parcela {
   numero: number;
@@ -46,6 +48,9 @@ interface Parcela {
   dias: number;
   dataVencimento: string;
   valor: number;
+  jurosPct?: number;
+  jurosRs?: number;
+  valorComFinanceiro?: number;
 }
 
 export default function Simulador() {
@@ -73,12 +78,14 @@ export default function Simulador() {
     { numero: 3, percentual: 30, dias: 60, dataVencimento: "", valor: 0 },
   ]);
 
+  // Taxa financeira para cálculo prorata (% ao mês)
+  const [taxaFinanceiraMensal, setTaxaFinanceiraMensal] = useState(1.80);
+
   // Sucata inputs
   const [pctLmeSucata, setPctLmeSucata] = useState(97);
   const [custoCompraKg, setCustoCompraKg] = useState(66.09);
   const [custoMO, setCustoMO] = useState(3.40);
-  const [custoFinanceiroMode, setCustoFinanceiroMode] = useState<"pct" | "rs">("pct");
-  const [custoFinanceiroVal, setCustoFinanceiroVal] = useState(2);
+  const [prazoSucataDias, setPrazoSucataDias] = useState(40);
   const [pesoKg, setPesoKg] = useState(10000);
 
   // Buscar histórico diário
@@ -231,12 +238,26 @@ export default function Simulador() {
   const precoComImposto = lmeSemanaBrlKg / fatorImposto;
   const precoAVista = precoComImposto * (1 - pctLmeNegociada / 100);
 
-  // Calcular valores das parcelas
-  const parcelasComValor = parcelas.map(p => ({
-    ...p,
-    valor: precoAVista * (p.percentual / 100)
-  }));
+  // Calcular valores das parcelas com custo financeiro prorata
+  // Fórmula: Juros (%) = Taxa Mensal × (Dias / 30)
+  //          Juros (R$) = Valor Base × Juros (%)
+  //          Valor Total = Valor Base + Juros (R$)
+  const parcelasComValor = parcelas.map(p => {
+    const valorBase = precoAVista * (p.percentual / 100);
+    const jurosPct = (taxaFinanceiraMensal / 100) * (p.dias / 30);
+    const jurosRs = valorBase * jurosPct;
+    return {
+      ...p,
+      valor: valorBase,
+      jurosPct,
+      jurosRs,
+      valorComFinanceiro: valorBase + jurosRs
+    };
+  });
+
   const totalParcelas = parcelasComValor.reduce((acc, p) => acc + p.valor, 0);
+  const totalJuros = parcelasComValor.reduce((acc, p) => acc + (p.jurosRs || 0), 0);
+  const totalComFinanceiro = parcelasComValor.reduce((acc, p) => acc + (p.valorComFinanceiro || 0), 0);
 
   // === CÁLCULOS SUCATA ===
   const totalMediaBrl = (cobreUsdT * dolarBrl);
@@ -245,10 +266,9 @@ export default function Simulador() {
   const valorCompra = custoCompraKg * pesoKg;
   const valorMO = custoMO * pesoKg;
   
-  // Cálculo do custo financeiro
-  const custoFinanceiroRsKg = custoFinanceiroMode === "pct" 
-    ? custoCompraKg * (custoFinanceiroVal / 100) 
-    : custoFinanceiroVal;
+  // Cálculo do custo financeiro prorata para sucata
+  const jurosProrataSucata = (taxaFinanceiraMensal / 100) * (prazoSucataDias / 30);
+  const custoFinanceiroRsKg = custoCompraKg * jurosProrataSucata;
   const valorFinanceiro = custoFinanceiroRsKg * pesoKg;
   
   const difOperacoes = valorCompra - valorVendaSucata;
@@ -256,9 +276,15 @@ export default function Simulador() {
   const precoIndustrializado = custoCompraKg + custoMO + custoFinanceiroRsKg + (difOperacoes > 0 ? difOperacoes / pesoKg : 0);
 
   // === COMPARATIVO ===
-  const diferenca = precoAVista - precoIndustrializado;
-  const economiaPct = ((diferenca / precoAVista) * 100);
+  const diferenca = totalComFinanceiro - precoIndustrializado;
+  const economiaPct = ((diferenca / totalComFinanceiro) * 100);
   const valeAPena = saldoOperacao > 0;
+
+  // Dados do gráfico comparativo
+  const dadosComparativo = [
+    { nome: "Vergalhão LME", valor: totalComFinanceiro, fill: "#f59e0b" },
+    { nome: "Sucata + Ind.", valor: precoIndustrializado, fill: "#10b981" },
+  ];
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-BR", {
@@ -289,6 +315,113 @@ export default function Simulador() {
     ));
   };
 
+  // Exportar para PDF
+  const exportToPDF = () => {
+    const printContent = `
+      <html>
+        <head>
+          <title>Simulação LME - ${format(new Date(), "dd/MM/yyyy HH:mm")}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; font-size: 12px; }
+            h1 { color: #333; border-bottom: 2px solid #0ea5e9; padding-bottom: 10px; font-size: 18px; }
+            h2 { color: #555; margin-top: 20px; font-size: 14px; }
+            h3 { color: #666; margin-top: 15px; font-size: 12px; }
+            table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+            th, td { border: 1px solid #ddd; padding: 6px; text-align: left; }
+            th { background-color: #f5f5f5; }
+            .highlight { background-color: #fef3c7; font-weight: bold; }
+            .success { color: #10b981; }
+            .danger { color: #ef4444; }
+            .section { margin-bottom: 25px; page-break-inside: avoid; }
+            .header-info { display: flex; justify-content: space-between; margin-bottom: 20px; }
+          </style>
+        </head>
+        <body>
+          <h1>Simulação LME - Orben</h1>
+          <p><strong>Data:</strong> ${format(new Date(), "dd/MM/yyyy HH:mm")}</p>
+          
+          <div class="section">
+            <h2>Parâmetros de Mercado</h2>
+            <table>
+              <tr><th>Cobre (US$/t)</th><td>${cobreUsdT.toLocaleString("pt-BR")}</td></tr>
+              <tr><th>Dólar (R$/US$)</th><td>R$ ${dolarBrl.toFixed(4)}</td></tr>
+              <tr><th>LME Semana (R$/kg)</th><td>${formatCurrency(lmeSemanaBrlKg)}</td></tr>
+              <tr><th>Taxa Financeira</th><td>${taxaFinanceiraMensal.toFixed(2)}% a.m.</td></tr>
+            </table>
+          </div>
+          
+          <div class="section">
+            <h2>Vergalhão LME</h2>
+            <table>
+              <tr><th>Fator Imposto</th><td>${fatorImposto}</td></tr>
+              <tr><th>% LME Negociada</th><td>${pctLmeNegociada}%</td></tr>
+              <tr><th>Preço c/ Imposto</th><td>${formatCurrency(precoComImposto)}/kg</td></tr>
+              <tr class="highlight"><th>Preço à Vista</th><td>${formatCurrency(precoAVista)}/kg</td></tr>
+              <tr><th>Custo Financeiro</th><td>+${formatCurrency(totalJuros)}/kg</td></tr>
+              <tr class="highlight"><th>Preço Final a Prazo</th><td>${formatCurrency(totalComFinanceiro)}/kg</td></tr>
+            </table>
+            
+            <h3>Parcelas</h3>
+            <table>
+              <tr><th>Parcela</th><th>%</th><th>Dias</th><th>Vencimento</th><th>Valor Base</th><th>Juros (%)</th><th>Juros (R$)</th><th>Total</th></tr>
+              ${parcelasComValor.map(p => `
+                <tr>
+                  <td>${p.numero}ª</td>
+                  <td>${p.percentual}%</td>
+                  <td>${p.dias}</td>
+                  <td>${p.dataVencimento ? format(new Date(p.dataVencimento), "dd/MM/yyyy") : "-"}</td>
+                  <td>${formatCurrency(p.valor)}</td>
+                  <td>${((p.jurosPct || 0) * 100).toFixed(3)}%</td>
+                  <td>${formatCurrency(p.jurosRs || 0)}</td>
+                  <td>${formatCurrency(p.valorComFinanceiro || 0)}</td>
+                </tr>
+              `).join('')}
+              <tr class="highlight">
+                <td colspan="4"><strong>TOTAL</strong></td>
+                <td>${formatCurrency(totalParcelas)}</td>
+                <td></td>
+                <td>${formatCurrency(totalJuros)}</td>
+                <td><strong>${formatCurrency(totalComFinanceiro)}/kg</strong></td>
+              </tr>
+            </table>
+          </div>
+          
+          <div class="section">
+            <h2>Sucata + Industrialização</h2>
+            <table>
+              <tr><th>% LME Sucata</th><td>${pctLmeSucata}%</td></tr>
+              <tr><th>Preço Sucata</th><td>${formatCurrency(precoFinalKg)}/kg</td></tr>
+              <tr><th>Custo Compra</th><td>${formatCurrency(custoCompraKg)}/kg</td></tr>
+              <tr><th>Mão de Obra</th><td>${formatCurrency(custoMO)}/kg</td></tr>
+              <tr><th>Prazo (dias)</th><td>${prazoSucataDias}</td></tr>
+              <tr><th>Custo Financeiro</th><td>${formatCurrency(custoFinanceiroRsKg)}/kg</td></tr>
+              <tr class="highlight"><th>Preço Industrializado</th><td>${formatCurrency(precoIndustrializado)}/kg</td></tr>
+            </table>
+          </div>
+          
+          <div class="section">
+            <h2>Resultado Comparativo</h2>
+            <table>
+              <tr><th>Vergalhão LME a Prazo</th><td>${formatCurrency(totalComFinanceiro)}/kg</td></tr>
+              <tr><th>Custo Industrializado</th><td>${formatCurrency(precoIndustrializado)}/kg</td></tr>
+              <tr><th>Diferença</th><td class="${diferenca > 0 ? 'danger' : 'success'}">${formatCurrency(diferenca)}/kg</td></tr>
+              <tr><th>Economia</th><td class="${economiaPct > 0 ? 'danger' : 'success'}">${economiaPct.toFixed(1)}%</td></tr>
+              <tr class="highlight"><th>Resultado</th><td class="${valeAPena ? 'success' : 'danger'}">${valeAPena ? "COMPRAR SUCATA" : "COMPRAR VERGALHÃO"}</td></tr>
+            </table>
+          </div>
+        </body>
+      </html>
+    `;
+    
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
+    }
+  };
+
   // Salvar simulação
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -297,14 +430,28 @@ export default function Simulador() {
         dolar_brl: dolarBrl,
         fator_imposto: fatorImposto,
         pct_lme_negociada: pctLmeNegociada,
-        prazo_dias: parcelas[0]?.dias || 40,
         lme_semana_brl_kg: lmeSemanaBrlKg,
         preco_com_imposto: precoComImposto,
         preco_a_vista: precoAVista,
-        preco_a_prazo: totalParcelas,
+        preco_a_prazo: totalComFinanceiro,
+        // Novos campos
+        taxa_financeira_mensal: taxaFinanceiraMensal,
+        total_juros_lme: totalJuros,
+        preco_final_prazo: totalComFinanceiro,
+        pct_lme_sucata: pctLmeSucata,
+        prazo_sucata_dias: prazoSucataDias,
         custo_sucata_kg: precoIndustrializado,
-        economia_pct: economiaPct,
-        resultado: valeAPena ? "COMPRAR SUCATA" : "COMPRAR VERGALHÃO",
+        economia_pct_new: economiaPct,
+        resultado_new: valeAPena ? "COMPRAR SUCATA" : "COMPRAR VERGALHÃO",
+        parcelas_json: parcelasComValor.map(p => ({
+          numero: p.numero,
+          percentual: p.percentual,
+          dias: p.dias,
+          valor: p.valor,
+          jurosPct: p.jurosPct,
+          jurosRs: p.jurosRs,
+          valorComFinanceiro: p.valorComFinanceiro
+        })),
         created_by: user?.id,
       });
       if (error) throw error;
@@ -330,6 +477,10 @@ export default function Simulador() {
             </p>
           </div>
           <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={exportToPDF}>
+              <FileText className="mr-2 h-4 w-4" />
+              Exportar PDF
+            </Button>
             <Button variant="outline" size="sm" onClick={() => window.print()}>
               <Printer className="mr-2 h-4 w-4" />
               Imprimir
@@ -462,17 +613,45 @@ export default function Simulador() {
                       </div>
                       <div className="space-y-2">
                         <Label>% LME Negociada (desconto)</Label>
-                        <div className="flex items-center gap-4">
-                          <Slider
-                            value={[pctLmeNegociada]}
-                            onValueChange={([value]) => setPctLmeNegociada(value)}
-                            min={0}
-                            max={15}
-                            step={0.5}
-                            className="flex-1"
+                        <div className="relative">
+                          <Input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            max="100"
+                            value={pctLmeNegociada}
+                            onChange={(e) => setPctLmeNegociada(Number(e.target.value))}
+                            className="pr-8"
                           />
-                          <span className="w-12 text-right font-medium">{pctLmeNegociada}%</span>
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">%</span>
                         </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Custo Financeiro */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Percent className="h-5 w-5 text-primary" />
+                      Custo Financeiro
+                    </CardTitle>
+                    <CardDescription>Taxa aplicada ao prazo das parcelas</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      <Label>Taxa Financeira (% ao mês)</Label>
+                      <div className="relative">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={taxaFinanceiraMensal}
+                          onChange={(e) => setTaxaFinanceiraMensal(Number(e.target.value))}
+                          className="pr-14"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">% a.m.</span>
                       </div>
                     </div>
                   </CardContent>
@@ -504,11 +683,14 @@ export default function Simulador() {
                         <TableHeader>
                           <TableRow className="bg-muted/50">
                             <TableHead>Parcela</TableHead>
-                            <TableHead className="w-24">% do Total</TableHead>
-                            <TableHead className="w-24">Dias</TableHead>
+                            <TableHead className="w-20">% Total</TableHead>
+                            <TableHead className="w-20">Dias</TableHead>
                             <TableHead>Vencimento</TableHead>
-                            <TableHead className="text-right">Valor (R$/kg)</TableHead>
-                            <TableHead className="w-12"></TableHead>
+                            <TableHead className="text-right">Valor Base</TableHead>
+                            <TableHead className="text-right">Juros (%)</TableHead>
+                            <TableHead className="text-right">Juros (R$)</TableHead>
+                            <TableHead className="text-right">Total</TableHead>
+                            <TableHead className="w-10"></TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -520,7 +702,7 @@ export default function Simulador() {
                                   type="number"
                                   value={p.percentual}
                                   onChange={(e) => updateParcela(idx, "percentual", Number(e.target.value))}
-                                  className="h-8 w-20"
+                                  className="h-8 w-16"
                                 />
                               </TableCell>
                               <TableCell>
@@ -528,18 +710,27 @@ export default function Simulador() {
                                   type="number"
                                   value={p.dias}
                                   onChange={(e) => updateParcela(idx, "dias", Number(e.target.value))}
-                                  className="h-8 w-20"
+                                  className="h-8 w-16"
                                 />
                               </TableCell>
                               <TableCell>
                                 {p.dataVencimento ? format(new Date(p.dataVencimento), "dd/MM/yyyy") : "-"}
                               </TableCell>
-                              <TableCell className="text-right font-medium">
+                              <TableCell className="text-right">
                                 {formatCurrency(p.valor)}
+                              </TableCell>
+                              <TableCell className="text-right text-muted-foreground">
+                                {((p.jurosPct || 0) * 100).toFixed(3)}%
+                              </TableCell>
+                              <TableCell className="text-right text-orange-600">
+                                +{formatCurrency(p.jurosRs || 0)}
+                              </TableCell>
+                              <TableCell className="text-right font-medium">
+                                {formatCurrency(p.valorComFinanceiro || 0)}
                               </TableCell>
                               <TableCell>
                                 {parcelas.length > 1 && (
-                                  <Button variant="ghost" size="icon" onClick={() => removeParcela(idx)}>
+                                  <Button variant="ghost" size="icon" onClick={() => removeParcela(idx)} className="h-8 w-8">
                                     <Trash2 className="h-4 w-4 text-destructive" />
                                   </Button>
                                 )}
@@ -548,7 +739,10 @@ export default function Simulador() {
                           ))}
                           <TableRow className="bg-muted/30 font-bold">
                             <TableCell colSpan={4}>TOTAL</TableCell>
-                            <TableCell className="text-right">{formatCurrency(totalParcelas)}/kg</TableCell>
+                            <TableCell className="text-right">{formatCurrency(totalParcelas)}</TableCell>
+                            <TableCell className="text-right"></TableCell>
+                            <TableCell className="text-right text-orange-600">+{formatCurrency(totalJuros)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(totalComFinanceiro)}/kg</TableCell>
                             <TableCell></TableCell>
                           </TableRow>
                         </TableBody>
@@ -582,13 +776,18 @@ export default function Simulador() {
                         <span className="font-medium">{formatCurrency(precoComImposto)}</span>
                       </div>
                       <Separator />
-                      <div className="flex justify-between text-lg font-bold">
-                        <span>Preço à Vista</span>
-                        <span className="text-primary">{formatCurrency(precoAVista)}/kg</span>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Preço à Vista</span>
+                        <span className="font-medium">{formatCurrency(precoAVista)}/kg</span>
                       </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Custo Financeiro</span>
+                        <span className="font-medium text-orange-600">+{formatCurrency(totalJuros)}/kg</span>
+                      </div>
+                      <Separator />
                       <div className="flex justify-between text-lg font-bold">
-                        <span>Preço a Prazo</span>
-                        <span className="text-primary">{formatCurrency(totalParcelas)}/kg</span>
+                        <span>Preço Final a Prazo</span>
+                        <span className="text-primary">{formatCurrency(totalComFinanceiro)}/kg</span>
                       </div>
                     </div>
                   </CardContent>
@@ -692,16 +891,17 @@ export default function Simulador() {
                     <div className="grid gap-6 md:grid-cols-2">
                       <div className="space-y-2">
                         <Label>% LME Sucata (Mista: 97%, Mel: 102%)</Label>
-                        <div className="flex items-center gap-4">
-                          <Slider
-                            value={[pctLmeSucata]}
-                            onValueChange={([value]) => setPctLmeSucata(value)}
-                            min={90}
-                            max={110}
-                            step={1}
-                            className="flex-1"
+                        <div className="relative">
+                          <Input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            max="200"
+                            value={pctLmeSucata}
+                            onChange={(e) => setPctLmeSucata(Number(e.target.value))}
+                            className="pr-8"
                           />
-                          <span className="w-16 text-right font-medium">{pctLmeSucata}%</span>
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">%</span>
                         </div>
                       </div>
                       <div className="space-y-2">
@@ -726,7 +926,7 @@ export default function Simulador() {
                     <CardDescription>Compare venda da sucata vs compra + industrialização</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
                       <div className="space-y-2">
                         <Label>Peso (kg)</Label>
                         <Input
@@ -754,31 +954,33 @@ export default function Simulador() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>Custo Financeiro</Label>
-                        <div className="flex gap-2">
-                          <Select 
-                            value={custoFinanceiroMode} 
-                            onValueChange={(v: "pct" | "rs") => setCustoFinanceiroMode(v)}
-                          >
-                            <SelectTrigger className="w-20">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="pct">%</SelectItem>
-                              <SelectItem value="rs">R$</SelectItem>
-                            </SelectContent>
-                          </Select>
+                        <Label>Taxa Financeira (% a.m.)</Label>
+                        <div className="relative">
                           <Input
                             type="number"
                             step="0.01"
-                            value={custoFinanceiroVal}
-                            onChange={(e) => setCustoFinanceiroVal(Number(e.target.value))}
-                            className="flex-1"
+                            min="0"
+                            value={taxaFinanceiraMensal}
+                            onChange={(e) => setTaxaFinanceiraMensal(Number(e.target.value))}
+                            className="pr-14"
                           />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">% a.m.</span>
                         </div>
-                        <span className="text-xs text-muted-foreground">
-                          = {formatCurrency(custoFinanceiroRsKg)}/kg
-                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Prazo (dias)</Label>
+                        <Input
+                          type="number"
+                          value={prazoSucataDias}
+                          onChange={(e) => setPrazoSucataDias(Number(e.target.value))}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-muted/50 rounded-lg">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Custo Financeiro Calculado:</span>
+                        <span className="font-medium text-orange-600">{formatCurrency(custoFinanceiroRsKg)}/kg ({(jurosProrataSucata * 100).toFixed(3)}%)</span>
                       </div>
                     </div>
 
@@ -892,9 +1094,9 @@ export default function Simulador() {
 
                     <div className="space-y-3">
                       <div className="rounded-lg bg-primary/5 p-3">
-                        <p className="text-xs text-muted-foreground mb-1">Vergalhão LME à Vista</p>
+                        <p className="text-xs text-muted-foreground mb-1">Vergalhão LME a Prazo</p>
                         <p className="text-2xl font-bold text-primary">
-                          {formatCurrency(precoAVista)}/kg
+                          {formatCurrency(totalComFinanceiro)}/kg
                         </p>
                       </div>
                       <div className="text-center text-2xl font-bold text-muted-foreground">vs</div>
@@ -911,15 +1113,48 @@ export default function Simulador() {
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Diferença</span>
-                        <span className={cn("font-bold", diferenca > 0 ? "text-success" : "text-destructive")}>
+                        <span className={cn("font-bold", diferenca > 0 ? "text-destructive" : "text-success")}>
                           {formatCurrency(diferenca)}/kg
                         </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Economia</span>
-                        <span className={cn("font-bold", economiaPct > 0 ? "text-success" : "text-destructive")}>
+                        <span className={cn("font-bold", economiaPct > 0 ? "text-destructive" : "text-success")}>
                           {economiaPct.toFixed(1)}%
                         </span>
+                      </div>
+                    </div>
+
+                    {/* Gráfico Comparativo */}
+                    <div className="pt-4 border-t">
+                      <p className="text-sm font-medium mb-3">Comparativo Visual</p>
+                      <div className="h-32">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart 
+                            data={dadosComparativo} 
+                            layout="vertical"
+                            margin={{ top: 5, right: 60, bottom: 5, left: 80 }}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                            <XAxis 
+                              type="number" 
+                              tickFormatter={(v) => `R$ ${v.toFixed(0)}`}
+                              domain={['dataMin - 5', 'dataMax + 5']}
+                            />
+                            <YAxis type="category" dataKey="nome" width={80} fontSize={12} />
+                            <Bar dataKey="valor" radius={[0, 4, 4, 0]}>
+                              {dadosComparativo.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.fill} />
+                              ))}
+                              <LabelList 
+                                dataKey="valor" 
+                                position="right" 
+                                formatter={(v: number) => formatCurrency(v)} 
+                                style={{ fontSize: 11, fontWeight: 'bold' }}
+                              />
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
                       </div>
                     </div>
                   </CardContent>
@@ -944,7 +1179,9 @@ export default function Simulador() {
                       <TableHead>Data</TableHead>
                       <TableHead>Cobre (US$/t)</TableHead>
                       <TableHead>Dólar</TableHead>
+                      <TableHead>Taxa Fin.</TableHead>
                       <TableHead>Preço à Vista</TableHead>
+                      <TableHead>Preço a Prazo</TableHead>
                       <TableHead>Custo Sucata</TableHead>
                       <TableHead>Economia</TableHead>
                       <TableHead>Resultado</TableHead>
@@ -953,7 +1190,7 @@ export default function Simulador() {
                   <TableBody>
                     {!historicoSimulacoes?.length ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center text-muted-foreground">
+                        <TableCell colSpan={9} className="text-center text-muted-foreground">
                           Nenhuma simulação salva
                         </TableCell>
                       </TableRow>
@@ -963,17 +1200,19 @@ export default function Simulador() {
                           <TableCell>{format(new Date(sim.data_simulacao), "dd/MM/yyyy HH:mm")}</TableCell>
                           <TableCell>{sim.cobre_usd_t?.toLocaleString("pt-BR")}</TableCell>
                           <TableCell>{sim.dolar_brl?.toFixed(4)}</TableCell>
+                          <TableCell>{sim.taxa_financeira_mensal?.toFixed(2) || "0.00"}%</TableCell>
                           <TableCell>{formatCurrency(sim.preco_a_vista)}</TableCell>
+                          <TableCell>{formatCurrency(sim.preco_final_prazo || sim.preco_a_prazo)}</TableCell>
                           <TableCell>{formatCurrency(sim.custo_sucata_kg)}</TableCell>
-                          <TableCell className={cn(sim.economia_pct > 0 ? "text-success" : "text-destructive")}>
-                            {sim.economia_pct?.toFixed(1)}%
+                          <TableCell className={cn((sim.economia_pct_new || sim.economia_pct) > 0 ? "text-destructive" : "text-success")}>
+                            {(sim.economia_pct_new || sim.economia_pct)?.toFixed(1)}%
                           </TableCell>
                           <TableCell>
                             <span className={cn(
                               "px-2 py-1 rounded text-xs font-medium",
-                              sim.resultado?.includes("SUCATA") ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"
+                              (sim.resultado_new || sim.resultado)?.includes("SUCATA") ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"
                             )}>
-                              {sim.resultado}
+                              {sim.resultado_new || sim.resultado}
                             </span>
                           </TableCell>
                         </TableRow>
