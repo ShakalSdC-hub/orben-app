@@ -1187,6 +1187,78 @@ export type Database = {
           },
         ]
       }
+      orcamentos_servico_terceiros: {
+        Row: {
+          cobranca_mode: string | null
+          cobranca_valor: number
+          created_at: string | null
+          created_by: string | null
+          custo_frete_kg: number | null
+          custo_mo_interna_kg: number | null
+          custo_mo_terceira_kg: number | null
+          custo_servico_kg: number
+          id: string
+          is_deleted: boolean | null
+          lucro_total: number | null
+          margem_lucro_kg: number | null
+          material_recebido: string
+          material_retornado: string | null
+          nome_cliente: string
+          perda_pct: number | null
+          preco_compra_kg: number
+          qtd_recebida_kg: number
+          qtd_retornada_kg: number
+          total_custos_kg: number
+          valor_final_kg_cliente: number
+        }
+        Insert: {
+          cobranca_mode?: string | null
+          cobranca_valor: number
+          created_at?: string | null
+          created_by?: string | null
+          custo_frete_kg?: number | null
+          custo_mo_interna_kg?: number | null
+          custo_mo_terceira_kg?: number | null
+          custo_servico_kg: number
+          id?: string
+          is_deleted?: boolean | null
+          lucro_total?: number | null
+          margem_lucro_kg?: number | null
+          material_recebido: string
+          material_retornado?: string | null
+          nome_cliente: string
+          perda_pct?: number | null
+          preco_compra_kg: number
+          qtd_recebida_kg: number
+          qtd_retornada_kg: number
+          total_custos_kg: number
+          valor_final_kg_cliente: number
+        }
+        Update: {
+          cobranca_mode?: string | null
+          cobranca_valor?: number
+          created_at?: string | null
+          created_by?: string | null
+          custo_frete_kg?: number | null
+          custo_mo_interna_kg?: number | null
+          custo_mo_terceira_kg?: number | null
+          custo_servico_kg?: number
+          id?: string
+          is_deleted?: boolean | null
+          lucro_total?: number | null
+          margem_lucro_kg?: number | null
+          material_recebido?: string
+          material_retornado?: string | null
+          nome_cliente?: string
+          perda_pct?: number | null
+          preco_compra_kg?: number
+          qtd_recebida_kg?: number
+          qtd_retornada_kg?: number
+          total_custos_kg?: number
+          valor_final_kg_cliente?: number
+        }
+        Relationships: []
+      }
       parceiros: {
         Row: {
           ativo: boolean | null

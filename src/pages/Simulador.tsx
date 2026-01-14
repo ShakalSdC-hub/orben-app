@@ -88,6 +88,20 @@ export default function Simulador() {
   const [prazoSucataDias, setPrazoSucataDias] = useState(40);
   const [pesoKg, setPesoKg] = useState(10000);
 
+  // === Estados para Orçamento Serviço Terceiros ===
+  const [orcNomeCliente, setOrcNomeCliente] = useState("");
+  const [orcMaterialRecebido, setOrcMaterialRecebido] = useState("Sucata");
+  const [orcQtdRecebidaKg, setOrcQtdRecebidaKg] = useState(10000);
+  const [orcPrecoCompraKg, setOrcPrecoCompraKg] = useState(70);
+  const [orcCustoFreteKg, setOrcCustoFreteKg] = useState(0);
+  const [orcCustoMoTerceiraKg, setOrcCustoMoTerceiraKg] = useState(0);
+  const [orcCustoMoInternaKg, setOrcCustoMoInternaKg] = useState(3.40);
+  const [orcPerdaPct, setOrcPerdaPct] = useState(5);
+  const [orcCobrancaMode, setOrcCobrancaMode] = useState<"percentual" | "valor">("valor");
+  const [orcCobrancaValor, setOrcCobrancaValor] = useState(7.10);
+  const [orcMaterialRetornado, setOrcMaterialRetornado] = useState("Fio de Cobre 1,83mm");
+  const [orcEditingId, setOrcEditingId] = useState<string | null>(null);
+
   // Buscar histórico diário
   const { data: historico = [] } = useQuery({
     queryKey: ["historico_lme_simulador"],
@@ -140,6 +154,21 @@ export default function Simulador() {
         .select("*")
         .order("data_simulacao", { ascending: false })
         .limit(10);
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Buscar histórico de orçamentos de terceiros
+  const { data: historicoOrcamentos = [] } = useQuery({
+    queryKey: ["orcamentos-servico-terceiros"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("orcamentos_servico_terceiros")
+        .select("*")
+        .eq("is_deleted", false)
+        .order("created_at", { ascending: false })
+        .limit(20);
       if (error) throw error;
       return data;
     },
@@ -285,6 +314,21 @@ export default function Simulador() {
     { nome: "Vergalhão LME", valor: totalComFinanceiro, fill: "#f59e0b" },
     { nome: "Sucata + Ind.", valor: precoIndustrializado, fill: "#10b981" },
   ];
+
+  // === CÁLCULOS ORÇAMENTO TERCEIROS ===
+  const orcTotalCustosKg = orcCustoFreteKg + orcCustoMoTerceiraKg + orcCustoMoInternaKg;
+  const orcQtdRetornadaKg = orcQtdRecebidaKg * (1 - orcPerdaPct / 100);
+  const orcCustoServicoKg = orcCobrancaMode === "valor" 
+    ? orcCobrancaValor 
+    : (orcTotalCustosKg * (1 + orcCobrancaValor / 100));
+  const orcMargemLucroKg = orcCustoServicoKg - orcTotalCustosKg;
+  const orcMargemLucroPct = orcTotalCustosKg > 0 ? (orcMargemLucroKg / orcTotalCustosKg) * 100 : 0;
+  const orcReceitaTotal = orcCustoServicoKg * orcQtdRetornadaKg;
+  const orcCustoOperacionalTotal = orcTotalCustosKg * orcQtdRecebidaKg;
+  const orcLucroTotal = orcReceitaTotal - orcCustoOperacionalTotal;
+  const orcValorMaterialCliente = orcQtdRecebidaKg * orcPrecoCompraKg;
+  const orcCustoBaseKgRetornado = orcQtdRetornadaKg > 0 ? orcValorMaterialCliente / orcQtdRetornadaKg : 0;
+  const orcValorFinalKgCliente = orcCustoBaseKgRetornado + orcCustoServicoKg;
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat("pt-BR", {
@@ -465,6 +509,256 @@ export default function Simulador() {
     },
   });
 
+  // Salvar orçamento de terceiros
+  const saveOrcamentoMutation = useMutation({
+    mutationFn: async () => {
+      if (!orcNomeCliente.trim()) {
+        throw new Error("Nome do cliente é obrigatório");
+      }
+      const payload = {
+        nome_cliente: orcNomeCliente,
+        material_recebido: orcMaterialRecebido,
+        qtd_recebida_kg: orcQtdRecebidaKg,
+        preco_compra_kg: orcPrecoCompraKg,
+        custo_frete_kg: orcCustoFreteKg,
+        custo_mo_terceira_kg: orcCustoMoTerceiraKg,
+        custo_mo_interna_kg: orcCustoMoInternaKg,
+        perda_pct: orcPerdaPct,
+        total_custos_kg: orcTotalCustosKg,
+        cobranca_mode: orcCobrancaMode,
+        cobranca_valor: orcCobrancaValor,
+        custo_servico_kg: orcCustoServicoKg,
+        material_retornado: orcMaterialRetornado,
+        qtd_retornada_kg: orcQtdRetornadaKg,
+        valor_final_kg_cliente: orcValorFinalKgCliente,
+        margem_lucro_kg: orcMargemLucroKg,
+        lucro_total: orcLucroTotal,
+        created_by: user?.id,
+      };
+      
+      if (orcEditingId) {
+        const { error } = await supabase
+          .from("orcamentos_servico_terceiros")
+          .update(payload)
+          .eq("id", orcEditingId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("orcamentos_servico_terceiros")
+          .insert(payload);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["orcamentos-servico-terceiros"] });
+      toast({ 
+        title: orcEditingId ? "Orçamento atualizado" : "Orçamento salvo", 
+        description: "Registro salvo no histórico." 
+      });
+      setOrcEditingId(null);
+    },
+    onError: (error: any) => {
+      toast({ title: "Erro", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const loadOrcamento = (orc: any) => {
+    setOrcNomeCliente(orc.nome_cliente || "");
+    setOrcMaterialRecebido(orc.material_recebido || "");
+    setOrcQtdRecebidaKg(orc.qtd_recebida_kg || 0);
+    setOrcPrecoCompraKg(orc.preco_compra_kg || 0);
+    setOrcCustoFreteKg(orc.custo_frete_kg || 0);
+    setOrcCustoMoTerceiraKg(orc.custo_mo_terceira_kg || 0);
+    setOrcCustoMoInternaKg(orc.custo_mo_interna_kg || 0);
+    setOrcPerdaPct(orc.perda_pct || 0);
+    setOrcCobrancaMode(orc.cobranca_mode || "valor");
+    setOrcCobrancaValor(orc.cobranca_valor || 0);
+    setOrcMaterialRetornado(orc.material_retornado || "");
+    setOrcEditingId(orc.id);
+    toast({ title: "Orçamento carregado", description: `Cliente: ${orc.nome_cliente}` });
+  };
+
+  const novoOrcamento = () => {
+    setOrcNomeCliente("");
+    setOrcMaterialRecebido("Sucata");
+    setOrcQtdRecebidaKg(10000);
+    setOrcPrecoCompraKg(70);
+    setOrcCustoFreteKg(0);
+    setOrcCustoMoTerceiraKg(0);
+    setOrcCustoMoInternaKg(3.40);
+    setOrcPerdaPct(5);
+    setOrcCobrancaMode("valor");
+    setOrcCobrancaValor(7.10);
+    setOrcMaterialRetornado("Fio de Cobre 1,83mm");
+    setOrcEditingId(null);
+  };
+
+  // PDF Orçamento Ibrac (Interno)
+  const exportPdfIbrac = () => {
+    const printContent = `
+      <html>
+        <head>
+          <title>Orçamento Serviço Terceiros - Ibrac - ${format(new Date(), "dd/MM/yyyy HH:mm")}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 30px; max-width: 800px; margin: 0 auto; }
+            h1 { color: #0ea5e9; border-bottom: 3px solid #0ea5e9; padding-bottom: 10px; }
+            h2 { color: #555; margin-top: 25px; border-left: 4px solid #0ea5e9; padding-left: 10px; }
+            table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+            th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+            th { background-color: #f5f5f5; font-weight: bold; width: 40%; }
+            .highlight { background-color: #fef3c7; font-weight: bold; }
+            .success { color: #10b981; font-weight: bold; }
+            .danger { color: #ef4444; }
+            .total-row { background-color: #e0f2fe; font-weight: bold; }
+            .header-info { display: flex; justify-content: space-between; margin-bottom: 20px; }
+            .logo { font-size: 24px; font-weight: bold; color: #0ea5e9; }
+            .confidential { color: #ef4444; font-size: 12px; font-style: italic; }
+          </style>
+        </head>
+        <body>
+          <div class="header-info">
+            <div class="logo">IBRAC - Orçamento Interno</div>
+            <div>
+              <p><strong>Data:</strong> ${format(new Date(), "dd/MM/yyyy HH:mm")}</p>
+              <p class="confidential">DOCUMENTO CONFIDENCIAL - USO INTERNO</p>
+            </div>
+          </div>
+          
+          <h1>Orçamento Serviço para Terceiros</h1>
+          
+          <h2>Dados do Cliente</h2>
+          <table>
+            <tr><th>Cliente</th><td>${orcNomeCliente || "Não informado"}</td></tr>
+            <tr><th>Material Recebido</th><td>${orcMaterialRecebido}</td></tr>
+            <tr><th>Quantidade Recebida</th><td>${orcQtdRecebidaKg.toLocaleString("pt-BR")} kg</td></tr>
+            <tr><th>Preço Compra Cliente</th><td>${formatCurrency(orcPrecoCompraKg)}/kg</td></tr>
+            <tr><th>Valor Total Material</th><td>${formatCurrency(orcValorMaterialCliente)}</td></tr>
+          </table>
+          
+          <h2>Custos Operacionais (por kg)</h2>
+          <table>
+            <tr><th>Custos de Frete</th><td>${formatCurrency(orcCustoFreteKg)}/kg</td></tr>
+            <tr><th>Custos MO Terceirizada</th><td>${formatCurrency(orcCustoMoTerceiraKg)}/kg</td></tr>
+            <tr><th>Custos MO Interna</th><td>${formatCurrency(orcCustoMoInternaKg)}/kg</td></tr>
+            <tr><th>Perda Estimada</th><td>${orcPerdaPct}%</td></tr>
+            <tr class="total-row"><th>TOTAL CUSTOS</th><td>${formatCurrency(orcTotalCustosKg)}/kg</td></tr>
+          </table>
+          
+          <h2>Cobrança e Margem</h2>
+          <table>
+            <tr><th>Modo de Cobrança</th><td>${orcCobrancaMode === "valor" ? "Valor fixo por kg" : "Acréscimo percentual"}</td></tr>
+            <tr><th>Valor/Acréscimo</th><td>${orcCobrancaMode === "valor" ? formatCurrency(orcCobrancaValor) + "/kg" : orcCobrancaValor + "%"}</td></tr>
+            <tr class="highlight"><th>Cobrança Serviço Final</th><td>${formatCurrency(orcCustoServicoKg)}/kg</td></tr>
+            <tr><th>Margem de Lucro</th><td class="success">${formatCurrency(orcMargemLucroKg)}/kg (${orcMargemLucroPct.toFixed(1)}%)</td></tr>
+          </table>
+          
+          <h2>Resultado da Operação</h2>
+          <table>
+            <tr><th>Quantidade Retornada</th><td>${orcQtdRetornadaKg.toLocaleString("pt-BR")} kg</td></tr>
+            <tr><th>Material Retornado</th><td>${orcMaterialRetornado}</td></tr>
+            <tr><th>Custo Total Operação</th><td>${formatCurrency(orcCustoOperacionalTotal)}</td></tr>
+            <tr><th>Receita Total</th><td>${formatCurrency(orcReceitaTotal)}</td></tr>
+            <tr class="total-row"><th>LUCRO ESTIMADO</th><td class="${orcLucroTotal >= 0 ? 'success' : 'danger'}">${formatCurrency(orcLucroTotal)}</td></tr>
+          </table>
+          
+          <h2>Valor Final para Cliente</h2>
+          <table>
+            <tr class="highlight">
+              <th>Valor por KG Retornado</th>
+              <td style="font-size: 18px;">${formatCurrency(orcValorFinalKgCliente)}/kg</td>
+            </tr>
+          </table>
+          <p style="font-size: 12px; color: #666;">
+            <strong>Memória de cálculo:</strong> (${orcQtdRecebidaKg.toLocaleString("pt-BR")} kg × ${formatCurrency(orcPrecoCompraKg)}) / ${orcQtdRetornadaKg.toLocaleString("pt-BR")} kg + ${formatCurrency(orcCustoServicoKg)} = ${formatCurrency(orcValorFinalKgCliente)}/kg
+          </p>
+        </body>
+      </html>
+    `;
+    
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
+    }
+  };
+
+  // PDF Cliente (Simplificado)
+  const exportPdfCliente = () => {
+    const printContent = `
+      <html>
+        <head>
+          <title>Proposta de Serviço - ${orcNomeCliente || "Cliente"} - ${format(new Date(), "dd/MM/yyyy")}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 40px; max-width: 700px; margin: 0 auto; }
+            h1 { color: #0ea5e9; text-align: center; border-bottom: 2px solid #0ea5e9; padding-bottom: 15px; }
+            .header { text-align: center; margin-bottom: 30px; }
+            .logo { font-size: 28px; font-weight: bold; color: #0ea5e9; }
+            table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+            th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+            th { background-color: #f8fafc; width: 50%; }
+            .highlight { background-color: #e0f2fe; }
+            .total { background-color: #0ea5e9; color: white; font-size: 18px; }
+            .footer { margin-top: 40px; text-align: center; font-size: 12px; color: #666; }
+            .memory { font-size: 11px; color: #888; margin-top: 10px; padding: 10px; background: #f8fafc; border-radius: 4px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="logo">IBRAC</div>
+            <p>Proposta de Serviço de Beneficiamento</p>
+            <p><strong>Data:</strong> ${format(new Date(), "dd/MM/yyyy")}</p>
+          </div>
+          
+          <h1>Proposta Comercial</h1>
+          
+          ${orcNomeCliente ? `<p><strong>Cliente:</strong> ${orcNomeCliente}</p>` : ''}
+          
+          <table>
+            <tr><th>Material Enviado</th><td>${orcMaterialRecebido}</td></tr>
+            <tr><th>Quantidade Enviada</th><td>${orcQtdRecebidaKg.toLocaleString("pt-BR")} kg</td></tr>
+            <tr><th>Valor Unitário do Material</th><td>${formatCurrency(orcPrecoCompraKg)}/kg</td></tr>
+            <tr class="highlight"><th>Valor Total do Material</th><td>${formatCurrency(orcValorMaterialCliente)}</td></tr>
+          </table>
+          
+          <table>
+            <tr><th>Custo do Serviço</th><td>${formatCurrency(orcCustoServicoKg)}/kg</td></tr>
+            <tr><th>Material Retornado</th><td>${orcMaterialRetornado}</td></tr>
+            <tr><th>Quantidade Retornada</th><td>${orcQtdRetornadaKg.toLocaleString("pt-BR")} kg</td></tr>
+          </table>
+          
+          <table>
+            <tr class="total">
+              <th style="background-color: #0ea5e9; color: white;">VALOR FINAL POR KG</th>
+              <td style="background-color: #0ea5e9; color: white; font-weight: bold;">${formatCurrency(orcValorFinalKgCliente)}/kg</td>
+            </tr>
+          </table>
+          
+          <div class="memory">
+            <strong>Composição do valor:</strong><br/>
+            Valor do material: ${formatCurrency(orcValorMaterialCliente)} / ${orcQtdRetornadaKg.toLocaleString("pt-BR")} kg = ${formatCurrency(orcCustoBaseKgRetornado)}/kg<br/>
+            Custo do serviço: + ${formatCurrency(orcCustoServicoKg)}/kg<br/>
+            <strong>Total: ${formatCurrency(orcValorFinalKgCliente)}/kg</strong>
+          </div>
+          
+          <div class="footer">
+            <p>Esta proposta é válida por 7 dias.</p>
+            <p>IBRAC - Indústria Brasileira de Cobre</p>
+          </div>
+        </body>
+      </html>
+    `;
+    
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
+    }
+  };
+
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -506,9 +800,10 @@ export default function Simulador() {
         </div>
 
         <Tabs defaultValue="vergalhao" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:inline-grid">
+          <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
             <TabsTrigger value="vergalhao">Vergalhão LME</TabsTrigger>
             <TabsTrigger value="sucata">Sucata + Industrialização</TabsTrigger>
+            <TabsTrigger value="orcamento">Orçamento Terceiros</TabsTrigger>
             <TabsTrigger value="historico">Histórico</TabsTrigger>
           </TabsList>
 
@@ -1160,6 +1455,384 @@ export default function Simulador() {
                   </CardContent>
                 </Card>
               </div>
+            </div>
+          </TabsContent>
+
+          {/* ========== TAB ORÇAMENTO TERCEIROS ========== */}
+          <TabsContent value="orcamento">
+            <div className="space-y-6">
+              <div className="grid gap-6 lg:grid-cols-3">
+                {/* Coluna Formulário */}
+                <div className="lg:col-span-2 space-y-6">
+                  {/* Card: Material Recebido */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Scale className="h-5 w-5 text-primary" />
+                        Material Recebido
+                      </CardTitle>
+                      <CardDescription>Informações do material enviado pelo cliente</CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>Nome do Cliente *</Label>
+                        <Input
+                          value={orcNomeCliente}
+                          onChange={(e) => setOrcNomeCliente(e.target.value)}
+                          placeholder="Ex: Cliente XYZ"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Tipo de Material</Label>
+                        <Input
+                          value={orcMaterialRecebido}
+                          onChange={(e) => setOrcMaterialRecebido(e.target.value)}
+                          placeholder="Ex: Sucata de Cobre"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Quantidade Recebida (kg)</Label>
+                        <Input
+                          type="number"
+                          value={orcQtdRecebidaKg}
+                          onChange={(e) => setOrcQtdRecebidaKg(Number(e.target.value))}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Preço de Compra do Cliente (R$/kg)</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          value={orcPrecoCompraKg}
+                          onChange={(e) => setOrcPrecoCompraKg(Number(e.target.value))}
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Card: Custos Operacionais */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <DollarSign className="h-5 w-5 text-primary" />
+                        Custos Operacionais (R$/kg)
+                      </CardTitle>
+                      <CardDescription>Custos de produção e operação por kg</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label>Custos de Frete</Label>
+                          <div className="relative">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={orcCustoFreteKg}
+                              onChange={(e) => setOrcCustoFreteKg(Number(e.target.value))}
+                              className="pr-12"
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">R$/kg</span>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Custos MO Terceirizada</Label>
+                          <div className="relative">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={orcCustoMoTerceiraKg}
+                              onChange={(e) => setOrcCustoMoTerceiraKg(Number(e.target.value))}
+                              className="pr-12"
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">R$/kg</span>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Custos MO Interna</Label>
+                          <div className="relative">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={orcCustoMoInternaKg}
+                              onChange={(e) => setOrcCustoMoInternaKg(Number(e.target.value))}
+                              className="pr-12"
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">R$/kg</span>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Perda Estimada (%)</Label>
+                          <div className="relative">
+                            <Input
+                              type="number"
+                              step="0.1"
+                              value={orcPerdaPct}
+                              onChange={(e) => setOrcPerdaPct(Number(e.target.value))}
+                              className="pr-8"
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">%</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <Separator />
+                      
+                      <div className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
+                        <span className="font-medium">Total Custos Operacionais</span>
+                        <span className="text-xl font-bold text-primary">{formatCurrency(orcTotalCustosKg)}/kg</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Card: Cobrança do Serviço */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Percent className="h-5 w-5 text-primary" />
+                        Cobrança do Serviço
+                      </CardTitle>
+                      <CardDescription>Defina quanto será cobrado do cliente</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="flex items-center gap-4 p-3 bg-muted/50 rounded-lg">
+                        <Label>Modo de cobrança:</Label>
+                        <Select value={orcCobrancaMode} onValueChange={(v: "percentual" | "valor") => setOrcCobrancaMode(v)}>
+                          <SelectTrigger className="w-48">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="valor">Valor por KG (R$/kg)</SelectItem>
+                            <SelectItem value="percentual">Acréscimo % sobre custos</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <Label>{orcCobrancaMode === "valor" ? "Valor a Cobrar (R$/kg)" : "Acréscimo (%)"}</Label>
+                          <div className="relative">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={orcCobrancaValor}
+                              onChange={(e) => setOrcCobrancaValor(Number(e.target.value))}
+                              className="pr-12"
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                              {orcCobrancaMode === "valor" ? "R$/kg" : "%"}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Material Retornado</Label>
+                          <Input
+                            value={orcMaterialRetornado}
+                            onChange={(e) => setOrcMaterialRetornado(e.target.value)}
+                            placeholder="Ex: Fio de Cobre 1,83mm"
+                          />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Coluna Resultados */}
+                <div className="space-y-6">
+                  {/* Card Resumo Interno (Ibrac) */}
+                  <Card className="border-primary/20">
+                    <CardHeader className="bg-primary/5 rounded-t-lg">
+                      <CardTitle className="flex items-center gap-2">
+                        <Calculator className="h-5 w-5" />
+                        Resumo Ibrac (Interno)
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-4 space-y-3">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Qtd Recebida</span>
+                        <span className="font-medium">{orcQtdRecebidaKg.toLocaleString("pt-BR")} kg</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Perda ({orcPerdaPct}%)</span>
+                        <span className="font-medium text-destructive">-{(orcQtdRecebidaKg * orcPerdaPct / 100).toLocaleString("pt-BR")} kg</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Qtd Retornada</span>
+                        <span className="font-medium">{orcQtdRetornadaKg.toLocaleString("pt-BR")} kg</span>
+                      </div>
+                      <Separator />
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Custo Operacional/kg</span>
+                        <span className="font-medium">{formatCurrency(orcTotalCustosKg)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Cobrança Serviço/kg</span>
+                        <span className="font-medium text-primary">{formatCurrency(orcCustoServicoKg)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Margem Lucro/kg</span>
+                        <span className={cn("font-medium", orcMargemLucroKg >= 0 ? "text-success" : "text-destructive")}>
+                          {formatCurrency(orcMargemLucroKg)} ({orcMargemLucroPct.toFixed(1)}%)
+                        </span>
+                      </div>
+                      <Separator />
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Custo Total Operação</span>
+                        <span className="font-medium">{formatCurrency(orcCustoOperacionalTotal)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Receita Total</span>
+                        <span className="font-medium text-primary">{formatCurrency(orcReceitaTotal)}</span>
+                      </div>
+                      <div className="flex justify-between font-bold">
+                        <span>Lucro Estimado</span>
+                        <span className={orcLucroTotal >= 0 ? "text-success" : "text-destructive"}>{formatCurrency(orcLucroTotal)}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Card Resumo Cliente */}
+                  <Card className="border-success/30 bg-success/5">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <FileText className="h-5 w-5" />
+                        Resumo para Cliente
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Material Enviado</span>
+                        <span className="font-medium">{orcMaterialRecebido}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Quantidade Enviada</span>
+                        <span className="font-medium">{orcQtdRecebidaKg.toLocaleString("pt-BR")} kg</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Preço Unitário</span>
+                        <span className="font-medium">{formatCurrency(orcPrecoCompraKg)}/kg</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Valor Total Material</span>
+                        <span className="font-medium">{formatCurrency(orcValorMaterialCliente)}</span>
+                      </div>
+                      <Separator />
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Custo Serviço</span>
+                        <span className="font-medium">{formatCurrency(orcCustoServicoKg)}/kg</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Material Retornado</span>
+                        <span className="font-medium">{orcMaterialRetornado}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Quantidade Retornada</span>
+                        <span className="font-medium">{orcQtdRetornadaKg.toLocaleString("pt-BR")} kg</span>
+                      </div>
+                      <Separator />
+                      <div className="p-3 bg-primary/10 rounded-lg">
+                        <div className="flex justify-between text-lg font-bold">
+                          <span>Valor Final por KG</span>
+                          <span className="text-primary">{formatCurrency(orcValorFinalKgCliente)}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          ({formatCurrency(orcValorMaterialCliente)} / {orcQtdRetornadaKg.toLocaleString("pt-BR")} kg) + {formatCurrency(orcCustoServicoKg)}
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Botões de Ação */}
+                  <div className="flex flex-col gap-2">
+                    <Button 
+                      onClick={() => saveOrcamentoMutation.mutate()} 
+                      disabled={saveOrcamentoMutation.isPending || !orcNomeCliente.trim()}
+                      className="w-full bg-gradient-copper hover:opacity-90"
+                    >
+                      {saveOrcamentoMutation.isPending ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Save className="mr-2 h-4 w-4" />
+                      )}
+                      {orcEditingId ? "Atualizar Orçamento" : "Salvar Orçamento"}
+                    </Button>
+                    <Button onClick={exportPdfIbrac} variant="outline" className="w-full">
+                      <FileText className="mr-2 h-4 w-4" />
+                      PDF Ibrac (Interno)
+                    </Button>
+                    <Button variant="outline" onClick={exportPdfCliente} className="w-full">
+                      <FileText className="mr-2 h-4 w-4" />
+                      PDF Cliente
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Histórico de Orçamentos */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="flex items-center gap-2">
+                      <History className="h-5 w-5" />
+                      Histórico de Orçamentos
+                    </CardTitle>
+                    <Button variant="outline" size="sm" onClick={novoOrcamento}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Novo Orçamento
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Data</TableHead>
+                        <TableHead>Cliente</TableHead>
+                        <TableHead>Material</TableHead>
+                        <TableHead className="text-right">Qtd (kg)</TableHead>
+                        <TableHead className="text-right">Custo Serviço</TableHead>
+                        <TableHead className="text-right">Valor Final/kg</TableHead>
+                        <TableHead className="text-right">Lucro</TableHead>
+                        <TableHead className="w-20"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {!historicoOrcamentos?.length ? (
+                        <TableRow>
+                          <TableCell colSpan={8} className="text-center text-muted-foreground">
+                            Nenhum orçamento salvo
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        historicoOrcamentos.map((orc: any) => (
+                          <TableRow key={orc.id} className={orcEditingId === orc.id ? "bg-primary/5" : ""}>
+                            <TableCell>{format(new Date(orc.created_at), "dd/MM/yyyy")}</TableCell>
+                            <TableCell className="font-medium">{orc.nome_cliente}</TableCell>
+                            <TableCell>{orc.material_recebido}</TableCell>
+                            <TableCell className="text-right">{orc.qtd_recebida_kg?.toLocaleString("pt-BR")}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(orc.custo_servico_kg)}/kg</TableCell>
+                            <TableCell className="text-right font-bold text-primary">
+                              {formatCurrency(orc.valor_final_kg_cliente)}/kg
+                            </TableCell>
+                            <TableCell className={cn("text-right", orc.lucro_total >= 0 ? "text-success" : "text-destructive")}>
+                              {formatCurrency(orc.lucro_total)}
+                            </TableCell>
+                            <TableCell>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => loadOrcamento(orc)}
+                                title="Carregar orçamento"
+                              >
+                                <RefreshCw className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
             </div>
           </TabsContent>
 
