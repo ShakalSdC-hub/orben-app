@@ -96,7 +96,8 @@ export default function Simulador() {
   const [orcCustoFreteKg, setOrcCustoFreteKg] = useState(0);
   const [orcCustoMoTerceiraKg, setOrcCustoMoTerceiraKg] = useState(0);
   const [orcCustoMoInternaKg, setOrcCustoMoInternaKg] = useState(3.40);
-  const [orcPerdaPct, setOrcPerdaPct] = useState(5);
+  const [orcPerdaRealPct, setOrcPerdaRealPct] = useState(3); // Perda efetiva do processo
+  const [orcPerdaClientePct, setOrcPerdaClientePct] = useState(5); // Perda informada ao cliente
   const [orcCobrancaMode, setOrcCobrancaMode] = useState<"percentual" | "valor">("valor");
   const [orcCobrancaValor, setOrcCobrancaValor] = useState(7.10);
   const [orcMaterialRetornado, setOrcMaterialRetornado] = useState("Fio de Cobre 1,83mm");
@@ -317,17 +318,39 @@ export default function Simulador() {
 
   // === CÁLCULOS ORÇAMENTO TERCEIROS ===
   const orcTotalCustosKg = orcCustoFreteKg + orcCustoMoTerceiraKg + orcCustoMoInternaKg;
-  const orcQtdRetornadaKg = orcQtdRecebidaKg * (1 - orcPerdaPct / 100);
+  
+  // Quantidades baseadas nas duas perdas
+  const orcQtdRetornadaReal = orcQtdRecebidaKg * (1 - orcPerdaRealPct / 100);    // O que realmente sobra
+  const orcQtdRetornadaCliente = orcQtdRecebidaKg * (1 - orcPerdaClientePct / 100); // O que informamos ao cliente
+  
+  // Diferença de perda = lucro adicional em kg
+  const orcDiferencaPerdaKg = orcQtdRetornadaReal - orcQtdRetornadaCliente;
+  const orcDiferencaPerdaPct = orcPerdaClientePct - orcPerdaRealPct;
+  
+  // Lucro da diferença de perda (em R$) - material que "sobra"
+  const orcLucroPerdaRs = orcDiferencaPerdaKg * orcPrecoCompraKg;
+  
   const orcCustoServicoKg = orcCobrancaMode === "valor" 
     ? orcCobrancaValor 
     : (orcTotalCustosKg * (1 + orcCobrancaValor / 100));
   const orcMargemLucroKg = orcCustoServicoKg - orcTotalCustosKg;
   const orcMargemLucroPct = orcTotalCustosKg > 0 ? (orcMargemLucroKg / orcTotalCustosKg) * 100 : 0;
-  const orcReceitaTotal = orcCustoServicoKg * orcQtdRetornadaKg;
+  
+  // Receita do serviço (baseada no que entregamos ao cliente)
+  const orcReceitaTotal = orcCustoServicoKg * orcQtdRetornadaCliente;
+  
+  // Custo operacional (baseado no que recebemos)
   const orcCustoOperacionalTotal = orcTotalCustosKg * orcQtdRecebidaKg;
-  const orcLucroTotal = orcReceitaTotal - orcCustoOperacionalTotal;
+  
+  // LUCRO TOTAL = Lucro do Serviço + Lucro da Diferença de Perda
+  const orcLucroServico = orcReceitaTotal - orcCustoOperacionalTotal;
+  const orcLucroTotal = orcLucroServico + orcLucroPerdaRs;
+  
+  // Cálculo para o cliente (usa perda do cliente)
   const orcValorMaterialCliente = orcQtdRecebidaKg * orcPrecoCompraKg;
-  const orcCustoBaseKgRetornado = orcQtdRetornadaKg > 0 ? orcValorMaterialCliente / orcQtdRetornadaKg : 0;
+  const orcCustoBaseKgRetornado = orcQtdRetornadaCliente > 0 
+    ? orcValorMaterialCliente / orcQtdRetornadaCliente 
+    : 0;
   const orcValorFinalKgCliente = orcCustoBaseKgRetornado + orcCustoServicoKg;
 
   const formatCurrency = (value: number) => {
@@ -523,13 +546,16 @@ export default function Simulador() {
         custo_frete_kg: orcCustoFreteKg,
         custo_mo_terceira_kg: orcCustoMoTerceiraKg,
         custo_mo_interna_kg: orcCustoMoInternaKg,
-        perda_pct: orcPerdaPct,
+        perda_real_pct: orcPerdaRealPct,
+        perda_cliente_pct: orcPerdaClientePct,
+        perda_pct: orcPerdaClientePct, // Manter compatibilidade
+        lucro_perda_kg: orcLucroPerdaRs,
         total_custos_kg: orcTotalCustosKg,
         cobranca_mode: orcCobrancaMode,
         cobranca_valor: orcCobrancaValor,
         custo_servico_kg: orcCustoServicoKg,
         material_retornado: orcMaterialRetornado,
-        qtd_retornada_kg: orcQtdRetornadaKg,
+        qtd_retornada_kg: orcQtdRetornadaCliente,
         valor_final_kg_cliente: orcValorFinalKgCliente,
         margem_lucro_kg: orcMargemLucroKg,
         lucro_total: orcLucroTotal,
@@ -570,7 +596,8 @@ export default function Simulador() {
     setOrcCustoFreteKg(orc.custo_frete_kg || 0);
     setOrcCustoMoTerceiraKg(orc.custo_mo_terceira_kg || 0);
     setOrcCustoMoInternaKg(orc.custo_mo_interna_kg || 0);
-    setOrcPerdaPct(orc.perda_pct || 0);
+    setOrcPerdaRealPct(orc.perda_real_pct ?? orc.perda_pct ?? 0);
+    setOrcPerdaClientePct(orc.perda_cliente_pct ?? orc.perda_pct ?? 0);
     setOrcCobrancaMode(orc.cobranca_mode || "valor");
     setOrcCobrancaValor(orc.cobranca_valor || 0);
     setOrcMaterialRetornado(orc.material_retornado || "");
@@ -586,7 +613,8 @@ export default function Simulador() {
     setOrcCustoFreteKg(0);
     setOrcCustoMoTerceiraKg(0);
     setOrcCustoMoInternaKg(3.40);
-    setOrcPerdaPct(5);
+    setOrcPerdaRealPct(3);
+    setOrcPerdaClientePct(5);
     setOrcCobrancaMode("valor");
     setOrcCobrancaValor(7.10);
     setOrcMaterialRetornado("Fio de Cobre 1,83mm");
@@ -637,39 +665,59 @@ export default function Simulador() {
           
           <h2>Custos Operacionais (por kg)</h2>
           <table>
-            <tr><th>Custos de Frete</th><td>${formatCurrency(orcCustoFreteKg)}/kg</td></tr>
-            <tr><th>Custos MO Terceirizada</th><td>${formatCurrency(orcCustoMoTerceiraKg)}/kg</td></tr>
-            <tr><th>Custos MO Interna</th><td>${formatCurrency(orcCustoMoInternaKg)}/kg</td></tr>
-            <tr><th>Perda Estimada</th><td>${orcPerdaPct}%</td></tr>
-            <tr class="total-row"><th>TOTAL CUSTOS</th><td>${formatCurrency(orcTotalCustosKg)}/kg</td></tr>
+            <tr><th>Custos de Frete</th><td>\${formatCurrency(orcCustoFreteKg)}/kg</td></tr>
+            <tr><th>Custos MO Terceirizada</th><td>\${formatCurrency(orcCustoMoTerceiraKg)}/kg</td></tr>
+            <tr><th>Custos MO Interna</th><td>\${formatCurrency(orcCustoMoInternaKg)}/kg</td></tr>
+            <tr class="total-row"><th>TOTAL CUSTOS</th><td>\${formatCurrency(orcTotalCustosKg)}/kg</td></tr>
+          </table>
+          
+          <h2>Análise de Perdas</h2>
+          <table>
+            <tr><th>Perda Real (efetiva)</th><td>\${orcPerdaRealPct}%</td><td>\${(orcQtdRecebidaKg * orcPerdaRealPct / 100).toLocaleString("pt-BR")} kg</td></tr>
+            <tr><th>Perda Cliente (informada)</th><td>\${orcPerdaClientePct}%</td><td>\${(orcQtdRecebidaKg * orcPerdaClientePct / 100).toLocaleString("pt-BR")} kg</td></tr>
+            <tr><th>Qtd Retornada Real</th><td colspan="2">\${orcQtdRetornadaReal.toLocaleString("pt-BR")} kg</td></tr>
+            <tr><th>Qtd Entregue ao Cliente</th><td colspan="2">\${orcQtdRetornadaCliente.toLocaleString("pt-BR")} kg</td></tr>
+            \${orcDiferencaPerdaPct > 0 ? \`
+              <tr class="highlight" style="background-color: #dcfce7;">
+                <th style="color: #16a34a;">Diferença (Lucro)</th>
+                <td style="color: #16a34a;">\${orcDiferencaPerdaPct.toFixed(1)}%</td>
+                <td style="color: #16a34a; font-weight: bold;">\${orcDiferencaPerdaKg.toLocaleString("pt-BR")} kg = \${formatCurrency(orcLucroPerdaRs)}</td>
+              </tr>
+            \` : ''}
           </table>
           
           <h2>Cobrança e Margem</h2>
           <table>
-            <tr><th>Modo de Cobrança</th><td>${orcCobrancaMode === "valor" ? "Valor fixo por kg" : "Acréscimo percentual"}</td></tr>
-            <tr><th>Valor/Acréscimo</th><td>${orcCobrancaMode === "valor" ? formatCurrency(orcCobrancaValor) + "/kg" : orcCobrancaValor + "%"}</td></tr>
-            <tr class="highlight"><th>Cobrança Serviço Final</th><td>${formatCurrency(orcCustoServicoKg)}/kg</td></tr>
-            <tr><th>Margem de Lucro</th><td class="success">${formatCurrency(orcMargemLucroKg)}/kg (${orcMargemLucroPct.toFixed(1)}%)</td></tr>
+            <tr><th>Modo de Cobrança</th><td>\${orcCobrancaMode === "valor" ? "Valor fixo por kg" : "Acréscimo percentual"}</td></tr>
+            <tr><th>Valor/Acréscimo</th><td>\${orcCobrancaMode === "valor" ? formatCurrency(orcCobrancaValor) + "/kg" : orcCobrancaValor + "%"}</td></tr>
+            <tr class="highlight"><th>Cobrança Serviço Final</th><td>\${formatCurrency(orcCustoServicoKg)}/kg</td></tr>
+            <tr><th>Margem de Lucro</th><td class="success">\${formatCurrency(orcMargemLucroKg)}/kg (\${orcMargemLucroPct.toFixed(1)}%)</td></tr>
           </table>
           
           <h2>Resultado da Operação</h2>
           <table>
-            <tr><th>Quantidade Retornada</th><td>${orcQtdRetornadaKg.toLocaleString("pt-BR")} kg</td></tr>
-            <tr><th>Material Retornado</th><td>${orcMaterialRetornado}</td></tr>
-            <tr><th>Custo Total Operação</th><td>${formatCurrency(orcCustoOperacionalTotal)}</td></tr>
-            <tr><th>Receita Total</th><td>${formatCurrency(orcReceitaTotal)}</td></tr>
-            <tr class="total-row"><th>LUCRO ESTIMADO</th><td class="${orcLucroTotal >= 0 ? 'success' : 'danger'}">${formatCurrency(orcLucroTotal)}</td></tr>
+            <tr><th>Quantidade Retornada Cliente</th><td>\${orcQtdRetornadaCliente.toLocaleString("pt-BR")} kg</td></tr>
+            <tr><th>Material Retornado</th><td>\${orcMaterialRetornado}</td></tr>
+            <tr><th>Custo Total Operação</th><td>\${formatCurrency(orcCustoOperacionalTotal)}</td></tr>
+            <tr><th>Receita Total</th><td>\${formatCurrency(orcReceitaTotal)}</td></tr>
+          </table>
+          
+          <h2>Composição do Lucro</h2>
+          <table>
+            <tr><th>Lucro do Serviço</th><td>\${formatCurrency(orcLucroServico)}</td></tr>
+            <tr style="background-color: #dcfce7;"><th style="color: #16a34a;">Lucro da Diferença de Perda</th><td class="success">\${formatCurrency(orcLucroPerdaRs)}</td></tr>
+            <tr class="total-row"><th>LUCRO TOTAL</th><td class="\${orcLucroTotal >= 0 ? 'success' : 'danger'}">\${formatCurrency(orcLucroTotal)}</td></tr>
           </table>
           
           <h2>Valor Final para Cliente</h2>
           <table>
             <tr class="highlight">
               <th>Valor por KG Retornado</th>
-              <td style="font-size: 18px;">${formatCurrency(orcValorFinalKgCliente)}/kg</td>
+              <td style="font-size: 18px;">\${formatCurrency(orcValorFinalKgCliente)}/kg</td>
             </tr>
           </table>
           <p style="font-size: 12px; color: #666;">
-            <strong>Memória de cálculo:</strong> (${orcQtdRecebidaKg.toLocaleString("pt-BR")} kg × ${formatCurrency(orcPrecoCompraKg)}) / ${orcQtdRetornadaKg.toLocaleString("pt-BR")} kg + ${formatCurrency(orcCustoServicoKg)} = ${formatCurrency(orcValorFinalKgCliente)}/kg
+            <strong>Memória de cálculo:</strong> (\${orcQtdRecebidaKg.toLocaleString("pt-BR")} kg × \${formatCurrency(orcPrecoCompraKg)}) / \${orcQtdRetornadaCliente.toLocaleString("pt-BR")} kg + \${formatCurrency(orcCustoServicoKg)} = \${formatCurrency(orcValorFinalKgCliente)}/kg
           </p>
         </body>
       </html>
@@ -723,23 +771,23 @@ export default function Simulador() {
           </table>
           
           <table>
-            <tr><th>Custo do Serviço</th><td>${formatCurrency(orcCustoServicoKg)}/kg</td></tr>
-            <tr><th>Material Retornado</th><td>${orcMaterialRetornado}</td></tr>
-            <tr><th>Quantidade Retornada</th><td>${orcQtdRetornadaKg.toLocaleString("pt-BR")} kg</td></tr>
+            <tr><th>Custo do Serviço</th><td>\${formatCurrency(orcCustoServicoKg)}/kg</td></tr>
+            <tr><th>Material Retornado</th><td>\${orcMaterialRetornado}</td></tr>
+            <tr><th>Quantidade Retornada</th><td>\${orcQtdRetornadaCliente.toLocaleString("pt-BR")} kg</td></tr>
           </table>
           
           <table>
             <tr class="total">
               <th style="background-color: #0ea5e9; color: white;">VALOR FINAL POR KG</th>
-              <td style="background-color: #0ea5e9; color: white; font-weight: bold;">${formatCurrency(orcValorFinalKgCliente)}/kg</td>
+              <td style="background-color: #0ea5e9; color: white; font-weight: bold;">\${formatCurrency(orcValorFinalKgCliente)}/kg</td>
             </tr>
           </table>
           
           <div class="memory">
             <strong>Composição do valor:</strong><br/>
-            Valor do material: ${formatCurrency(orcValorMaterialCliente)} / ${orcQtdRetornadaKg.toLocaleString("pt-BR")} kg = ${formatCurrency(orcCustoBaseKgRetornado)}/kg<br/>
-            Custo do serviço: + ${formatCurrency(orcCustoServicoKg)}/kg<br/>
-            <strong>Total: ${formatCurrency(orcValorFinalKgCliente)}/kg</strong>
+            Valor do material: \${formatCurrency(orcValorMaterialCliente)} / \${orcQtdRetornadaCliente.toLocaleString("pt-BR")} kg = \${formatCurrency(orcCustoBaseKgRetornado)}/kg<br/>
+            Custo do serviço: + \${formatCurrency(orcCustoServicoKg)}/kg<br/>
+            <strong>Total: \${formatCurrency(orcValorFinalKgCliente)}/kg</strong>
           </div>
           
           <div class="footer">
@@ -1561,19 +1609,48 @@ export default function Simulador() {
                           </div>
                         </div>
                         <div className="space-y-2">
-                          <Label>Perda Estimada (%)</Label>
+                          <Label className="flex items-center gap-2">
+                            Perda Real (%)
+                            <span className="text-xs text-muted-foreground">(efetiva)</span>
+                          </Label>
                           <div className="relative">
                             <Input
                               type="number"
                               step="0.1"
-                              value={orcPerdaPct}
-                              onChange={(e) => setOrcPerdaPct(Number(e.target.value))}
+                              value={orcPerdaRealPct}
+                              onChange={(e) => setOrcPerdaRealPct(Number(e.target.value))}
+                              className="pr-8"
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">%</span>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="flex items-center gap-2">
+                            Perda Cliente (%)
+                            <span className="text-xs text-muted-foreground">(informada)</span>
+                          </Label>
+                          <div className="relative">
+                            <Input
+                              type="number"
+                              step="0.1"
+                              value={orcPerdaClientePct}
+                              onChange={(e) => setOrcPerdaClientePct(Number(e.target.value))}
                               className="pr-8"
                             />
                             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">%</span>
                           </div>
                         </div>
                       </div>
+                      
+                      {/* Mostrar diferença de perda se houver */}
+                      {orcDiferencaPerdaPct > 0 && (
+                        <div className="flex justify-between items-center p-2 bg-success/10 rounded-lg border border-success/20">
+                          <span className="text-sm text-success font-medium">
+                            Lucro Diferença de Perda ({orcDiferencaPerdaPct.toFixed(1)}% = {orcDiferencaPerdaKg.toLocaleString("pt-BR")} kg)
+                          </span>
+                          <span className="font-bold text-success">+{formatCurrency(orcLucroPerdaRs)}</span>
+                        </div>
+                      )}
                       
                       <Separator />
                       
@@ -1652,13 +1729,37 @@ export default function Simulador() {
                         <span className="font-medium">{orcQtdRecebidaKg.toLocaleString("pt-BR")} kg</span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Perda ({orcPerdaPct}%)</span>
-                        <span className="font-medium text-destructive">-{(orcQtdRecebidaKg * orcPerdaPct / 100).toLocaleString("pt-BR")} kg</span>
+                        <span className="text-muted-foreground">Perda Real ({orcPerdaRealPct}%)</span>
+                        <span className="font-medium text-destructive">-{(orcQtdRecebidaKg * orcPerdaRealPct / 100).toLocaleString("pt-BR")} kg</span>
                       </div>
                       <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Qtd Retornada</span>
-                        <span className="font-medium">{orcQtdRetornadaKg.toLocaleString("pt-BR")} kg</span>
+                        <span className="text-muted-foreground">Qtd Retornada Real</span>
+                        <span className="font-medium">{orcQtdRetornadaReal.toLocaleString("pt-BR")} kg</span>
                       </div>
+                      <Separator />
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Perda Cliente ({orcPerdaClientePct}%)</span>
+                        <span className="font-medium">{(orcQtdRecebidaKg * orcPerdaClientePct / 100).toLocaleString("pt-BR")} kg</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Qtd Entregue ao Cliente</span>
+                        <span className="font-medium">{orcQtdRetornadaCliente.toLocaleString("pt-BR")} kg</span>
+                      </div>
+                      
+                      {/* Lucro da diferença de perda */}
+                      {orcDiferencaPerdaPct > 0 && (
+                        <div className="p-2 bg-success/10 rounded-lg">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-success font-medium">Diferença de Perda</span>
+                            <span className="text-success font-medium">{orcDiferencaPerdaKg.toLocaleString("pt-BR")} kg</span>
+                          </div>
+                          <div className="flex justify-between text-sm mt-1">
+                            <span className="text-success">Lucro Adicional</span>
+                            <span className="text-success font-bold">{formatCurrency(orcLucroPerdaRs)}</span>
+                          </div>
+                        </div>
+                      )}
+                      
                       <Separator />
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Custo Operacional/kg</span>
@@ -1683,8 +1784,19 @@ export default function Simulador() {
                         <span className="text-muted-foreground">Receita Total</span>
                         <span className="font-medium text-primary">{formatCurrency(orcReceitaTotal)}</span>
                       </div>
-                      <div className="flex justify-between font-bold">
-                        <span>Lucro Estimado</span>
+                      
+                      {/* Composição do Lucro */}
+                      <Separator />
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Lucro Serviço</span>
+                        <span className="font-medium">{formatCurrency(orcLucroServico)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Lucro Perda</span>
+                        <span className="font-medium text-success">{formatCurrency(orcLucroPerdaRs)}</span>
+                      </div>
+                      <div className="flex justify-between font-bold text-lg">
+                        <span>Lucro Total</span>
                         <span className={orcLucroTotal >= 0 ? "text-success" : "text-destructive"}>{formatCurrency(orcLucroTotal)}</span>
                       </div>
                     </CardContent>
@@ -1726,7 +1838,7 @@ export default function Simulador() {
                       </div>
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Quantidade Retornada</span>
-                        <span className="font-medium">{orcQtdRetornadaKg.toLocaleString("pt-BR")} kg</span>
+                        <span className="font-medium">{orcQtdRetornadaCliente.toLocaleString("pt-BR")} kg</span>
                       </div>
                       <Separator />
                       <div className="p-3 bg-primary/10 rounded-lg">
@@ -1735,7 +1847,7 @@ export default function Simulador() {
                           <span className="text-primary">{formatCurrency(orcValorFinalKgCliente)}</span>
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">
-                          ({formatCurrency(orcValorMaterialCliente)} / {orcQtdRetornadaKg.toLocaleString("pt-BR")} kg) + {formatCurrency(orcCustoServicoKg)}
+                          ({formatCurrency(orcValorMaterialCliente)} / {orcQtdRetornadaCliente.toLocaleString("pt-BR")} kg) + {formatCurrency(orcCustoServicoKg)}
                         </p>
                       </div>
                     </CardContent>
