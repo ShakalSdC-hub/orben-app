@@ -1199,12 +1199,15 @@ export type Database = {
           custo_servico_kg: number
           id: string
           is_deleted: boolean | null
+          lucro_perda_kg: number | null
           lucro_total: number | null
           margem_lucro_kg: number | null
           material_recebido: string
           material_retornado: string | null
           nome_cliente: string
+          perda_cliente_pct: number | null
           perda_pct: number | null
+          perda_real_pct: number | null
           preco_compra_kg: number
           qtd_recebida_kg: number
           qtd_retornada_kg: number
@@ -1222,12 +1225,15 @@ export type Database = {
           custo_servico_kg: number
           id?: string
           is_deleted?: boolean | null
+          lucro_perda_kg?: number | null
           lucro_total?: number | null
           margem_lucro_kg?: number | null
           material_recebido: string
           material_retornado?: string | null
           nome_cliente: string
+          perda_cliente_pct?: number | null
           perda_pct?: number | null
+          perda_real_pct?: number | null
           preco_compra_kg: number
           qtd_recebida_kg: number
           qtd_retornada_kg: number
@@ -1245,12 +1251,15 @@ export type Database = {
           custo_servico_kg?: number
           id?: string
           is_deleted?: boolean | null
+          lucro_perda_kg?: number | null
           lucro_total?: number | null
           margem_lucro_kg?: number | null
           material_recebido?: string
           material_retornado?: string | null
           nome_cliente?: string
+          perda_cliente_pct?: number | null
           perda_pct?: number | null
+          perda_real_pct?: number | null
           preco_compra_kg?: number
           qtd_recebida_kg?: number
           qtd_retornada_kg?: number
