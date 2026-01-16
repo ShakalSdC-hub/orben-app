@@ -3,11 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { DollarSign, Package, ArrowUpRight, ArrowDownRight, Factory, Users, TrendingUp, Layers, CalendarIcon, FileSpreadsheet, FileText, Download } from "lucide-react";
+import { DollarSign, Package, ArrowUpRight, ArrowDownRight, Factory, Users, TrendingUp, Layers, CalendarIcon, FileSpreadsheet, FileText } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { formatCurrency, formatWeightCompact as formatWeight } from "@/lib/kpis";
@@ -91,9 +90,9 @@ export default function ExtratoDono() {
 
   // Fetch vendas Intermediação (Cenário Operação Terceiro)
   const { data: vendasIntermediacao = [] } = useQuery({
-    queryKey: ["vendas-intermediacao-extrato", selectedDono],
+    queryKey: ["vendas-intermediacao-extrato"],
     queryFn: async () => {
-      let query = supabase
+      const { data, error } = await supabase
         .from("vendas_intermediacao")
         .select(`
           id, dt, kg_vendido, nf_venda, preco_venda_rkg, valor_venda_rs,
@@ -105,8 +104,6 @@ export default function ExtratoDono() {
         `)
         .eq("is_deleted", false)
         .order("dt", { ascending: false });
-      
-      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
@@ -121,7 +118,7 @@ export default function ExtratoDono() {
         .select("*")
         .order("created_at", { ascending: false });
       
-      if (selectedDono !== "todos") {
+      if (selectedDono !== "todos" && selectedDono !== "ibrac") {
         query = query.eq("parceiro_id", selectedDono);
       }
       
@@ -145,46 +142,83 @@ export default function ExtratoDono() {
     });
   }, [dataInicio, dataFim]);
 
-  // Filtered data by date
-  const saidasC1Filtradas = useMemo(() => filterByDateRange(saidasC1, 'dt'), [saidasC1, filterByDateRange]);
-  const saidasTerceirosFiltradas = useMemo(() => filterByDateRange(saidasTerceiros, 'dt'), [saidasTerceiros, filterByDateRange]);
+  // Filtered data by date AND dono
+  const saidasC1Filtradas = useMemo(() => {
+    const filtradas = filterByDateRange(saidasC1, 'dt');
+    // Material Próprio só aparece para "todos" ou "ibrac"
+    if (selectedDono !== "todos" && selectedDono !== "ibrac") return [];
+    return filtradas;
+  }, [saidasC1, filterByDateRange, selectedDono]);
+
+  const saidasTerceirosFiltradas = useMemo(() => {
+    const filtradas = filterByDateRange(saidasTerceiros, 'dt');
+    // Se IBRAC selecionado, não mostra Industrialização
+    if (selectedDono === "ibrac") return [];
+    // Se dono específico, filtrar por cliente_id
+    if (selectedDono !== "todos") {
+      return filtradas.filter((s: any) => s.operacao?.cliente_id === selectedDono);
+    }
+    return filtradas;
+  }, [saidasTerceiros, filterByDateRange, selectedDono]);
+
   const vendasIntermediacaoFiltradas = useMemo(() => filterByDateRange(vendasIntermediacao, 'dt'), [vendasIntermediacao, filterByDateRange]);
 
   // Filter vendas by selected dono
-  const vendasFiltradas = selectedDono === "todos" 
-    ? vendasIntermediacaoFiltradas 
-    : vendasIntermediacaoFiltradas.filter((v: any) => v.operacao?.dono_economico_id === selectedDono);
+  const vendasFiltradas = useMemo(() => {
+    // Se IBRAC selecionado, não mostra Intermediação
+    if (selectedDono === "ibrac") return [];
+    // Se dono específico, filtrar por dono_economico_id
+    if (selectedDono !== "todos") {
+      return vendasIntermediacaoFiltradas.filter((v: any) => v.operacao?.dono_economico_id === selectedDono);
+    }
+    return vendasIntermediacaoFiltradas;
+  }, [vendasIntermediacaoFiltradas, selectedDono]);
 
-  // Calculate totals by cenário
-  const cenarioTotals: CenarioTotals[] = useMemo(() => [
-    {
-      cenario: 'proprio',
-      label: CENARIOS_CONFIG.proprio.label,
-      kgTotal: saidasC1Filtradas.reduce((acc: number, s: any) => acc + (s.kg_saida || 0), 0),
-      valorTotal: saidasC1Filtradas.reduce((acc: number, s: any) => acc + (s.receita_simulada_rs || 0), 0),
-      custoTotal: saidasC1Filtradas.reduce((acc: number, s: any) => acc + (s.custo_saida_rs || 0), 0),
-      resultadoTotal: saidasC1Filtradas.reduce((acc: number, s: any) => acc + (s.resultado_simulado_rs || 0), 0),
-      operacoes: saidasC1Filtradas.length,
-    },
-    {
-      cenario: 'industrializacao',
-      label: CENARIOS_CONFIG.industrializacao.label,
-      kgTotal: saidasTerceirosFiltradas.reduce((acc: number, s: any) => acc + (s.kg_devolvido || 0), 0),
-      valorTotal: saidasTerceirosFiltradas.reduce((acc: number, s: any) => acc + (s.custo_servico_saida_rs || 0), 0),
-      custoTotal: 0,
-      resultadoTotal: saidasTerceirosFiltradas.reduce((acc: number, s: any) => acc + (s.custo_servico_saida_rs || 0), 0),
-      operacoes: saidasTerceirosFiltradas.length,
-    },
-    {
-      cenario: 'operacao_terceiro',
-      label: CENARIOS_CONFIG.operacao_terceiro.label,
-      kgTotal: vendasFiltradas.reduce((acc: number, v: any) => acc + (v.kg_vendido || 0), 0),
-      valorTotal: vendasFiltradas.reduce((acc: number, v: any) => acc + (v.valor_venda_rs || 0), 0),
-      custoTotal: vendasFiltradas.reduce((acc: number, v: any) => acc + (v.custo_material_dono_rs || 0) + (v.comissao_ibrac_rs || 0), 0),
-      resultadoTotal: vendasFiltradas.reduce((acc: number, v: any) => acc + (v.saldo_repassar_rs || 0), 0),
-      operacoes: vendasFiltradas.length,
-    },
-  ], [saidasC1Filtradas, saidasTerceirosFiltradas, vendasFiltradas]);
+  // Calculate totals by cenário (dynamic based on dono selection)
+  const cenarioTotals: CenarioTotals[] = useMemo(() => {
+    const totals: CenarioTotals[] = [];
+    
+    // Material Próprio - só para IBRAC ou Todos
+    if (saidasC1Filtradas.length > 0) {
+      totals.push({
+        cenario: 'proprio',
+        label: CENARIOS_CONFIG.proprio.label,
+        kgTotal: saidasC1Filtradas.reduce((acc: number, s: any) => acc + (s.kg_saida || 0), 0),
+        valorTotal: saidasC1Filtradas.reduce((acc: number, s: any) => acc + (s.receita_simulada_rs || 0), 0),
+        custoTotal: saidasC1Filtradas.reduce((acc: number, s: any) => acc + (s.custo_saida_rs || 0), 0),
+        resultadoTotal: saidasC1Filtradas.reduce((acc: number, s: any) => acc + (s.resultado_simulado_rs || 0), 0),
+        operacoes: saidasC1Filtradas.length,
+      });
+    }
+    
+    // Industrialização - só para dono específico ou Todos (não IBRAC)
+    if (saidasTerceirosFiltradas.length > 0) {
+      totals.push({
+        cenario: 'industrializacao',
+        label: CENARIOS_CONFIG.industrializacao.label,
+        kgTotal: saidasTerceirosFiltradas.reduce((acc: number, s: any) => acc + (s.kg_devolvido || 0), 0),
+        valorTotal: saidasTerceirosFiltradas.reduce((acc: number, s: any) => acc + (s.custo_servico_saida_rs || 0), 0),
+        custoTotal: 0,
+        resultadoTotal: saidasTerceirosFiltradas.reduce((acc: number, s: any) => acc + (s.custo_servico_saida_rs || 0), 0),
+        operacoes: saidasTerceirosFiltradas.length,
+      });
+    }
+    
+    // Intermediação - só para dono específico ou Todos (não IBRAC)
+    if (vendasFiltradas.length > 0) {
+      totals.push({
+        cenario: 'operacao_terceiro',
+        label: 'Intermediação',
+        kgTotal: vendasFiltradas.reduce((acc: number, v: any) => acc + (v.kg_vendido || 0), 0),
+        valorTotal: vendasFiltradas.reduce((acc: number, v: any) => acc + (v.valor_venda_rs || 0), 0),
+        custoTotal: vendasFiltradas.reduce((acc: number, v: any) => acc + (v.custo_material_dono_rs || 0) + (v.comissao_ibrac_rs || 0), 0),
+        resultadoTotal: vendasFiltradas.reduce((acc: number, v: any) => acc + (v.saldo_repassar_rs || 0), 0),
+        operacoes: vendasFiltradas.length,
+      });
+    }
+    
+    return totals;
+  }, [saidasC1Filtradas, saidasTerceirosFiltradas, vendasFiltradas]);
 
   const acertosPendentes = acertos.filter((a: any) => a.status === "pendente");
   const totalAPagar = acertosPendentes
@@ -196,6 +230,15 @@ export default function ExtratoDono() {
 
   const totalGeral = cenarioTotals.reduce((acc, c) => acc + c.resultadoTotal, 0);
   const kgGeral = cenarioTotals.reduce((acc, c) => acc + c.kgTotal, 0);
+  const totalOperacoes = cenarioTotals.reduce((acc, c) => acc + c.operacoes, 0);
+
+  // Get dono name for display
+  const getDonoNome = () => {
+    if (selectedDono === "todos") return "Todos os Donos";
+    if (selectedDono === "ibrac") return "IBRAC (Material Próprio)";
+    const dono = donos.find((d: any) => d.id === selectedDono);
+    return dono?.nome_fantasia || dono?.razao_social || "Dono";
+  };
 
   // Chart data
   const pieChartData = cenarioTotals.map((ct, index) => ({
@@ -213,9 +256,7 @@ export default function ExtratoDono() {
 
   // Export functions
   const exportToExcel = useCallback(() => {
-    const donoNome = selectedDono === "todos" 
-      ? "Todos" 
-      : donos.find((d: any) => d.id === selectedDono)?.nome_fantasia || "Dono";
+    const donoNome = getDonoNome();
     
     // Sheet 1: Resumo por cenário
     const resumoData = cenarioTotals.map((ct) => ({
@@ -226,80 +267,77 @@ export default function ExtratoDono() {
       "Custos (R$)": ct.custoTotal,
       "Resultado (R$)": ct.resultadoTotal,
     }));
-    resumoData.push({
-      "Cenário": "TOTAL GERAL",
-      "Operações": cenarioTotals.reduce((acc, c) => acc + c.operacoes, 0),
-      "Kg Total": kgGeral,
-      "Valor Bruto (R$)": cenarioTotals.reduce((acc, c) => acc + c.valorTotal, 0),
-      "Custos (R$)": cenarioTotals.reduce((acc, c) => acc + c.custoTotal, 0),
-      "Resultado (R$)": totalGeral,
-    });
-
-    // Sheet 2: Material Próprio
-    const saidasC1Data = saidasC1Filtradas.map((s: any) => ({
-      "Data": format(parseISO(s.dt), 'dd/MM/yyyy'),
-      "Operação": s.operacao?.nome || '-',
-      "Tipo": s.tipo_saida,
-      "Documento": s.documento || '-',
-      "Kg": s.kg_saida,
-      "Custo (R$)": s.custo_saida_rs || 0,
-      "Receita (R$)": s.receita_simulada_rs || 0,
-      "Resultado (R$)": s.resultado_simulado_rs || 0,
-    }));
-
-    // Sheet 3: Industrialização
-    const saidasTercData = saidasTerceirosFiltradas.map((s: any) => ({
-      "Data": format(parseISO(s.dt), 'dd/MM/yyyy'),
-      "Operação": s.operacao?.nome || '-',
-      "Cliente": s.operacao?.cliente?.nome_fantasia || s.operacao?.cliente?.razao_social || '-',
-      "Documento": s.documento || '-',
-      "Kg Devolvido": s.kg_devolvido,
-      "Receita Serviço (R$)": s.custo_servico_saida_rs || 0,
-    }));
-
-    // Sheet 4: Operação Terceiro
-    const vendasData = vendasFiltradas.map((v: any) => ({
-      "Data": format(parseISO(v.dt), 'dd/MM/yyyy'),
-      "Operação": v.operacao?.nome || '-',
-      "Dono": v.operacao?.dono?.nome_fantasia || v.operacao?.dono?.razao_social || '-',
-      "NF": v.nf_venda || '-',
-      "Kg": v.kg_vendido,
-      "Valor Venda (R$)": v.valor_venda_rs || 0,
-      "Comissão (R$)": v.comissao_ibrac_rs || 0,
-      "Repasse Dono (R$)": v.saldo_repassar_rs || 0,
-    }));
+    if (cenarioTotals.length > 0) {
+      resumoData.push({
+        "Cenário": "TOTAL GERAL",
+        "Operações": totalOperacoes,
+        "Kg Total": kgGeral,
+        "Valor Bruto (R$)": cenarioTotals.reduce((acc, c) => acc + c.valorTotal, 0),
+        "Custos (R$)": cenarioTotals.reduce((acc, c) => acc + c.custoTotal, 0),
+        "Resultado (R$)": totalGeral,
+      });
+    }
 
     const workbook = XLSX.utils.book_new();
     
     const wsResumo = XLSX.utils.json_to_sheet(resumoData);
     XLSX.utils.book_append_sheet(workbook, wsResumo, "Resumo");
     
-    if (saidasC1Data.length > 0) {
+    // Sheet 2: Material Próprio (only if there's data)
+    if (saidasC1Filtradas.length > 0) {
+      const saidasC1Data = saidasC1Filtradas.map((s: any) => ({
+        "Data": format(parseISO(s.dt), 'dd/MM/yyyy'),
+        "Operação": s.operacao?.nome || '-',
+        "Tipo": s.tipo_saida,
+        "Documento": s.documento || '-',
+        "Kg": s.kg_saida,
+        "Custo (R$)": s.custo_saida_rs || 0,
+        "Receita (R$)": s.receita_simulada_rs || 0,
+        "Resultado (R$)": s.resultado_simulado_rs || 0,
+      }));
       const wsC1 = XLSX.utils.json_to_sheet(saidasC1Data);
       XLSX.utils.book_append_sheet(workbook, wsC1, "Material Próprio");
     }
     
-    if (saidasTercData.length > 0) {
+    // Sheet 3: Industrialização (only if there's data)
+    if (saidasTerceirosFiltradas.length > 0) {
+      const saidasTercData = saidasTerceirosFiltradas.map((s: any) => ({
+        "Data": format(parseISO(s.dt), 'dd/MM/yyyy'),
+        "Operação": s.operacao?.nome || '-',
+        "Cliente": s.operacao?.cliente?.nome_fantasia || s.operacao?.cliente?.razao_social || '-',
+        "Documento": s.documento || '-',
+        "Kg Devolvido": s.kg_devolvido,
+        "Receita Serviço (R$)": s.custo_servico_saida_rs || 0,
+      }));
       const wsTerc = XLSX.utils.json_to_sheet(saidasTercData);
       XLSX.utils.book_append_sheet(workbook, wsTerc, "Industrialização");
     }
     
-    if (vendasData.length > 0) {
+    // Sheet 4: Intermediação (only if there's data)
+    if (vendasFiltradas.length > 0) {
+      const vendasData = vendasFiltradas.map((v: any) => ({
+        "Data": format(parseISO(v.dt), 'dd/MM/yyyy'),
+        "Operação": v.operacao?.nome || '-',
+        "Dono": v.operacao?.dono?.nome_fantasia || v.operacao?.dono?.razao_social || '-',
+        "NF": v.nf_venda || '-',
+        "Kg": v.kg_vendido,
+        "Valor Venda (R$)": v.valor_venda_rs || 0,
+        "Comissão (R$)": v.comissao_ibrac_rs || 0,
+        "Repasse Dono (R$)": v.saldo_repassar_rs || 0,
+      }));
       const wsVendas = XLSX.utils.json_to_sheet(vendasData);
-      XLSX.utils.book_append_sheet(workbook, wsVendas, "Operação Terceiro");
+      XLSX.utils.book_append_sheet(workbook, wsVendas, "Intermediação");
     }
 
     const periodo = dataInicio && dataFim 
       ? `${format(dataInicio, 'ddMMyy')}_a_${format(dataFim, 'ddMMyy')}` 
       : format(new Date(), 'yyyyMMdd');
     
-    XLSX.writeFile(workbook, `Extrato_${donoNome}_${periodo}.xlsx`);
-  }, [cenarioTotals, saidasC1Filtradas, saidasTerceirosFiltradas, vendasFiltradas, donos, selectedDono, dataInicio, dataFim, kgGeral, totalGeral]);
+    XLSX.writeFile(workbook, `Extrato_${donoNome.replace(/[^a-zA-Z0-9]/g, '_')}_${periodo}.xlsx`);
+  }, [cenarioTotals, saidasC1Filtradas, saidasTerceirosFiltradas, vendasFiltradas, dataInicio, dataFim, kgGeral, totalGeral, totalOperacoes, getDonoNome]);
 
   const exportToPDF = useCallback(() => {
-    const donoNome = selectedDono === "todos" 
-      ? "Todos os Donos" 
-      : donos.find((d: any) => d.id === selectedDono)?.nome_fantasia || "Dono";
+    const donoNome = getDonoNome();
     
     const periodoStr = dataInicio && dataFim 
       ? `${format(dataInicio, 'dd/MM/yyyy')} a ${format(dataFim, 'dd/MM/yyyy')}` 
@@ -331,6 +369,7 @@ export default function ExtratoDono() {
           .text-right { text-align: right; }
           .section { page-break-inside: avoid; margin-bottom: 30px; }
           .totals-row { background-color: #f0f0f0 !important; font-weight: bold; }
+          .no-data { text-align: center; padding: 40px; color: #888; }
           @media print {
             body { margin: 0; }
             .section { page-break-after: auto; }
@@ -345,12 +384,13 @@ export default function ExtratoDono() {
           <strong>Gerado em:</strong> ${format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
         </p>
 
+        ${cenarioTotals.length > 0 ? `
         <div class="section">
           <h2>Resumo por Cenário</h2>
           <div class="kpis">
             <div class="kpi">
               <div class="kpi-label">Total Operações</div>
-              <div class="kpi-value">${cenarioTotals.reduce((acc, c) => acc + c.operacoes, 0)}</div>
+              <div class="kpi-value">${totalOperacoes}</div>
             </div>
             <div class="kpi">
               <div class="kpi-label">Kg Total</div>
@@ -394,7 +434,7 @@ export default function ExtratoDono() {
               `).join('')}
               <tr class="totals-row">
                 <td>TOTAL</td>
-                <td class="text-right">${cenarioTotals.reduce((acc, c) => acc + c.operacoes, 0)}</td>
+                <td class="text-right">${totalOperacoes}</td>
                 <td class="text-right">${formatWeight(kgGeral)}</td>
                 <td class="text-right">${formatCurrency(cenarioTotals.reduce((acc, c) => acc + c.valorTotal, 0))}</td>
                 <td class="text-right">${formatCurrency(cenarioTotals.reduce((acc, c) => acc + c.custoTotal, 0))}</td>
@@ -403,6 +443,7 @@ export default function ExtratoDono() {
             </tbody>
           </table>
         </div>
+        ` : '<div class="no-data">Nenhuma operação encontrada para o dono e período selecionados.</div>'}
 
         ${saidasC1Filtradas.length > 0 ? `
         <div class="section">
@@ -440,7 +481,7 @@ export default function ExtratoDono() {
 
         ${saidasTerceirosFiltradas.length > 0 ? `
         <div class="section">
-          <h2>Industrialização (Terceiros)</h2>
+          <h2>Industrialização</h2>
           <table>
             <thead>
               <tr>
@@ -470,7 +511,7 @@ export default function ExtratoDono() {
 
         ${vendasFiltradas.length > 0 ? `
         <div class="section">
-          <h2>Operação Terceiro (Intermediação)</h2>
+          <h2>Intermediação</h2>
           <table>
             <thead>
               <tr>
@@ -509,7 +550,7 @@ export default function ExtratoDono() {
 
     printWindow.document.write(html);
     printWindow.document.close();
-  }, [cenarioTotals, saidasC1Filtradas, saidasTerceirosFiltradas, vendasFiltradas, donos, selectedDono, dataInicio, dataFim, kgGeral, totalGeral, totalAPagar, totalAReceber]);
+  }, [cenarioTotals, saidasC1Filtradas, saidasTerceirosFiltradas, vendasFiltradas, dataInicio, dataFim, kgGeral, totalGeral, totalAPagar, totalAReceber, totalOperacoes, getDonoNome]);
 
   return (
     <MainLayout>
@@ -546,11 +587,12 @@ export default function ExtratoDono() {
             </Popover>
 
             <Select value={selectedDono} onValueChange={setSelectedDono}>
-              <SelectTrigger className="w-48">
+              <SelectTrigger className="w-56">
                 <SelectValue placeholder="Selecione o dono" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">Todos os Donos</SelectItem>
+                <SelectItem value="ibrac">IBRAC (Material Próprio)</SelectItem>
                 {donos.map((d: any) => (
                   <SelectItem key={d.id} value={d.id}>{d.nome_fantasia || d.razao_social}</SelectItem>
                 ))}
@@ -579,7 +621,7 @@ export default function ExtratoDono() {
             </CardHeader>
             <CardContent>
               <p className="text-2xl font-bold text-primary">
-                {cenarioTotals.reduce((acc, c) => acc + c.operacoes, 0)}
+                {totalOperacoes}
               </p>
               <p className="text-sm text-muted-foreground">{formatWeight(kgGeral)}</p>
             </CardContent>
@@ -596,7 +638,9 @@ export default function ExtratoDono() {
               <p className={`text-2xl font-bold ${totalGeral >= 0 ? 'text-success' : 'text-destructive'}`}>
                 {formatCurrency(totalGeral)}
               </p>
-              <p className="text-sm text-muted-foreground">Soma dos 3 cenários</p>
+              <p className="text-sm text-muted-foreground">
+                {cenarioTotals.length} cenário{cenarioTotals.length !== 1 ? 's' : ''}
+              </p>
             </CardContent>
           </Card>
 
@@ -634,120 +678,111 @@ export default function ExtratoDono() {
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <Users className="h-4 w-4 text-warning" />
-                Donos
+                Dono Selecionado
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-2xl font-bold text-warning">{donos.length}</p>
-              <p className="text-sm text-muted-foreground">Cadastrados</p>
+              <p className="text-lg font-bold text-warning truncate" title={getDonoNome()}>
+                {selectedDono === "todos" ? "Todos" : selectedDono === "ibrac" ? "IBRAC" : getDonoNome().substring(0, 15)}
+              </p>
+              <p className="text-sm text-muted-foreground">{donos.length} cadastrados</p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Gráficos */}
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Distribuição de Resultado por Cenário</CardTitle>
-              <CardDescription>Proporção do resultado de cada cenário</CardDescription>
-            </CardHeader>
-            <CardContent className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={pieChartData.filter(d => d.value > 0)}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                    outerRadius={100}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    {pieChartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                </PieChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Comparativo por Cenário</CardTitle>
-              <CardDescription>Kg, Receita e Resultado por cenário</CardDescription>
-            </CardHeader>
-            <CardContent className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={barChartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} tickFormatter={(value) => value >= 1000 ? `${(value / 1000).toFixed(0)}k` : value} />
-                  <Tooltip formatter={(value: number, name: string) => {
-                    if (name === 'kg') return [formatWeight(value), 'Kg'];
-                    return [formatCurrency(value), name === 'receita' ? 'Receita' : 'Resultado'];
-                  }} />
-                  <Legend />
-                  <Bar dataKey="receita" name="Receita" fill="hsl(210, 80%, 60%)" />
-                  <Bar dataKey="resultado" name="Resultado" fill="hsl(150, 60%, 50%)" />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Cards por Cenário */}
-        <div className="grid gap-4 md:grid-cols-3">
-          {cenarioTotals.map((ct) => (
-            <Card key={ct.cenario} className={`${getCenarioColor(ct.cenario as CenarioOperacao)} border`}>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg flex items-center justify-between">
-                  {ct.label}
-                  <Badge variant="outline">{ct.operacoes} saídas</Badge>
-                </CardTitle>
-                <CardDescription>{CENARIOS_CONFIG[ct.cenario as CenarioOperacao]?.descricao}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Kg Total:</span>
-                  <span className="font-medium">{formatWeight(ct.kgTotal)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Valor Bruto:</span>
-                  <span className="font-medium">{formatCurrency(ct.valorTotal)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Custos:</span>
-                  <span className="font-medium text-destructive">{formatCurrency(ct.custoTotal)}</span>
-                </div>
-                <div className="flex justify-between border-t pt-2">
-                  <span className="font-semibold">Resultado:</span>
-                  <span className={`font-bold ${ct.resultadoTotal >= 0 ? 'text-success' : 'text-destructive'}`}>
-                    {formatCurrency(ct.resultadoTotal)}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* Tabs com detalhes por cenário */}
-        <Tabs defaultValue="proprio" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="proprio">Material Próprio</TabsTrigger>
-            <TabsTrigger value="industrializacao">Industrialização</TabsTrigger>
-            <TabsTrigger value="operacao_terceiro">Operação Terceiro</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="proprio">
+        {/* Gráficos - só mostra se houver mais de 1 cenário */}
+        {cenarioTotals.length > 1 && (
+          <div className="grid gap-4 md:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle>Saídas - Material Próprio (C1)</CardTitle>
+                <CardTitle className="text-lg">Distribuição de Resultado por Cenário</CardTitle>
+                <CardDescription>Proporção do resultado de cada cenário</CardDescription>
+              </CardHeader>
+              <CardContent className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={pieChartData.filter(d => d.value > 0)}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={100}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {pieChartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Comparativo por Cenário</CardTitle>
+                <CardDescription>Kg, Receita e Resultado por cenário</CardDescription>
+              </CardHeader>
+              <CardContent className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={barChartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                    <YAxis tick={{ fontSize: 11 }} tickFormatter={(value) => value >= 1000 ? `${(value / 1000).toFixed(0)}k` : value} />
+                    <Tooltip formatter={(value: number, name: string) => {
+                      if (name === 'kg') return [formatWeight(value), 'Kg'];
+                      return [formatCurrency(value), name === 'receita' ? 'Receita' : 'Resultado'];
+                    }} />
+                    <Legend />
+                    <Bar dataKey="receita" name="Receita" fill="hsl(210, 80%, 60%)" />
+                    <Bar dataKey="resultado" name="Resultado" fill="hsl(150, 60%, 50%)" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Cards dinâmicos por cenário */}
+        <div className="space-y-6">
+          {/* Material Próprio - só para IBRAC ou Todos */}
+          {saidasC1Filtradas.length > 0 && (
+            <Card className="border-l-4 border-l-primary">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Factory className="h-5 w-5 text-primary" />
+                  Material Próprio (C1)
+                  <Badge variant="outline" className="ml-auto">{saidasC1Filtradas.length} saídas</Badge>
+                </CardTitle>
                 <CardDescription>IBRAC compra, beneficia e consome/vende</CardDescription>
               </CardHeader>
               <CardContent>
+                {/* Resumo do cenário */}
+                <div className="grid grid-cols-4 gap-4 mb-4 p-3 bg-muted/50 rounded-lg">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Kg Total</p>
+                    <p className="font-bold">{formatWeight(saidasC1Filtradas.reduce((acc: number, s: any) => acc + (s.kg_saida || 0), 0))}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Custo</p>
+                    <p className="font-bold text-destructive">{formatCurrency(saidasC1Filtradas.reduce((acc: number, s: any) => acc + (s.custo_saida_rs || 0), 0))}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Receita</p>
+                    <p className="font-bold">{formatCurrency(saidasC1Filtradas.reduce((acc: number, s: any) => acc + (s.receita_simulada_rs || 0), 0))}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Resultado</p>
+                    <p className={`font-bold ${saidasC1Filtradas.reduce((acc: number, s: any) => acc + (s.resultado_simulado_rs || 0), 0) >= 0 ? 'text-success' : 'text-destructive'}`}>
+                      {formatCurrency(saidasC1Filtradas.reduce((acc: number, s: any) => acc + (s.resultado_simulado_rs || 0), 0))}
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Tabela de detalhes */}
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -778,26 +813,46 @@ export default function ExtratoDono() {
                         </TableCell>
                       </TableRow>
                     ))}
-                    {saidasC1Filtradas.length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
-                          Nenhuma saída registrada no período
-                        </TableCell>
-                      </TableRow>
-                    )}
                   </TableBody>
                 </Table>
+                {saidasC1Filtradas.length > 10 && (
+                  <p className="text-sm text-muted-foreground text-center mt-2">
+                    Mostrando 10 de {saidasC1Filtradas.length} registros. Exporte para ver todos.
+                  </p>
+                )}
               </CardContent>
             </Card>
-          </TabsContent>
+          )}
 
-          <TabsContent value="industrializacao">
-            <Card>
+          {/* Industrialização - para dono específico ou Todos */}
+          {saidasTerceirosFiltradas.length > 0 && (
+            <Card className="border-l-4 border-l-info">
               <CardHeader>
-                <CardTitle>Saídas - Industrialização (Terceiros)</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <Factory className="h-5 w-5 text-info" />
+                  Industrialização
+                  <Badge variant="outline" className="ml-auto">{saidasTerceirosFiltradas.length} saídas</Badge>
+                </CardTitle>
                 <CardDescription>Cliente envia material, IBRAC presta serviço</CardDescription>
               </CardHeader>
               <CardContent>
+                {/* Resumo do cenário */}
+                <div className="grid grid-cols-3 gap-4 mb-4 p-3 bg-muted/50 rounded-lg">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Kg Devolvido</p>
+                    <p className="font-bold">{formatWeight(saidasTerceirosFiltradas.reduce((acc: number, s: any) => acc + (s.kg_devolvido || 0), 0))}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Receita Serviço</p>
+                    <p className="font-bold text-success">{formatCurrency(saidasTerceirosFiltradas.reduce((acc: number, s: any) => acc + (s.custo_servico_saida_rs || 0), 0))}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Operações</p>
+                    <p className="font-bold">{saidasTerceirosFiltradas.length}</p>
+                  </div>
+                </div>
+                
+                {/* Tabela de detalhes */}
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -820,26 +875,50 @@ export default function ExtratoDono() {
                         <TableCell className="text-right text-success">{formatCurrency(s.custo_servico_saida_rs)}</TableCell>
                       </TableRow>
                     ))}
-                    {saidasTerceirosFiltradas.length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                          Nenhuma saída registrada no período
-                        </TableCell>
-                      </TableRow>
-                    )}
                   </TableBody>
                 </Table>
+                {saidasTerceirosFiltradas.length > 10 && (
+                  <p className="text-sm text-muted-foreground text-center mt-2">
+                    Mostrando 10 de {saidasTerceirosFiltradas.length} registros. Exporte para ver todos.
+                  </p>
+                )}
               </CardContent>
             </Card>
-          </TabsContent>
+          )}
 
-          <TabsContent value="operacao_terceiro">
-            <Card>
+          {/* Intermediação - para dono específico ou Todos */}
+          {vendasFiltradas.length > 0 && (
+            <Card className="border-l-4 border-l-warning">
               <CardHeader>
-                <CardTitle>Vendas - Operação Terceiro (Intermediação)</CardTitle>
-                <CardDescription>IBRAC opera em nome do dono, cobra comissão</CardDescription>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5 text-warning" />
+                  Intermediação
+                  <Badge variant="outline" className="ml-auto">{vendasFiltradas.length} vendas</Badge>
+                </CardTitle>
+                <CardDescription>IBRAC opera em nome do dono e cobra comissão</CardDescription>
               </CardHeader>
               <CardContent>
+                {/* Resumo do cenário */}
+                <div className="grid grid-cols-4 gap-4 mb-4 p-3 bg-muted/50 rounded-lg">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Kg Vendido</p>
+                    <p className="font-bold">{formatWeight(vendasFiltradas.reduce((acc: number, v: any) => acc + (v.kg_vendido || 0), 0))}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Valor Venda</p>
+                    <p className="font-bold">{formatCurrency(vendasFiltradas.reduce((acc: number, v: any) => acc + (v.valor_venda_rs || 0), 0))}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Comissão IBRAC</p>
+                    <p className="font-bold text-warning">{formatCurrency(vendasFiltradas.reduce((acc: number, v: any) => acc + (v.comissao_ibrac_rs || 0), 0))}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Repasse Dono</p>
+                    <p className="font-bold text-success">{formatCurrency(vendasFiltradas.reduce((acc: number, v: any) => acc + (v.saldo_repassar_rs || 0), 0))}</p>
+                  </div>
+                </div>
+                
+                {/* Tabela de detalhes */}
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -848,9 +927,9 @@ export default function ExtratoDono() {
                       <TableHead>Dono</TableHead>
                       <TableHead>NF</TableHead>
                       <TableHead className="text-right">Kg</TableHead>
-                      <TableHead className="text-right">Valor Venda</TableHead>
+                      <TableHead className="text-right">Valor</TableHead>
                       <TableHead className="text-right">Comissão</TableHead>
-                      <TableHead className="text-right">Repasse Dono</TableHead>
+                      <TableHead className="text-right">Repasse</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -862,23 +941,34 @@ export default function ExtratoDono() {
                         <TableCell>{v.nf_venda || '-'}</TableCell>
                         <TableCell className="text-right">{formatWeight(v.kg_vendido)}</TableCell>
                         <TableCell className="text-right">{formatCurrency(v.valor_venda_rs)}</TableCell>
-                        <TableCell className="text-right text-info">{formatCurrency(v.comissao_ibrac_rs)}</TableCell>
-                        <TableCell className="text-right text-success font-medium">{formatCurrency(v.saldo_repassar_rs)}</TableCell>
+                        <TableCell className="text-right text-warning">{formatCurrency(v.comissao_ibrac_rs)}</TableCell>
+                        <TableCell className="text-right text-success">{formatCurrency(v.saldo_repassar_rs)}</TableCell>
                       </TableRow>
                     ))}
-                    {vendasFiltradas.length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
-                          Nenhuma venda registrada no período
-                        </TableCell>
-                      </TableRow>
-                    )}
                   </TableBody>
                 </Table>
+                {vendasFiltradas.length > 10 && (
+                  <p className="text-sm text-muted-foreground text-center mt-2">
+                    Mostrando 10 de {vendasFiltradas.length} registros. Exporte para ver todos.
+                  </p>
+                )}
               </CardContent>
             </Card>
-          </TabsContent>
-        </Tabs>
+          )}
+
+          {/* Mensagem quando não há dados */}
+          {saidasC1Filtradas.length === 0 && saidasTerceirosFiltradas.length === 0 && vendasFiltradas.length === 0 && (
+            <Card className="border-dashed">
+              <CardContent className="text-center py-12">
+                <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <p className="text-lg font-medium">Nenhuma operação encontrada</p>
+                <p className="text-muted-foreground">
+                  Ajuste o filtro de período ou selecione outro dono.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       </div>
     </MainLayout>
   );

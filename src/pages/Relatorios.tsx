@@ -4,14 +4,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { 
-  FileText, Download, Printer, Calendar, TrendingUp, Package, 
+  FileText, Printer, Calendar, TrendingUp, Package, 
   DollarSign, Scale, Loader2, FileSpreadsheet, ChevronDown, ChevronRight, 
-  ArrowRight, Factory, Users
+  ArrowRight, Factory, Users, Filter
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,14 +22,20 @@ import { formatWeight, formatCurrency } from "@/lib/kpis";
 import { useExportReport } from "@/hooks/useExportReport";
 import * as XLSX from "xlsx";
 
+type CenarioType = "todos" | "c1" | "intermediacao" | "terceiros";
+
 export default function Relatorios() {
-  const { exportToExcel, printReport } = useExportReport();
+  const { printReport } = useExportReport();
   const [dataInicio, setDataInicio] = useState(format(startOfMonth(new Date()), "yyyy-MM-dd"));
   const [dataFim, setDataFim] = useState(format(endOfMonth(new Date()), "yyyy-MM-dd"));
   const [activeTab, setActiveTab] = useState("resumo");
   const [expandedC1, setExpandedC1] = useState<string | null>(null);
   const [expandedInterm, setExpandedInterm] = useState<string | null>(null);
   const [expandedTerc, setExpandedTerc] = useState<string | null>(null);
+  
+  // New filters
+  const [selectedCenario, setSelectedCenario] = useState<CenarioType>("todos");
+  const [selectedOperacao, setSelectedOperacao] = useState<string>("todas");
 
   // Queries para todas as operações
   const { data: operacoesC1 = [], isLoading: loadingC1 } = useQuery({
@@ -48,7 +55,7 @@ export default function Relatorios() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("entradas_c1")
-        .select("*, operacao:operacoes(nome, beneficiador:parceiros!operacoes_beneficiador_id_fkey(razao_social, nome_fantasia))")
+        .select("*, operacao:operacoes(id, nome, beneficiador:parceiros!operacoes_beneficiador_id_fkey(razao_social, nome_fantasia))")
         .eq("is_deleted", false);
       if (error) throw error;
       return data;
@@ -60,7 +67,7 @@ export default function Relatorios() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("beneficiamentos_c1")
-        .select("*, operacao:operacoes(nome, beneficiador:parceiros!operacoes_beneficiador_id_fkey(razao_social, nome_fantasia))")
+        .select("*, operacao:operacoes(id, nome, beneficiador:parceiros!operacoes_beneficiador_id_fkey(razao_social, nome_fantasia))")
         .eq("is_deleted", false);
       if (error) throw error;
       return data;
@@ -72,7 +79,7 @@ export default function Relatorios() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("saidas_c1")
-        .select("*, operacao:operacoes(nome, beneficiador:parceiros!operacoes_beneficiador_id_fkey(razao_social, nome_fantasia)), parceiro:parceiros!saidas_c1_parceiro_destino_id_fkey(razao_social, nome_fantasia)")
+        .select("*, operacao:operacoes(id, nome, beneficiador:parceiros!operacoes_beneficiador_id_fkey(razao_social, nome_fantasia)), parceiro:parceiros!saidas_c1_parceiro_destino_id_fkey(razao_social, nome_fantasia)")
         .eq("is_deleted", false);
       if (error) throw error;
       return data;
@@ -104,7 +111,7 @@ export default function Relatorios() {
         .select(`
           *, 
           operacao:operacoes_intermediacao(
-            nome, 
+            id, nome, 
             dono:parceiros!operacoes_intermediacao_dono_economico_id_fkey(razao_social, nome_fantasia),
             beneficiador:parceiros!operacoes_intermediacao_beneficiador_id_fkey(razao_social, nome_fantasia)
           ), 
@@ -124,7 +131,7 @@ export default function Relatorios() {
         .select(`
           *, 
           operacao:operacoes_intermediacao(
-            nome,
+            id, nome,
             beneficiador:parceiros!operacoes_intermediacao_beneficiador_id_fkey(razao_social, nome_fantasia)
           )
         `)
@@ -142,7 +149,7 @@ export default function Relatorios() {
         .select(`
           *, 
           operacao:operacoes_intermediacao(
-            nome, 
+            id, nome, 
             dono:parceiros!operacoes_intermediacao_dono_economico_id_fkey(razao_social, nome_fantasia)
           ), 
           cliente:parceiros!vendas_intermediacao_cliente_id_fkey(razao_social, nome_fantasia)
@@ -177,7 +184,7 @@ export default function Relatorios() {
         .select(`
           *, 
           operacao:operacoes_terceiros(
-            nome,
+            id, nome,
             cliente:parceiros!operacoes_terceiros_cliente_id_fkey(razao_social, nome_fantasia),
             beneficiador:parceiros!operacoes_terceiros_beneficiador_id_fkey(razao_social, nome_fantasia)
           )
@@ -196,7 +203,7 @@ export default function Relatorios() {
         .select(`
           *, 
           operacao:operacoes_terceiros(
-            nome,
+            id, nome,
             beneficiador:parceiros!operacoes_terceiros_beneficiador_id_fkey(razao_social, nome_fantasia)
           )
         `)
@@ -214,7 +221,7 @@ export default function Relatorios() {
         .select(`
           *, 
           operacao:operacoes_terceiros(
-            nome,
+            id, nome,
             cliente:parceiros!operacoes_terceiros_cliente_id_fkey(razao_social, nome_fantasia)
           )
         `)
@@ -231,7 +238,7 @@ export default function Relatorios() {
         .from("cobrancas_servico_terceiros")
         .select(`
           *, 
-          operacao:operacoes_terceiros(nome, cliente:parceiros!operacoes_terceiros_cliente_id_fkey(razao_social, nome_fantasia))
+          operacao:operacoes_terceiros(id, nome, cliente:parceiros!operacoes_terceiros_cliente_id_fkey(razao_social, nome_fantasia))
         `)
         .eq("is_deleted", false);
       if (error) throw error;
@@ -240,30 +247,81 @@ export default function Relatorios() {
   });
 
   // Filtrar dados pelo período
-  const filterByPeriod = <T extends { dt?: string; dt_recebimento?: string; created_at?: string }>(data: T[]) => {
+  const filterByPeriod = <T extends { dt?: string; dt_recebimento?: string; created_at?: string; operacao_id?: string; operacao?: { id?: string } }>(data: T[]) => {
     return data.filter((item) => {
       const date = item.dt || item.dt_recebimento || item.created_at;
       if (!date) return false;
       try {
         const itemDate = parseISO(date);
-        return isWithinInterval(itemDate, { start: parseISO(dataInicio), end: parseISO(dataFim) });
+        const inPeriod = isWithinInterval(itemDate, { start: parseISO(dataInicio), end: parseISO(dataFim) });
+        
+        // Filter by operation if selected
+        if (selectedOperacao !== "todas" && inPeriod) {
+          const opId = item.operacao_id || item.operacao?.id;
+          return opId === selectedOperacao;
+        }
+        
+        return inPeriod;
       } catch {
         return false;
       }
     });
   };
 
+  // Build list of available operations based on selected scenario
+  const operacoesDisponiveis = useMemo(() => {
+    switch (selectedCenario) {
+      case "c1":
+        return operacoesC1.map(o => ({ id: o.id, nome: o.nome }));
+      case "intermediacao":
+        return operacoesInterm.map(o => ({ id: o.id, nome: o.nome }));
+      case "terceiros":
+        return operacoesTerceiros.map(o => ({ id: o.id, nome: o.nome }));
+      default:
+        return [
+          ...operacoesC1.map(o => ({ id: o.id, nome: `[C1] ${o.nome}` })),
+          ...operacoesInterm.map(o => ({ id: o.id, nome: `[Int] ${o.nome}` })),
+          ...operacoesTerceiros.map(o => ({ id: o.id, nome: `[Terc] ${o.nome}` })),
+        ];
+    }
+  }, [selectedCenario, operacoesC1, operacoesInterm, operacoesTerceiros]);
+
   // Calcular totais
   const totais = useMemo(() => {
-    const entradasPeriodo = filterByPeriod(entradasC1);
-    const benefPeriodo = filterByPeriod(benefC1);
-    const saidasPeriodo = filterByPeriod(saidasC1);
-    const comprasPeriodo = filterByPeriod(comprasInterm);
-    const vendasPeriodo = filterByPeriod(vendasInterm);
-    const entTercPeriodo = filterByPeriod(entradasTerceiros);
-    const benefTercPeriodo = filterByPeriod(benefTerceiros);
-    const saidaTercPeriodo = filterByPeriod(saidasTerceiros);
-    const cobrancasTercPeriodo = filterByPeriod(cobrancasTerceiros);
+    // Apply period and operation filters
+    let entradasPeriodo = filterByPeriod(entradasC1);
+    let benefPeriodo = filterByPeriod(benefC1);
+    let saidasPeriodo = filterByPeriod(saidasC1);
+    let comprasPeriodo = filterByPeriod(comprasInterm);
+    let vendasPeriodo = filterByPeriod(vendasInterm);
+    let entTercPeriodo = filterByPeriod(entradasTerceiros);
+    let benefTercPeriodo = filterByPeriod(benefTerceiros);
+    let saidaTercPeriodo = filterByPeriod(saidasTerceiros);
+    let cobrancasTercPeriodo = filterByPeriod(cobrancasTerceiros);
+
+    // Apply scenario filter
+    if (selectedCenario === "c1") {
+      comprasPeriodo = [];
+      vendasPeriodo = [];
+      entTercPeriodo = [];
+      benefTercPeriodo = [];
+      saidaTercPeriodo = [];
+      cobrancasTercPeriodo = [];
+    } else if (selectedCenario === "intermediacao") {
+      entradasPeriodo = [];
+      benefPeriodo = [];
+      saidasPeriodo = [];
+      entTercPeriodo = [];
+      benefTercPeriodo = [];
+      saidaTercPeriodo = [];
+      cobrancasTercPeriodo = [];
+    } else if (selectedCenario === "terceiros") {
+      entradasPeriodo = [];
+      benefPeriodo = [];
+      saidasPeriodo = [];
+      comprasPeriodo = [];
+      vendasPeriodo = [];
+    }
 
     return {
       c1: {
@@ -295,115 +353,216 @@ export default function Relatorios() {
         terceiros: operacoesTerceiros.filter(o => o.status === "ABERTA").length,
       },
     };
-  }, [entradasC1, benefC1, saidasC1, comprasInterm, vendasInterm, entradasTerceiros, benefTerceiros, saidasTerceiros, cobrancasTerceiros, operacoesC1, operacoesInterm, operacoesTerceiros, dataInicio, dataFim]);
+  }, [entradasC1, benefC1, saidasC1, comprasInterm, vendasInterm, entradasTerceiros, benefTerceiros, saidasTerceiros, cobrancasTerceiros, operacoesC1, operacoesInterm, operacoesTerceiros, dataInicio, dataFim, selectedCenario, selectedOperacao]);
+
+  // Get filter description for exports
+  const getFilterDescription = () => {
+    const parts: string[] = [];
+    
+    if (selectedCenario !== "todos") {
+      const cenarioNames: Record<CenarioType, string> = {
+        todos: "Todos",
+        c1: "C1 - Material Próprio",
+        intermediacao: "Intermediação",
+        terceiros: "Terceiros (Serviço)"
+      };
+      parts.push(cenarioNames[selectedCenario]);
+    }
+    
+    if (selectedOperacao !== "todas") {
+      const op = operacoesDisponiveis.find(o => o.id === selectedOperacao);
+      if (op) parts.push(`Op: ${op.nome}`);
+    }
+    
+    return parts.length > 0 ? ` - ${parts.join(' | ')}` : '';
+  };
 
   const handleExportPDF = () => {
-    const data = [
-      { "Cenário": "C1 - Material Próprio", "Kg Entrada": formatWeight(totais.c1.kgComprado), "Kg Saída": formatWeight(totais.c1.kgVendido), "Receita": formatCurrency(totais.c1.receita), "Resultado": formatCurrency(totais.c1.resultado) },
-      { "Cenário": "Intermediação", "Kg Entrada": formatWeight(totais.intermediacao.kgComprado), "Kg Saída": formatWeight(totais.intermediacao.kgVendido), "Receita": formatCurrency(totais.intermediacao.valorVendas), "Resultado": formatCurrency(totais.intermediacao.comissao) },
-      { "Cenário": "Terceiros (Serviço)", "Kg Entrada": formatWeight(totais.terceiros.kgRecebido), "Kg Saída": formatWeight(totais.terceiros.kgDevolvido), "Receita": formatCurrency(totais.terceiros.receitaServico), "Resultado": formatCurrency(totais.terceiros.receitaServico - totais.terceiros.custoServico) },
-    ];
-    printReport(`Relatório Consolidado ${format(parseISO(dataInicio), "dd/MM/yyyy")} - ${format(parseISO(dataFim), "dd/MM/yyyy")}`, data, ["Cenário", "Kg Entrada", "Kg Saída", "Receita", "Resultado"]);
+    const filterDesc = getFilterDescription();
+    const titulo = `Relatório Consolidado${filterDesc} - ${format(parseISO(dataInicio), "dd/MM/yyyy")} a ${format(parseISO(dataFim), "dd/MM/yyyy")}`;
+    
+    const data: any[] = [];
+    
+    if (selectedCenario === "todos" || selectedCenario === "c1") {
+      data.push({ 
+        "Cenário": "C1 - Material Próprio", 
+        "Kg Entrada": formatWeight(totais.c1.kgComprado), 
+        "Kg Saída": formatWeight(totais.c1.kgVendido), 
+        "Receita": formatCurrency(totais.c1.receita), 
+        "Resultado": formatCurrency(totais.c1.resultado) 
+      });
+    }
+    
+    if (selectedCenario === "todos" || selectedCenario === "intermediacao") {
+      data.push({ 
+        "Cenário": "Intermediação", 
+        "Kg Entrada": formatWeight(totais.intermediacao.kgComprado), 
+        "Kg Saída": formatWeight(totais.intermediacao.kgVendido), 
+        "Receita": formatCurrency(totais.intermediacao.valorVendas), 
+        "Resultado": formatCurrency(totais.intermediacao.comissao) 
+      });
+    }
+    
+    if (selectedCenario === "todos" || selectedCenario === "terceiros") {
+      data.push({ 
+        "Cenário": "Terceiros (Serviço)", 
+        "Kg Entrada": formatWeight(totais.terceiros.kgRecebido), 
+        "Kg Saída": formatWeight(totais.terceiros.kgDevolvido), 
+        "Receita": formatCurrency(totais.terceiros.receitaServico), 
+        "Resultado": formatCurrency(totais.terceiros.receitaServico - totais.terceiros.custoServico) 
+      });
+    }
+    
+    printReport(titulo, data, ["Cenário", "Kg Entrada", "Kg Saída", "Receita", "Resultado"]);
   };
 
   const handleExportExcel = () => {
-    const resumo = [
-      { Cenario: "C1 - Material Próprio", Kg_Entrada: totais.c1.kgComprado, Kg_Saida: totais.c1.kgVendido, Receita: totais.c1.receita, Resultado: totais.c1.resultado },
-      { Cenario: "Intermediação", Kg_Entrada: totais.intermediacao.kgComprado, Kg_Saida: totais.intermediacao.kgVendido, Receita: totais.intermediacao.valorVendas, Resultado: totais.intermediacao.comissao },
-      { Cenario: "Terceiros", Kg_Entrada: totais.terceiros.kgRecebido, Kg_Saida: totais.terceiros.kgDevolvido, Custo_Servico: totais.terceiros.custoServico, Receita_Servico: totais.terceiros.receitaServico },
-    ];
+    const filterDesc = getFilterDescription();
+    
+    const resumo: any[] = [];
+    
+    if (selectedCenario === "todos" || selectedCenario === "c1") {
+      resumo.push({ 
+        Cenario: "C1 - Material Próprio", 
+        Kg_Entrada: totais.c1.kgComprado, 
+        Kg_Saida: totais.c1.kgVendido, 
+        Receita: totais.c1.receita, 
+        Resultado: totais.c1.resultado 
+      });
+    }
+    
+    if (selectedCenario === "todos" || selectedCenario === "intermediacao") {
+      resumo.push({ 
+        Cenario: "Intermediação", 
+        Kg_Entrada: totais.intermediacao.kgComprado, 
+        Kg_Saida: totais.intermediacao.kgVendido, 
+        Receita: totais.intermediacao.valorVendas, 
+        Resultado: totais.intermediacao.comissao 
+      });
+    }
+    
+    if (selectedCenario === "todos" || selectedCenario === "terceiros") {
+      resumo.push({ 
+        Cenario: "Terceiros", 
+        Kg_Entrada: totais.terceiros.kgRecebido, 
+        Kg_Saida: totais.terceiros.kgDevolvido, 
+        Custo_Servico: totais.terceiros.custoServico, 
+        Receita_Servico: totais.terceiros.receitaServico 
+      });
+    }
 
     const workbook = XLSX.utils.book_new();
     const wsResumo = XLSX.utils.json_to_sheet(resumo);
     XLSX.utils.book_append_sheet(workbook, wsResumo, "Resumo");
 
     // C1 - Entradas
-    const entradasC1Formatted = filterByPeriod(entradasC1).map(e => ({
-      Operacao: e.operacao?.nome || "-",
-      Data: e.dt_recebimento,
-      Ticket: e.ticket_num || "-",
-      Kg_Ticket: e.kg_ticket,
-      Kg_Liquido: e.kg_liquido_total,
-      Custo_Total: e.custos_pre_total_rs,
-      Beneficiador: e.operacao?.beneficiador?.nome_fantasia || e.operacao?.beneficiador?.razao_social || "-",
-    }));
-    if (entradasC1Formatted.length > 0) {
-      XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(entradasC1Formatted), "Entradas C1");
-    }
+    if (selectedCenario === "todos" || selectedCenario === "c1") {
+      const entradasC1Formatted = filterByPeriod(entradasC1).map(e => ({
+        Operacao: e.operacao?.nome || "-",
+        Data: e.dt_recebimento,
+        Ticket: e.ticket_num || "-",
+        Kg_Ticket: e.kg_ticket,
+        Kg_Liquido: e.kg_liquido_total,
+        Custo_Total: e.custos_pre_total_rs,
+        Beneficiador: e.operacao?.beneficiador?.nome_fantasia || e.operacao?.beneficiador?.razao_social || "-",
+      }));
+      if (entradasC1Formatted.length > 0) {
+        XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(entradasC1Formatted), "Entradas C1");
+      }
 
-    // C1 - Saídas
-    const saidasC1Formatted = filterByPeriod(saidasC1).map(s => ({
-      Operacao: s.operacao?.nome || "-",
-      Data: s.dt,
-      Tipo: s.tipo_saida,
-      Cliente: s.parceiro?.nome_fantasia || s.parceiro?.razao_social || "-",
-      Kg: s.kg_saida,
-      Receita: s.receita_simulada_rs,
-      Resultado: s.resultado_simulado_rs,
-    }));
-    if (saidasC1Formatted.length > 0) {
-      XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(saidasC1Formatted), "Saídas C1");
+      // C1 - Saídas
+      const saidasC1Formatted = filterByPeriod(saidasC1).map(s => ({
+        Operacao: s.operacao?.nome || "-",
+        Data: s.dt,
+        Tipo: s.tipo_saida,
+        Cliente: s.parceiro?.nome_fantasia || s.parceiro?.razao_social || "-",
+        Kg: s.kg_saida,
+        Receita: s.receita_simulada_rs,
+        Resultado: s.resultado_simulado_rs,
+      }));
+      if (saidasC1Formatted.length > 0) {
+        XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(saidasC1Formatted), "Saídas C1");
+      }
     }
 
     // Intermediação - Compras
-    const comprasFormatted = filterByPeriod(comprasInterm).map(c => ({
-      Operacao: c.operacao?.nome || "-",
-      Data: c.dt,
-      Fornecedor: c.fornecedor?.nome_fantasia || c.fornecedor?.razao_social || "-",
-      Dono: c.operacao?.dono?.nome_fantasia || c.operacao?.dono?.razao_social || "-",
-      Tipo_Material: c.tipo_material,
-      Kg: c.kg_comprado,
-      Valor: c.valor_compra_rs,
-    }));
-    if (comprasFormatted.length > 0) {
-      XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(comprasFormatted), "Compras Interm");
-    }
+    if (selectedCenario === "todos" || selectedCenario === "intermediacao") {
+      const comprasFormatted = filterByPeriod(comprasInterm).map(c => ({
+        Operacao: c.operacao?.nome || "-",
+        Data: c.dt,
+        Fornecedor: c.fornecedor?.nome_fantasia || c.fornecedor?.razao_social || "-",
+        Dono: c.operacao?.dono?.nome_fantasia || c.operacao?.dono?.razao_social || "-",
+        Tipo_Material: c.tipo_material,
+        Kg: c.kg_comprado,
+        Valor: c.valor_compra_rs,
+      }));
+      if (comprasFormatted.length > 0) {
+        XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(comprasFormatted), "Compras Interm");
+      }
 
-    // Intermediação - Vendas
-    const vendasFormatted = filterByPeriod(vendasInterm).map(v => ({
-      Operacao: v.operacao?.nome || "-",
-      Data: v.dt,
-      Cliente: v.cliente?.nome_fantasia || v.cliente?.razao_social || "-",
-      Dono: v.operacao?.dono?.nome_fantasia || v.operacao?.dono?.razao_social || "-",
-      Kg: v.kg_vendido,
-      Valor_Venda: v.valor_venda_rs,
-      Comissao: v.comissao_ibrac_rs,
-    }));
-    if (vendasFormatted.length > 0) {
-      XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(vendasFormatted), "Vendas Interm");
+      // Intermediação - Vendas
+      const vendasFormatted = filterByPeriod(vendasInterm).map(v => ({
+        Operacao: v.operacao?.nome || "-",
+        Data: v.dt,
+        Cliente: v.cliente?.nome_fantasia || v.cliente?.razao_social || "-",
+        Dono: v.operacao?.dono?.nome_fantasia || v.operacao?.dono?.razao_social || "-",
+        Kg: v.kg_vendido,
+        Valor_Venda: v.valor_venda_rs,
+        Comissao: v.comissao_ibrac_rs,
+      }));
+      if (vendasFormatted.length > 0) {
+        XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(vendasFormatted), "Vendas Interm");
+      }
     }
 
     // Terceiros - Entradas
-    const entTercFormatted = filterByPeriod(entradasTerceiros).map(e => ({
-      Operacao: e.operacao?.nome || "-",
-      Data: e.dt,
-      Cliente: e.operacao?.cliente?.nome_fantasia || e.operacao?.cliente?.razao_social || "-",
-      Kg_Recebido: e.kg_recebido,
-      Documento: e.documento || "-",
-    }));
-    if (entTercFormatted.length > 0) {
-      XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(entTercFormatted), "Entradas Terceiros");
+    if (selectedCenario === "todos" || selectedCenario === "terceiros") {
+      const entTercFormatted = filterByPeriod(entradasTerceiros).map(e => ({
+        Operacao: e.operacao?.nome || "-",
+        Data: e.dt,
+        Cliente: e.operacao?.cliente?.nome_fantasia || e.operacao?.cliente?.razao_social || "-",
+        Kg_Recebido: e.kg_recebido,
+        Documento: e.documento || "-",
+      }));
+      if (entTercFormatted.length > 0) {
+        XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(entTercFormatted), "Entradas Terceiros");
+      }
+
+      // Terceiros - Saídas
+      const saidaTercFormatted = filterByPeriod(saidasTerceiros).map(s => ({
+        Operacao: s.operacao?.nome || "-",
+        Data: s.dt,
+        Cliente: s.operacao?.cliente?.nome_fantasia || s.operacao?.cliente?.razao_social || "-",
+        Kg_Devolvido: s.kg_devolvido,
+        Documento: s.documento || "-",
+      }));
+      if (saidaTercFormatted.length > 0) {
+        XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(saidaTercFormatted), "Saídas Terceiros");
+      }
     }
 
-    // Terceiros - Saídas
-    const saidaTercFormatted = filterByPeriod(saidasTerceiros).map(s => ({
-      Operacao: s.operacao?.nome || "-",
-      Data: s.dt,
-      Cliente: s.operacao?.cliente?.nome_fantasia || s.operacao?.cliente?.razao_social || "-",
-      Kg_Devolvido: s.kg_devolvido,
-      Documento: s.documento || "-",
-    }));
-    if (saidaTercFormatted.length > 0) {
-      XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(saidaTercFormatted), "Saídas Terceiros");
-    }
-
-    XLSX.writeFile(workbook, `Relatorio_Consolidado_${format(new Date(), "yyyyMMdd")}.xlsx`);
+    const filename = `Relatorio_Consolidado${filterDesc.replace(/[^a-zA-Z0-9]/g, '_')}_${format(new Date(), "yyyyMMdd")}.xlsx`;
+    XLSX.writeFile(workbook, filename);
   };
 
   const isLoading = loadingC1;
 
   // Helper para nome de parceiro
   const getParceiroNome = (parceiro: any) => parceiro?.nome_fantasia || parceiro?.razao_social || "-";
+
+  // Reset operacao when cenario changes
+  const handleCenarioChange = (value: CenarioType) => {
+    setSelectedCenario(value);
+    setSelectedOperacao("todas");
+  };
+
+  // Clear all filters
+  const handleClearFilters = () => {
+    setDataInicio(format(startOfMonth(new Date()), "yyyy-MM-dd"));
+    setDataFim(format(endOfMonth(new Date()), "yyyy-MM-dd"));
+    setSelectedCenario("todos");
+    setSelectedOperacao("todas");
+  };
 
   return (
     <MainLayout>
@@ -427,12 +586,12 @@ export default function Relatorios() {
           </div>
         </div>
 
-        {/* Filtros de Período */}
+        {/* Filtros de Período e Operação */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
-              <Calendar className="h-5 w-5" />
-              Período
+              <Filter className="h-5 w-5" />
+              Filtros
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -455,16 +614,62 @@ export default function Relatorios() {
                   className="w-40"
                 />
               </div>
+              
+              {/* Filtro por Cenário */}
+              <div className="space-y-2">
+                <Label>Cenário</Label>
+                <Select value={selectedCenario} onValueChange={handleCenarioChange}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos os Cenários</SelectItem>
+                    <SelectItem value="c1">C1 - Material Próprio</SelectItem>
+                    <SelectItem value="intermediacao">Intermediação</SelectItem>
+                    <SelectItem value="terceiros">Terceiros (Serviço)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {/* Filtro por Operação */}
+              <div className="space-y-2">
+                <Label>Operação</Label>
+                <Select value={selectedOperacao} onValueChange={setSelectedOperacao}>
+                  <SelectTrigger className="w-64">
+                    <SelectValue placeholder="Todas as Operações" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todas">Todas as Operações</SelectItem>
+                    {operacoesDisponiveis.map(op => (
+                      <SelectItem key={op.id} value={op.id}>{op.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
               <Button
                 variant="outline"
-                onClick={() => {
-                  setDataInicio(format(startOfMonth(new Date()), "yyyy-MM-dd"));
-                  setDataFim(format(endOfMonth(new Date()), "yyyy-MM-dd"));
-                }}
+                onClick={handleClearFilters}
               >
-                Mês Atual
+                Limpar Filtros
               </Button>
             </div>
+            
+            {/* Show active filters */}
+            {(selectedCenario !== "todos" || selectedOperacao !== "todas") && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {selectedCenario !== "todos" && (
+                  <Badge variant="secondary">
+                    Cenário: {selectedCenario === "c1" ? "C1" : selectedCenario === "intermediacao" ? "Intermediação" : "Terceiros"}
+                  </Badge>
+                )}
+                {selectedOperacao !== "todas" && (
+                  <Badge variant="secondary">
+                    Operação: {operacoesDisponiveis.find(o => o.id === selectedOperacao)?.nome}
+                  </Badge>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -539,9 +744,15 @@ export default function Relatorios() {
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="resumo">Resumo</TabsTrigger>
-                <TabsTrigger value="c1">C1 - Material Próprio</TabsTrigger>
-                <TabsTrigger value="intermediacao">Intermediação</TabsTrigger>
-                <TabsTrigger value="terceiros">Terceiros (Serviço)</TabsTrigger>
+                <TabsTrigger value="c1" disabled={selectedCenario !== "todos" && selectedCenario !== "c1"}>
+                  C1 - Material Próprio
+                </TabsTrigger>
+                <TabsTrigger value="intermediacao" disabled={selectedCenario !== "todos" && selectedCenario !== "intermediacao"}>
+                  Intermediação
+                </TabsTrigger>
+                <TabsTrigger value="terceiros" disabled={selectedCenario !== "todos" && selectedCenario !== "terceiros"}>
+                  Terceiros (Serviço)
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="resumo" className="mt-4">
@@ -550,6 +761,7 @@ export default function Relatorios() {
                     <CardTitle>Resumo por Cenário</CardTitle>
                     <CardDescription>
                       Período: {format(parseISO(dataInicio), "dd/MM/yyyy", { locale: ptBR })} até {format(parseISO(dataFim), "dd/MM/yyyy", { locale: ptBR })}
+                      {getFilterDescription() && <span className="ml-2 text-primary">{getFilterDescription()}</span>}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -565,42 +777,48 @@ export default function Relatorios() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        <TableRow>
-                          <TableCell className="font-medium">
-                            <Badge>C1</Badge> Material Próprio
-                          </TableCell>
-                          <TableCell className="text-right">{formatWeight(totais.c1.kgComprado)}</TableCell>
-                          <TableCell className="text-right">{formatWeight(totais.c1.kgVendido)}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(totais.c1.custoTotal)}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(totais.c1.receita)}</TableCell>
-                          <TableCell className={`text-right font-bold ${totais.c1.resultado >= 0 ? "text-success" : "text-destructive"}`}>
-                            {formatCurrency(totais.c1.resultado)}
-                          </TableCell>
-                        </TableRow>
-                        <TableRow>
-                          <TableCell className="font-medium">
-                            <Badge variant="secondary">C2</Badge> Intermediação
-                          </TableCell>
-                          <TableCell className="text-right">{formatWeight(totais.intermediacao.kgComprado)}</TableCell>
-                          <TableCell className="text-right">{formatWeight(totais.intermediacao.kgVendido)}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(totais.intermediacao.valorCompras)}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(totais.intermediacao.valorVendas)}</TableCell>
-                          <TableCell className="text-right font-bold text-success">
-                            {formatCurrency(totais.intermediacao.comissao)}
-                          </TableCell>
-                        </TableRow>
-                        <TableRow>
-                          <TableCell className="font-medium">
-                            <Badge variant="outline">C3</Badge> Terceiros (Serviço)
-                          </TableCell>
-                          <TableCell className="text-right">{formatWeight(totais.terceiros.kgRecebido)}</TableCell>
-                          <TableCell className="text-right">{formatWeight(totais.terceiros.kgDevolvido)}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(totais.terceiros.custoServico)}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(totais.terceiros.receitaServico)}</TableCell>
-                          <TableCell className={`text-right font-bold ${(totais.terceiros.receitaServico - totais.terceiros.custoServico) >= 0 ? "text-success" : "text-destructive"}`}>
-                            {formatCurrency(totais.terceiros.receitaServico - totais.terceiros.custoServico)}
-                          </TableCell>
-                        </TableRow>
+                        {(selectedCenario === "todos" || selectedCenario === "c1") && (
+                          <TableRow>
+                            <TableCell className="font-medium">
+                              <Badge>C1</Badge> Material Próprio
+                            </TableCell>
+                            <TableCell className="text-right">{formatWeight(totais.c1.kgComprado)}</TableCell>
+                            <TableCell className="text-right">{formatWeight(totais.c1.kgVendido)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(totais.c1.custoTotal)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(totais.c1.receita)}</TableCell>
+                            <TableCell className={`text-right font-bold ${totais.c1.resultado >= 0 ? "text-success" : "text-destructive"}`}>
+                              {formatCurrency(totais.c1.resultado)}
+                            </TableCell>
+                          </TableRow>
+                        )}
+                        {(selectedCenario === "todos" || selectedCenario === "intermediacao") && (
+                          <TableRow>
+                            <TableCell className="font-medium">
+                              <Badge variant="secondary">C2</Badge> Intermediação
+                            </TableCell>
+                            <TableCell className="text-right">{formatWeight(totais.intermediacao.kgComprado)}</TableCell>
+                            <TableCell className="text-right">{formatWeight(totais.intermediacao.kgVendido)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(totais.intermediacao.valorCompras)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(totais.intermediacao.valorVendas)}</TableCell>
+                            <TableCell className="text-right font-bold text-success">
+                              {formatCurrency(totais.intermediacao.comissao)}
+                            </TableCell>
+                          </TableRow>
+                        )}
+                        {(selectedCenario === "todos" || selectedCenario === "terceiros") && (
+                          <TableRow>
+                            <TableCell className="font-medium">
+                              <Badge variant="outline">C3</Badge> Terceiros (Serviço)
+                            </TableCell>
+                            <TableCell className="text-right">{formatWeight(totais.terceiros.kgRecebido)}</TableCell>
+                            <TableCell className="text-right">{formatWeight(totais.terceiros.kgDevolvido)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(totais.terceiros.custoServico)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(totais.terceiros.receitaServico)}</TableCell>
+                            <TableCell className={`text-right font-bold ${(totais.terceiros.receitaServico - totais.terceiros.custoServico) >= 0 ? "text-success" : "text-destructive"}`}>
+                              {formatCurrency(totais.terceiros.receitaServico - totais.terceiros.custoServico)}
+                            </TableCell>
+                          </TableRow>
+                        )}
                       </TableBody>
                     </Table>
                   </CardContent>
@@ -704,7 +922,7 @@ export default function Relatorios() {
                     {/* Saídas C1 */}
                     <div>
                       <h4 className="font-medium mb-2 flex items-center gap-2">
-                        <TrendingUp className="h-4 w-4" /> Saídas (Vendas/Consumo)
+                        <ArrowRight className="h-4 w-4" /> Saídas (Vendas/Consumo)
                       </h4>
                       <Table>
                         <TableHeader>
@@ -712,7 +930,7 @@ export default function Relatorios() {
                             <TableHead>Operação</TableHead>
                             <TableHead>Data</TableHead>
                             <TableHead>Tipo</TableHead>
-                            <TableHead>Destino</TableHead>
+                            <TableHead>Cliente</TableHead>
                             <TableHead className="text-right">Kg</TableHead>
                             <TableHead className="text-right">Receita</TableHead>
                             <TableHead className="text-right">Resultado</TableHead>
@@ -735,13 +953,8 @@ export default function Relatorios() {
                                     {s.tipo_saida}
                                   </Badge>
                                 </TableCell>
-                                <TableCell>
-                                  <div className="flex items-center gap-1">
-                                    <Users className="h-3 w-3" />
-                                    {getParceiroNome(s.parceiro) || "Consumo interno"}
-                                  </div>
-                                </TableCell>
-                                <TableCell className="text-right">{formatWeight(s.kg_saida)}</TableCell>
+                                <TableCell>{getParceiroNome(s.parceiro)}</TableCell>
+                                <TableCell className="text-right">{formatWeight(s.kg_saida || 0)}</TableCell>
                                 <TableCell className="text-right">{formatCurrency(s.receita_simulada_rs || 0)}</TableCell>
                                 <TableCell className={`text-right font-bold ${(s.resultado_simulado_rs || 0) >= 0 ? "text-success" : "text-destructive"}`}>
                                   {formatCurrency(s.resultado_simulado_rs || 0)}
@@ -765,11 +978,11 @@ export default function Relatorios() {
                       Fluxo Intermediação
                     </CardTitle>
                     <CardDescription>
-                      Compra (Dono) → Beneficiamento → Venda → Comissão IBRAC
+                      IBRAC opera em nome do Dono: Compra → Beneficia → Vende
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {/* Compras */}
+                    {/* Compras Intermediação */}
                     <div>
                       <h4 className="font-medium mb-2 flex items-center gap-2">
                         <FileText className="h-4 w-4" /> Compras
@@ -781,7 +994,7 @@ export default function Relatorios() {
                             <TableHead>Operação</TableHead>
                             <TableHead>Data</TableHead>
                             <TableHead>Fornecedor</TableHead>
-                            <TableHead>Dono Material</TableHead>
+                            <TableHead>Dono</TableHead>
                             <TableHead className="text-right">Kg</TableHead>
                             <TableHead className="text-right">Valor</TableHead>
                           </TableRow>
@@ -808,9 +1021,12 @@ export default function Relatorios() {
                                   <TableCell>{format(parseISO(c.dt), "dd/MM/yy")}</TableCell>
                                   <TableCell>{getParceiroNome(c.fornecedor)}</TableCell>
                                   <TableCell>
-                                    <Badge variant="secondary">{getParceiroNome(c.operacao?.dono)}</Badge>
+                                    <Badge variant="outline" className="flex items-center gap-1 w-fit">
+                                      <Users className="h-3 w-3" />
+                                      {getParceiroNome(c.operacao?.dono)}
+                                    </Badge>
                                   </TableCell>
-                                  <TableCell className="text-right">{formatWeight(c.kg_comprado)}</TableCell>
+                                  <TableCell className="text-right">{formatWeight(c.kg_comprado || 0)}</TableCell>
                                   <TableCell className="text-right">{formatCurrency(c.valor_compra_rs || 0)}</TableCell>
                                 </TableRow>
                                 <CollapsibleContent asChild>
@@ -818,20 +1034,16 @@ export default function Relatorios() {
                                     <TableCell colSpan={7} className="py-3">
                                       <div className="flex items-center gap-4 text-sm">
                                         <div className="flex items-center gap-2">
-                                          <Users className="h-4 w-4" />
-                                          <span className="text-muted-foreground">Fornecedor:</span>
-                                          <span>{getParceiroNome(c.fornecedor)}</span>
+                                          <span className="text-muted-foreground">Tipo Material:</span>
+                                          <span>{c.tipo_material || "Não informado"}</span>
                                         </div>
-                                        <ArrowRight className="h-4 w-4 text-muted-foreground" />
                                         <div className="flex items-center gap-2">
-                                          <Factory className="h-4 w-4 text-primary" />
-                                          <span className="text-muted-foreground">Beneficiador:</span>
-                                          <span className="font-medium">{getParceiroNome(c.operacao?.beneficiador)}</span>
+                                          <span className="text-muted-foreground">NF:</span>
+                                          <span>{c.nf_compra || "-"}</span>
                                         </div>
-                                        <ArrowRight className="h-4 w-4 text-muted-foreground" />
                                         <div className="flex items-center gap-2">
-                                          <span className="text-muted-foreground">Tipo:</span>
-                                          <Badge variant="outline">{c.tipo_material || "Não especificado"}</Badge>
+                                          <span className="text-muted-foreground">Preço/kg:</span>
+                                          <span>{formatCurrency(c.preco_compra_rkg || 0)}</span>
                                         </div>
                                       </div>
                                     </TableCell>
@@ -844,10 +1056,10 @@ export default function Relatorios() {
                       </Table>
                     </div>
 
-                    {/* Vendas */}
+                    {/* Vendas Intermediação */}
                     <div>
                       <h4 className="font-medium mb-2 flex items-center gap-2">
-                        <TrendingUp className="h-4 w-4" /> Vendas
+                        <ArrowRight className="h-4 w-4" /> Vendas
                       </h4>
                       <Table>
                         <TableHeader>
@@ -855,9 +1067,9 @@ export default function Relatorios() {
                             <TableHead>Operação</TableHead>
                             <TableHead>Data</TableHead>
                             <TableHead>Cliente</TableHead>
-                            <TableHead>Dono Material</TableHead>
+                            <TableHead>Dono</TableHead>
                             <TableHead className="text-right">Kg</TableHead>
-                            <TableHead className="text-right">Valor Venda</TableHead>
+                            <TableHead className="text-right">Valor</TableHead>
                             <TableHead className="text-right">Comissão</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -875,9 +1087,12 @@ export default function Relatorios() {
                                 <TableCell>{format(parseISO(v.dt), "dd/MM/yy")}</TableCell>
                                 <TableCell>{getParceiroNome(v.cliente)}</TableCell>
                                 <TableCell>
-                                  <Badge variant="secondary">{getParceiroNome(v.operacao?.dono)}</Badge>
+                                  <Badge variant="outline" className="flex items-center gap-1 w-fit">
+                                    <Users className="h-3 w-3" />
+                                    {getParceiroNome(v.operacao?.dono)}
+                                  </Badge>
                                 </TableCell>
-                                <TableCell className="text-right">{formatWeight(v.kg_vendido)}</TableCell>
+                                <TableCell className="text-right">{formatWeight(v.kg_vendido || 0)}</TableCell>
                                 <TableCell className="text-right">{formatCurrency(v.valor_venda_rs || 0)}</TableCell>
                                 <TableCell className="text-right font-bold text-success">
                                   {formatCurrency(v.comissao_ibrac_rs || 0)}
@@ -892,7 +1107,7 @@ export default function Relatorios() {
                 </Card>
               </TabsContent>
 
-              {/* Tab Terceiros (Serviço) */}
+              {/* Tab Terceiros */}
               <TabsContent value="terceiros" className="mt-4 space-y-4">
                 <Card>
                   <CardHeader>
@@ -901,36 +1116,14 @@ export default function Relatorios() {
                       Fluxo Terceiros (Serviço)
                     </CardTitle>
                     <CardDescription>
-                      Recebimento (Cliente) → Beneficiamento → Devolução → Cobrança
+                      Cliente envia material → IBRAC processa → Devolve para cliente
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {/* KPIs Terceiros */}
-                    <div className="grid gap-4 md:grid-cols-4 mb-4">
-                      <div className="bg-muted/50 rounded-lg p-3">
-                        <p className="text-xs text-muted-foreground">Kg Recebido</p>
-                        <p className="text-xl font-bold">{formatWeight(totais.terceiros.kgRecebido)}</p>
-                      </div>
-                      <div className="bg-muted/50 rounded-lg p-3">
-                        <p className="text-xs text-muted-foreground">Kg Beneficiado</p>
-                        <p className="text-xl font-bold">{formatWeight(totais.terceiros.kgBeneficiado)}</p>
-                      </div>
-                      <div className="bg-muted/50 rounded-lg p-3">
-                        <p className="text-xs text-muted-foreground">Kg Devolvido</p>
-                        <p className="text-xl font-bold">{formatWeight(totais.terceiros.kgDevolvido)}</p>
-                      </div>
-                      <div className="bg-muted/50 rounded-lg p-3">
-                        <p className="text-xs text-muted-foreground">Resultado Serviço</p>
-                        <p className={`text-xl font-bold ${(totais.terceiros.receitaServico - totais.terceiros.custoServico) >= 0 ? "text-success" : "text-destructive"}`}>
-                          {formatCurrency(totais.terceiros.receitaServico - totais.terceiros.custoServico)}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Recebimentos */}
+                    {/* Entradas Terceiros */}
                     <div>
                       <h4 className="font-medium mb-2 flex items-center gap-2">
-                        <FileText className="h-4 w-4" /> Recebimentos do Cliente
+                        <FileText className="h-4 w-4" /> Entradas (Recebimentos)
                       </h4>
                       <Table>
                         <TableHeader>
@@ -939,16 +1132,15 @@ export default function Relatorios() {
                             <TableHead>Operação</TableHead>
                             <TableHead>Data</TableHead>
                             <TableHead>Cliente</TableHead>
-                            <TableHead>Documento</TableHead>
                             <TableHead className="text-right">Kg Recebido</TableHead>
-                            <TableHead>Beneficiador</TableHead>
+                            <TableHead>Documento</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {filterByPeriod(entradasTerceiros).length === 0 ? (
                             <TableRow>
-                              <TableCell colSpan={7} className="text-center text-muted-foreground py-4">
-                                Nenhum recebimento no período
+                              <TableCell colSpan={6} className="text-center text-muted-foreground py-4">
+                                Nenhuma entrada no período
                               </TableCell>
                             </TableRow>
                           ) : (
@@ -965,33 +1157,23 @@ export default function Relatorios() {
                                   <TableCell className="font-medium">{e.operacao?.nome || "-"}</TableCell>
                                   <TableCell>{format(parseISO(e.dt), "dd/MM/yy")}</TableCell>
                                   <TableCell>
-                                    <Badge variant="outline">{getParceiroNome(e.operacao?.cliente)}</Badge>
-                                  </TableCell>
-                                  <TableCell>{e.documento || "-"}</TableCell>
-                                  <TableCell className="text-right">{formatWeight(e.kg_recebido)}</TableCell>
-                                  <TableCell>
-                                    <Badge variant="secondary" className="flex items-center gap-1 w-fit">
-                                      <Factory className="h-3 w-3" />
-                                      {getParceiroNome(e.operacao?.beneficiador)}
+                                    <Badge variant="outline" className="flex items-center gap-1 w-fit">
+                                      <Users className="h-3 w-3" />
+                                      {getParceiroNome(e.operacao?.cliente)}
                                     </Badge>
                                   </TableCell>
+                                  <TableCell className="text-right">{formatWeight(e.kg_recebido || 0)}</TableCell>
+                                  <TableCell>{e.documento || "-"}</TableCell>
                                 </TableRow>
                                 <CollapsibleContent asChild>
                                   <TableRow className="bg-muted/30">
-                                    <TableCell colSpan={7} className="py-3">
+                                    <TableCell colSpan={6} className="py-3">
                                       <div className="flex items-center gap-4 text-sm">
-                                        <div className="flex items-center gap-2">
-                                          <Users className="h-4 w-4" />
-                                          <span className="text-muted-foreground">Cliente (Dono):</span>
-                                          <span className="font-medium">{getParceiroNome(e.operacao?.cliente)}</span>
-                                        </div>
-                                        <ArrowRight className="h-4 w-4 text-muted-foreground" />
                                         <div className="flex items-center gap-2">
                                           <Factory className="h-4 w-4 text-primary" />
                                           <span className="text-muted-foreground">Beneficiador:</span>
                                           <span className="font-medium">{getParceiroNome(e.operacao?.beneficiador)}</span>
                                         </div>
-                                        <ArrowRight className="h-4 w-4 text-muted-foreground" />
                                         <div className="flex items-center gap-2">
                                           <span className="text-muted-foreground">Valor Ref:</span>
                                           <span>{formatCurrency(e.valor_ref_rkg || 0)}/kg</span>
@@ -1007,54 +1189,10 @@ export default function Relatorios() {
                       </Table>
                     </div>
 
-                    {/* Beneficiamentos Terceiros */}
+                    {/* Saídas Terceiros */}
                     <div>
                       <h4 className="font-medium mb-2 flex items-center gap-2">
-                        <Factory className="h-4 w-4" /> Beneficiamentos
-                      </h4>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Operação</TableHead>
-                            <TableHead>Data</TableHead>
-                            <TableHead>Beneficiador</TableHead>
-                            <TableHead className="text-right">Kg Retornado</TableHead>
-                            <TableHead className="text-right">Kg Disp. Cliente</TableHead>
-                            <TableHead className="text-right">Custo Serviço</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {filterByPeriod(benefTerceiros).length === 0 ? (
-                            <TableRow>
-                              <TableCell colSpan={6} className="text-center text-muted-foreground py-4">
-                                Nenhum beneficiamento no período
-                              </TableCell>
-                            </TableRow>
-                          ) : (
-                            filterByPeriod(benefTerceiros).map((b) => (
-                              <TableRow key={b.id}>
-                                <TableCell className="font-medium">{b.operacao?.nome || "-"}</TableCell>
-                                <TableCell>{format(parseISO(b.dt), "dd/MM/yy")}</TableCell>
-                                <TableCell>
-                                  <Badge variant="secondary" className="flex items-center gap-1 w-fit">
-                                    <Factory className="h-3 w-3" />
-                                    {getParceiroNome(b.operacao?.beneficiador)}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell className="text-right">{formatWeight(b.kg_retornado)}</TableCell>
-                                <TableCell className="text-right">{formatWeight(b.kg_disponivel_cliente || 0)}</TableCell>
-                                <TableCell className="text-right">{formatCurrency(b.custos_servico_total_rs || 0)}</TableCell>
-                              </TableRow>
-                            ))
-                          )}
-                        </TableBody>
-                      </Table>
-                    </div>
-
-                    {/* Devoluções */}
-                    <div>
-                      <h4 className="font-medium mb-2 flex items-center gap-2">
-                        <TrendingUp className="h-4 w-4" /> Devoluções ao Cliente
+                        <ArrowRight className="h-4 w-4" /> Saídas (Devoluções)
                       </h4>
                       <Table>
                         <TableHeader>
@@ -1062,15 +1200,16 @@ export default function Relatorios() {
                             <TableHead>Operação</TableHead>
                             <TableHead>Data</TableHead>
                             <TableHead>Cliente</TableHead>
-                            <TableHead>Documento</TableHead>
                             <TableHead className="text-right">Kg Devolvido</TableHead>
+                            <TableHead>Documento</TableHead>
+                            <TableHead className="text-right">Custo Serviço</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {filterByPeriod(saidasTerceiros).length === 0 ? (
                             <TableRow>
-                              <TableCell colSpan={5} className="text-center text-muted-foreground py-4">
-                                Nenhuma devolução no período
+                              <TableCell colSpan={6} className="text-center text-muted-foreground py-4">
+                                Nenhuma saída no período
                               </TableCell>
                             </TableRow>
                           ) : (
@@ -1079,53 +1218,14 @@ export default function Relatorios() {
                                 <TableCell className="font-medium">{s.operacao?.nome || "-"}</TableCell>
                                 <TableCell>{format(parseISO(s.dt), "dd/MM/yy")}</TableCell>
                                 <TableCell>
-                                  <Badge variant="outline">{getParceiroNome(s.operacao?.cliente)}</Badge>
+                                  <Badge variant="outline" className="flex items-center gap-1 w-fit">
+                                    <Users className="h-3 w-3" />
+                                    {getParceiroNome(s.operacao?.cliente)}
+                                  </Badge>
                                 </TableCell>
+                                <TableCell className="text-right">{formatWeight(s.kg_devolvido || 0)}</TableCell>
                                 <TableCell>{s.documento || "-"}</TableCell>
-                                <TableCell className="text-right">{formatWeight(s.kg_devolvido)}</TableCell>
-                              </TableRow>
-                            ))
-                          )}
-                        </TableBody>
-                      </Table>
-                    </div>
-
-                    {/* Cobranças */}
-                    <div>
-                      <h4 className="font-medium mb-2 flex items-center gap-2">
-                        <DollarSign className="h-4 w-4" /> Cobranças de Serviço
-                      </h4>
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Operação</TableHead>
-                            <TableHead>Data</TableHead>
-                            <TableHead>Cliente</TableHead>
-                            <TableHead>Tipo</TableHead>
-                            <TableHead>Documento</TableHead>
-                            <TableHead className="text-right">Valor</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {filterByPeriod(cobrancasTerceiros).length === 0 ? (
-                            <TableRow>
-                              <TableCell colSpan={6} className="text-center text-muted-foreground py-4">
-                                Nenhuma cobrança no período
-                              </TableCell>
-                            </TableRow>
-                          ) : (
-                            filterByPeriod(cobrancasTerceiros).map((c) => (
-                              <TableRow key={c.id}>
-                                <TableCell className="font-medium">{c.operacao?.nome || "-"}</TableCell>
-                                <TableCell>{format(parseISO(c.dt), "dd/MM/yy")}</TableCell>
-                                <TableCell>
-                                  <Badge variant="outline">{getParceiroNome(c.operacao?.cliente)}</Badge>
-                                </TableCell>
-                                <TableCell>{c.tipo || "-"}</TableCell>
-                                <TableCell>{c.documento || "-"}</TableCell>
-                                <TableCell className="text-right font-bold text-success">
-                                  {formatCurrency(c.val || 0)}
-                                </TableCell>
+                                <TableCell className="text-right">{formatCurrency(s.custo_servico_saida_rs || 0)}</TableCell>
                               </TableRow>
                             ))
                           )}
