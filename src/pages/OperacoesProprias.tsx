@@ -666,24 +666,35 @@ export default function OperacoesProprias() {
                                 <TableHead>Tipo</TableHead>
                                 <TableHead>Cliente</TableHead>
                                 <TableHead className="text-right">Kg</TableHead>
+                                <TableHead className="text-right">Custo/kg</TableHead>
+                                <TableHead className="text-right">Custo Total</TableHead>
                                 <TableHead className="text-right">Receita</TableHead>
-                                <TableHead className="text-right">Custo</TableHead>
                                 <TableHead className="text-right">Resultado</TableHead>
                                 {canEdit && <TableHead className="w-[80px]">Ações</TableHead>}
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {saidas.map((s) => (
+                              {saidas.map((s) => {
+                                const margem = (s.receita_simulada_rs || 0) > 0 
+                                  ? ((s.resultado_simulado_rs || 0) / (s.receita_simulada_rs || 1)) * 100
+                                  : 0;
+                                return (
                                 <TableRow key={s.id}>
                                   <TableCell>{format(new Date(s.dt), "dd/MM/yy")}</TableCell>
                                   <TableCell><Badge variant="outline">{s.tipo_saida}</Badge></TableCell>
                                   <TableCell>{s.parceiro?.razao_social || "-"}</TableCell>
                                   <TableCell className="text-right">{formatWeight(s.kg_saida)}</TableCell>
-                                  <TableCell className="text-right">{formatCurrency(s.receita_simulada_rs || 0)}</TableCell>
+                                  <TableCell className="text-right text-muted-foreground">
+                                    {formatCurrency(s.custo_saida_rkg || 0)}/kg
+                                  </TableCell>
                                   <TableCell className="text-right">{formatCurrency(s.custo_saida_rs || 0)}</TableCell>
+                                  <TableCell className="text-right">{formatCurrency(s.receita_simulada_rs || 0)}</TableCell>
                                   <TableCell className="text-right">
-                                    <span className={s.resultado_simulado_rs >= 0 ? "text-success" : "text-destructive"}>
+                                    <div className={s.resultado_simulado_rs >= 0 ? "text-success font-medium" : "text-destructive font-medium"}>
                                       {formatCurrency(s.resultado_simulado_rs || 0)}
+                                    </div>
+                                    <span className="text-xs text-muted-foreground">
+                                      ({margem.toFixed(1)}%)
                                     </span>
                                   </TableCell>
                                   {canEdit && (
@@ -704,7 +715,7 @@ export default function OperacoesProprias() {
                                     </TableCell>
                                   )}
                                 </TableRow>
-                              ))}
+                              );})}
                             </TableBody>
                           </Table>
                         )}
