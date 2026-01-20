@@ -135,6 +135,8 @@ export function CobrancaTerceirosForm({ open, onOpenChange, operacaoId, editData
               <SelectContent>
                 <SelectItem value="MO">Mão de Obra</SelectItem>
                 <SelectItem value="FRETE">Frete</SelectItem>
+                <SelectItem value="SERVICO_ADICIONAL">Serviço Adicional</SelectItem>
+                <SelectItem value="COMISSAO">Comissão</SelectItem>
                 <SelectItem value="OUTROS">Outros</SelectItem>
               </SelectContent>
             </Select>
@@ -163,6 +165,7 @@ export function CobrancaTerceirosForm({ open, onOpenChange, operacaoId, editData
                 <SelectItem value="DEVOLVIDO">Kg Devolvido</SelectItem>
                 <SelectItem value="RECEBIDO">Kg Recebido</SelectItem>
                 <SelectItem value="BENEFICIADO">Kg Beneficiado</SelectItem>
+                <SelectItem value="RETORNADO">Kg Retornado</SelectItem>
               </SelectContent>
             </Select>
           </div>

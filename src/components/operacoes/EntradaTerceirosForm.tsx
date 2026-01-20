@@ -3,7 +3,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -15,6 +16,15 @@ interface EntradaTerceiros {
   documento: string | null;
   kg_recebido: number;
   valor_ref_rkg: number | null;
+  produto_id: string | null;
+}
+
+interface Produto {
+  id: string;
+  nome: string;
+  codigo: string | null;
+  tipo: string | null;
+  perda_padrao_pct: number | null;
 }
 
 interface EntradaTerceirosFormProps {
@@ -32,6 +42,21 @@ export function EntradaTerceirosForm({ open, onOpenChange, operacaoId, editData 
     documento: "",
     kg_recebido: 0,
     valor_ref_rkg: 0,
+    produto_id: "",
+  });
+
+  // Buscar produtos disponíveis
+  const { data: produtos = [] } = useQuery({
+    queryKey: ["produtos_terceiros"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("produtos_terceiros")
+        .select("*")
+        .eq("ativo", true)
+        .order("nome");
+      if (error) throw error;
+      return data as Produto[];
+    },
   });
 
   useEffect(() => {
@@ -42,9 +67,10 @@ export function EntradaTerceirosForm({ open, onOpenChange, operacaoId, editData 
           documento: editData.documento || "",
           kg_recebido: editData.kg_recebido,
           valor_ref_rkg: editData.valor_ref_rkg || 0,
+          produto_id: editData.produto_id || "",
         });
       } else {
-        setForm({ dt: format(new Date(), "yyyy-MM-dd"), documento: "", kg_recebido: 0, valor_ref_rkg: 0 });
+        setForm({ dt: format(new Date(), "yyyy-MM-dd"), documento: "", kg_recebido: 0, valor_ref_rkg: 0, produto_id: "" });
       }
     }
   }, [open, editData]);
@@ -57,6 +83,7 @@ export function EntradaTerceirosForm({ open, onOpenChange, operacaoId, editData 
           documento: form.documento || null,
           kg_recebido: form.kg_recebido,
           valor_ref_rkg: form.valor_ref_rkg || null,
+          produto_id: form.produto_id || null,
         }).eq("id", editData.id);
         if (error) throw error;
       } else {
@@ -66,6 +93,7 @@ export function EntradaTerceirosForm({ open, onOpenChange, operacaoId, editData 
           documento: form.documento || null,
           kg_recebido: form.kg_recebido,
           valor_ref_rkg: form.valor_ref_rkg || null,
+          produto_id: form.produto_id || null,
         });
         if (error) throw error;
       }
@@ -77,6 +105,9 @@ export function EntradaTerceirosForm({ open, onOpenChange, operacaoId, editData 
     },
     onError: (error) => toast({ title: "Erro", description: error.message, variant: "destructive" }),
   });
+
+  // Obter perda padrão do produto selecionado
+  const produtoSelecionado = produtos.find(p => p.id === form.produto_id);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -94,6 +125,27 @@ export function EntradaTerceirosForm({ open, onOpenChange, operacaoId, editData 
               <Label>Documento</Label>
               <Input value={form.documento} onChange={(e) => setForm({ ...form, documento: e.target.value })} placeholder="NF remessa" />
             </div>
+          </div>
+
+          <div>
+            <Label>Produto Recebido</Label>
+            <Select value={form.produto_id} onValueChange={(v) => setForm({ ...form, produto_id: v })}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o produto..." />
+              </SelectTrigger>
+              <SelectContent>
+                {produtos.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.nome} {p.codigo && `(${p.codigo})`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {produtoSelecionado && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Tipo: {produtoSelecionado.tipo} | Perda padrão: {produtoSelecionado.perda_padrao_pct}%
+              </p>
+            )}
           </div>
 
           <div>

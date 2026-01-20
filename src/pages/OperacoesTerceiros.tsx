@@ -74,7 +74,7 @@ export default function OperacoesTerceiros() {
       if (!selectedOperacao) return [];
       const { data, error } = await supabase
         .from("entradas_terceiros")
-        .select("*")
+        .select("*, produto:produtos_terceiros(nome, codigo)")
         .eq("operacao_id", selectedOperacao)
         .eq("is_deleted", false)
         .order("dt", { ascending: false });
@@ -421,6 +421,7 @@ export default function OperacoesTerceiros() {
                             <TableHeader>
                               <TableRow>
                                 <TableHead>Data</TableHead>
+                                <TableHead>Produto</TableHead>
                                 <TableHead>Documento</TableHead>
                                 <TableHead className="text-right">Kg Recebido</TableHead>
                                 <TableHead className="text-right">Saldo</TableHead>
@@ -431,6 +432,15 @@ export default function OperacoesTerceiros() {
                               {entradas.map((e) => (
                                 <TableRow key={e.id}>
                                   <TableCell>{format(new Date(e.dt), "dd/MM/yy")}</TableCell>
+                                  <TableCell>
+                                    {e.produto ? (
+                                      <Badge variant="outline">
+                                        {e.produto.codigo || e.produto.nome}
+                                      </Badge>
+                                    ) : (
+                                      <span className="text-muted-foreground">-</span>
+                                    )}
+                                  </TableCell>
                                   <TableCell>{e.documento || "-"}</TableCell>
                                   <TableCell className="text-right">{formatWeight(e.kg_recebido)}</TableCell>
                                   <TableCell className="text-right">
@@ -469,6 +479,8 @@ export default function OperacoesTerceiros() {
                               <TableRow>
                                 <TableHead>Data</TableHead>
                                 <TableHead>Documento</TableHead>
+                                <TableHead className="text-right">Kg Entrada</TableHead>
+                                <TableHead className="text-right">Perda</TableHead>
                                 <TableHead className="text-right">Kg Retornado</TableHead>
                                 <TableHead className="text-right">Custo Serviço</TableHead>
                                 <TableHead className="text-right">Saldo Cliente</TableHead>
@@ -476,26 +488,33 @@ export default function OperacoesTerceiros() {
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {beneficiamentos.map((b) => (
-                                <TableRow key={b.id}>
-                                  <TableCell>{format(new Date(b.dt), "dd/MM/yy")}</TableCell>
-                                  <TableCell>{b.documento || "-"}</TableCell>
-                                  <TableCell className="text-right">{formatWeight(b.kg_retornado)}</TableCell>
-                                  <TableCell className="text-right">{formatCurrency(b.custos_servico_total_rs || 0)}</TableCell>
-                                  <TableCell className="text-right">
-                                    <Badge variant={b.kg_disponivel_cliente > 0 ? "default" : "secondary"}>
-                                      {formatWeight(b.kg_disponivel_cliente || 0)}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell>
-                                    {canEdit && (
-                                      <Button variant="ghost" size="icon" onClick={() => handleEditBenef(b)}>
-                                        <Pencil className="h-4 w-4" />
-                                      </Button>
-                                    )}
-                                  </TableCell>
-                                </TableRow>
-                              ))}
+                              {beneficiamentos.map((b) => {
+                                const perdaRealPct = b.perda_real_pct ? (b.perda_real_pct * 100).toFixed(1) : "0.0";
+                                return (
+                                  <TableRow key={b.id}>
+                                    <TableCell>{format(new Date(b.dt), "dd/MM/yy")}</TableCell>
+                                    <TableCell>{b.documento || "-"}</TableCell>
+                                    <TableCell className="text-right">{formatWeight(b.kg_entrada || 0)}</TableCell>
+                                    <TableCell className="text-right">
+                                      <span className="text-destructive">{perdaRealPct}%</span>
+                                    </TableCell>
+                                    <TableCell className="text-right">{formatWeight(b.kg_retornado)}</TableCell>
+                                    <TableCell className="text-right">{formatCurrency(b.custos_servico_total_rs || 0)}</TableCell>
+                                    <TableCell className="text-right">
+                                      <Badge variant={b.kg_disponivel_cliente > 0 ? "default" : "secondary"}>
+                                        {formatWeight(b.kg_disponivel_cliente || 0)}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell>
+                                      {canEdit && (
+                                        <Button variant="ghost" size="icon" onClick={() => handleEditBenef(b)}>
+                                          <Pencil className="h-4 w-4" />
+                                        </Button>
+                                      )}
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
                             </TableBody>
                           </Table>
                         )}
