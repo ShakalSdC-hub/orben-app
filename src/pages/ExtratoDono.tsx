@@ -167,9 +167,16 @@ export default function ExtratoDono() {
   const vendasFiltradas = useMemo(() => {
     // Se IBRAC selecionado, não mostra Intermediação
     if (selectedDono === "ibrac") return [];
-    // Se dono específico, filtrar por dono_economico_id
+    // Se dono específico, filtrar por dono_economico_id da operação
     if (selectedDono !== "todos") {
-      return vendasIntermediacaoFiltradas.filter((v: any) => v.operacao?.dono_economico_id === selectedDono);
+      const filtradas = vendasIntermediacaoFiltradas.filter((v: any) => {
+        const donoIdOperacao = v.operacao?.dono_economico_id;
+        return donoIdOperacao === selectedDono;
+      });
+      console.log('[DEBUG ExtratoDono] selectedDono:', selectedDono);
+      console.log('[DEBUG ExtratoDono] vendasIntermediacaoFiltradas:', vendasIntermediacaoFiltradas.length);
+      console.log('[DEBUG ExtratoDono] vendasFiltradas result:', filtradas.length);
+      return filtradas;
     }
     return vendasIntermediacaoFiltradas;
   }, [vendasIntermediacaoFiltradas, selectedDono]);
