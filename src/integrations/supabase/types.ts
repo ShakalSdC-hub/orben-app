@@ -255,10 +255,15 @@ export type Database = {
           id: string
           is_deleted: boolean | null
           kg_disponivel: number | null
+          kg_mel_entrada: number | null
+          kg_mista_entrada: number | null
+          kg_perda_total: number | null
           kg_retornado: number
           mo_benef_mode: string | null
           mo_benef_val: number | null
           operacao_id: string
+          perda_mel_pct: number | null
+          perda_mista_pct: number | null
           updated_at: string
         }
         Insert: {
@@ -277,10 +282,15 @@ export type Database = {
           id?: string
           is_deleted?: boolean | null
           kg_disponivel?: number | null
+          kg_mel_entrada?: number | null
+          kg_mista_entrada?: number | null
+          kg_perda_total?: number | null
           kg_retornado: number
           mo_benef_mode?: string | null
           mo_benef_val?: number | null
           operacao_id: string
+          perda_mel_pct?: number | null
+          perda_mista_pct?: number | null
           updated_at?: string
         }
         Update: {
@@ -299,10 +309,15 @@ export type Database = {
           id?: string
           is_deleted?: boolean | null
           kg_disponivel?: number | null
+          kg_mel_entrada?: number | null
+          kg_mista_entrada?: number | null
+          kg_perda_total?: number | null
           kg_retornado?: number
           mo_benef_mode?: string | null
           mo_benef_val?: number | null
           operacao_id?: string
+          perda_mel_pct?: number | null
+          perda_mista_pct?: number | null
           updated_at?: string
         }
         Relationships: [
@@ -1858,6 +1873,10 @@ export type Database = {
     }
     Functions: {
       cleanup_old_audit_logs: { Args: never; Returns: undefined }
+      fn_recalc_benef_c1_custos: {
+        Args: { benef_id: string }
+        Returns: undefined
+      }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]

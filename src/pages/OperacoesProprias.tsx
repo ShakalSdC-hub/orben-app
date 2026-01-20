@@ -252,16 +252,27 @@ export default function OperacoesProprias() {
 
   // Calcular totais da operação selecionada
   const operacaoSelecionada = operacoes.find(o => o.id === selectedOperacao);
+  
+  // Calcular custo real total dos beneficiamentos
+  const custoRealTotalBenef = beneficiamentos.reduce((acc, b) => acc + (b.custo_real_total_rs || 0), 0);
+  const kgBeneficiado = beneficiamentos.reduce((acc, b) => acc + (b.kg_retornado || 0), 0);
+  const custoMedioRkg = kgBeneficiado > 0 ? custoRealTotalBenef / kgBeneficiado : 0;
+  
+  // Ganho vs Benchmark = (Benchmark - Custo Médio/kg) * Kg Beneficiado
+  const ganhoVsBenchmark = kgBeneficiado > 0 ? (benchmarkSemanal - custoMedioRkg) * kgBeneficiado : 0;
+  
   const totaisOperacao = {
     kgComprado: entradas.reduce((acc, e) => acc + (e.kg_ticket || 0), 0),
     kgLiquido: entradas.reduce((acc, e) => acc + (e.kg_liquido_total || 0), 0),
-    kgDisponivel: entradas.reduce((acc, e) => acc + (e.kg_liquido_disponivel || 0), 0),
+    kgDisponivel: entradas.reduce((acc, e) => acc + (e.kg_liquido_disponivel || 0), 0), // Pendente de benef
     custoTotal: entradas.reduce((acc, e) => acc + (e.custos_pre_total_rs || 0), 0),
-    kgBeneficiado: beneficiamentos.reduce((acc, b) => acc + (b.kg_retornado || 0), 0),
-    kgDisponivelVenda: beneficiamentos.reduce((acc, b) => acc + (b.kg_disponivel || 0), 0),
+    kgBeneficiado,
+    kgDisponivelVenda: beneficiamentos.reduce((acc, b) => acc + (b.kg_disponivel || 0), 0), // Em estoque fornecedor
     kgVendido: saidas.reduce((acc, s) => acc + (s.kg_saida || 0), 0),
     receitaTotal: saidas.reduce((acc, s) => acc + (s.receita_simulada_rs || 0), 0),
     resultadoTotal: saidas.reduce((acc, s) => acc + (s.resultado_simulado_rs || 0), 0),
+    custoMedioRkg,
+    ganhoVsBenchmark,
   };
 
   return (
@@ -390,7 +401,7 @@ export default function OperacoesProprias() {
             ) : (
               <>
                 {/* KPIs da Operação */}
-                <div className="grid gap-4 md:grid-cols-4">
+                <div className="grid gap-4 md:grid-cols-5">
                   <Card>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm font-medium text-muted-foreground">Kg Comprado</CardTitle>
@@ -413,22 +424,35 @@ export default function OperacoesProprias() {
                   </Card>
                   <Card>
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium text-muted-foreground">Kg Beneficiado</CardTitle>
+                      <CardTitle className="text-sm font-medium text-muted-foreground">Pend. Benef.</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">{formatWeight(totaisOperacao.kgBeneficiado)}</div>
-                      <p className="text-xs text-muted-foreground">Disponível: {formatWeight(totaisOperacao.kgDisponivelVenda)}</p>
+                      <div className="text-2xl font-bold">{formatWeight(totaisOperacao.kgDisponivel)}</div>
+                      <p className="text-xs text-muted-foreground">Disponível p/ industrialização</p>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium text-muted-foreground">Resultado</CardTitle>
+                      <CardTitle className="text-sm font-medium text-muted-foreground">Kg Beneficiado</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className={`text-2xl font-bold ${totaisOperacao.resultadoTotal >= 0 ? "text-success" : "text-destructive"}`}>
-                        {formatCurrency(totaisOperacao.resultadoTotal)}
+                      <div className="text-2xl font-bold">{formatWeight(totaisOperacao.kgBeneficiado)}</div>
+                      <p className="text-xs text-muted-foreground">
+                        Em fornecedor: {formatWeight(totaisOperacao.kgDisponivelVenda)}
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card className={totaisOperacao.ganhoVsBenchmark >= 0 ? "border-success/50" : "border-destructive/50"}>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium text-muted-foreground">Ganho vs LME</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className={`text-2xl font-bold ${totaisOperacao.ganhoVsBenchmark >= 0 ? "text-success" : "text-destructive"}`}>
+                        {formatCurrency(totaisOperacao.ganhoVsBenchmark)}
                       </div>
-                      <p className="text-xs text-muted-foreground">Receita: {formatCurrency(totaisOperacao.receitaTotal)}</p>
+                      <p className="text-xs text-muted-foreground">
+                        Custo: {formatCurrency(totaisOperacao.custoMedioRkg)}/kg | LME: {formatCurrency(benchmarkSemanal)}/kg
+                      </p>
                     </CardContent>
                   </Card>
                 </div>
