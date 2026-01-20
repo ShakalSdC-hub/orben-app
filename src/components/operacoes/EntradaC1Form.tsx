@@ -42,7 +42,7 @@ interface EntradaC1FormProps {
   editData?: EntradaC1 | null;
 }
 
-export function EntradaC1Form({ open, onOpenChange, operacaoId, defaultPerdaMel = 5, defaultPerdaMista = 10, editData }: EntradaC1FormProps) {
+export function EntradaC1Form({ open, onOpenChange, operacaoId, defaultPerdaMel = 3, defaultPerdaMista = 8, editData }: EntradaC1FormProps) {
   const queryClient = useQueryClient();
   const isEditing = !!editData;
   
@@ -128,6 +128,7 @@ export function EntradaC1Form({ open, onOpenChange, operacaoId, defaultPerdaMel 
         dt_recebimento: form.dt_recebimento,
         ticket_mel_kg: form.ticket_mel_kg,
         ticket_mista_kg: form.ticket_mista_kg,
+        // Perda ainda salva para referência, mas será usada no beneficiamento
         perda_mel_pct: form.perda_mel_pct / 100,
         perda_mista_pct: form.perda_mista_pct / 100,
         valor_unit_mel_rkg: form.valor_unit_mel_rkg,
@@ -160,8 +161,9 @@ export function EntradaC1Form({ open, onOpenChange, operacaoId, defaultPerdaMel 
   });
 
   const kgTicket = form.ticket_mel_kg + form.ticket_mista_kg;
-  const kgPerda = (form.ticket_mel_kg * form.perda_mel_pct / 100) + (form.ticket_mista_kg * form.perda_mista_pct / 100);
-  const kgLiquido = kgTicket - kgPerda;
+  // Nota: a perda será aplicada no beneficiamento, aqui é apenas estimativa
+  const kgPerdaEstimada = (form.ticket_mel_kg * form.perda_mel_pct / 100) + (form.ticket_mista_kg * form.perda_mista_pct / 100);
+  const kgLiquidoEstimado = kgTicket - kgPerdaEstimada;
   
   // Valores totais por tipo de sucata
   const valorTotalMel = form.ticket_mel_kg * form.valor_unit_mel_rkg;
@@ -215,15 +217,32 @@ export function EntradaC1Form({ open, onOpenChange, operacaoId, defaultPerdaMel 
             </div>
           </div>
 
-          {/* Perdas */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Perda MEL (%)</Label>
-              <Input type="number" step="0.1" value={form.perda_mel_pct} onChange={(e) => setForm({ ...form, perda_mel_pct: Number(e.target.value) })} />
-            </div>
-            <div>
-              <Label>Perda Mista (%)</Label>
-              <Input type="number" step="0.1" value={form.perda_mista_pct} onChange={(e) => setForm({ ...form, perda_mista_pct: Number(e.target.value) })} />
+          {/* Perdas Estimadas (informativo) */}
+          <div className="p-3 bg-muted/50 rounded-lg border border-dashed">
+            <p className="text-xs text-muted-foreground mb-2">
+              Perda estimada (referência - será definida no beneficiamento):
+            </p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-xs">Perda MEL (%)</Label>
+                <Input 
+                  type="number" 
+                  step="0.1" 
+                  value={form.perda_mel_pct} 
+                  onChange={(e) => setForm({ ...form, perda_mel_pct: Number(e.target.value) })}
+                  className="h-8"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Perda Mista (%)</Label>
+                <Input 
+                  type="number" 
+                  step="0.1" 
+                  value={form.perda_mista_pct} 
+                  onChange={(e) => setForm({ ...form, perda_mista_pct: Number(e.target.value) })}
+                  className="h-8"
+                />
+              </div>
             </div>
           </div>
 
@@ -231,8 +250,8 @@ export function EntradaC1Form({ open, onOpenChange, operacaoId, defaultPerdaMel 
           <div className="p-3 bg-muted rounded-lg space-y-2">
             <div className="flex justify-between text-sm">
               <span>Kg Ticket: <strong>{kgTicket.toLocaleString()}</strong></span>
-              <span>Perda: <strong>{kgPerda.toLocaleString()} kg</strong></span>
-              <span>Kg Líquido: <strong>{kgLiquido.toLocaleString()}</strong></span>
+              <span>Perda Est.: <strong>{kgPerdaEstimada.toLocaleString()} kg</strong></span>
+              <span>Kg Líq. Est.: <strong>{kgLiquidoEstimado.toLocaleString()}</strong></span>
             </div>
             <div className="flex justify-between text-sm border-t pt-2">
               <span>Valor MEL: <strong className="text-primary">{valorTotalMel.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</strong></span>
