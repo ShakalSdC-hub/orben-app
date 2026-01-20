@@ -423,6 +423,7 @@ export type Database = {
           id: string
           is_deleted: boolean | null
           kg_disponivel_cliente: number | null
+          kg_entrada: number | null
           kg_mel_entrada: number | null
           kg_mista_entrada: number | null
           kg_retornado: number
@@ -433,6 +434,8 @@ export type Database = {
           operacao_id: string
           perda_mel_pct: number | null
           perda_mista_pct: number | null
+          perda_pct: number | null
+          perda_real_pct: number | null
           perda_total_kg: number | null
           updated_at: string
         }
@@ -448,6 +451,7 @@ export type Database = {
           id?: string
           is_deleted?: boolean | null
           kg_disponivel_cliente?: number | null
+          kg_entrada?: number | null
           kg_mel_entrada?: number | null
           kg_mista_entrada?: number | null
           kg_retornado: number
@@ -458,6 +462,8 @@ export type Database = {
           operacao_id: string
           perda_mel_pct?: number | null
           perda_mista_pct?: number | null
+          perda_pct?: number | null
+          perda_real_pct?: number | null
           perda_total_kg?: number | null
           updated_at?: string
         }
@@ -473,6 +479,7 @@ export type Database = {
           id?: string
           is_deleted?: boolean | null
           kg_disponivel_cliente?: number | null
+          kg_entrada?: number | null
           kg_mel_entrada?: number | null
           kg_mista_entrada?: number | null
           kg_retornado?: number
@@ -483,6 +490,8 @@ export type Database = {
           operacao_id?: string
           perda_mel_pct?: number | null
           perda_mista_pct?: number | null
+          perda_pct?: number | null
+          perda_real_pct?: number | null
           perda_total_kg?: number | null
           updated_at?: string
         }
@@ -824,6 +833,7 @@ export type Database = {
           kg_disponivel: number | null
           kg_recebido: number
           operacao_id: string
+          produto_id: string | null
           updated_at: string
           valor_ref_rkg: number | null
         }
@@ -836,6 +846,7 @@ export type Database = {
           kg_disponivel?: number | null
           kg_recebido: number
           operacao_id: string
+          produto_id?: string | null
           updated_at?: string
           valor_ref_rkg?: number | null
         }
@@ -848,6 +859,7 @@ export type Database = {
           kg_disponivel?: number | null
           kg_recebido?: number
           operacao_id?: string
+          produto_id?: string | null
           updated_at?: string
           valor_ref_rkg?: number | null
         }
@@ -857,6 +869,13 @@ export type Database = {
             columns: ["operacao_id"]
             isOneToOne: false
             referencedRelation: "operacoes_terceiros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "entradas_terceiros_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos_terceiros"
             referencedColumns: ["id"]
           },
         ]
@@ -1338,6 +1357,39 @@ export type Database = {
           nome_fantasia?: string | null
           razao_social?: string
           telefone?: string | null
+          tipo?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      produtos_terceiros: {
+        Row: {
+          ativo: boolean | null
+          codigo: string | null
+          created_at: string
+          id: string
+          nome: string
+          perda_padrao_pct: number | null
+          tipo: string | null
+          updated_at: string
+        }
+        Insert: {
+          ativo?: boolean | null
+          codigo?: string | null
+          created_at?: string
+          id?: string
+          nome: string
+          perda_padrao_pct?: number | null
+          tipo?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ativo?: boolean | null
+          codigo?: string | null
+          created_at?: string
+          id?: string
+          nome?: string
+          perda_padrao_pct?: number | null
           tipo?: string | null
           updated_at?: string
         }
