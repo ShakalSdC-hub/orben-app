@@ -1,43 +1,55 @@
 
 
-## Plano: Ajustes na Aba Vergalhao LME do Simulador
+## Plano: Corrigir Logica de Comparacao no Simulador LME
 
-### 1. Formatar Cobre (US$/t) com 2 casas decimais
+### Problema Identificado
 
-O campo "Cobre (US$/t)" (linha 927) exibe o valor bruto sem formatacao. Quando desabilitado (modo Semanal/Mensal), sera formatado com 2 casas decimais. Em modo manual, permanece editavel normalmente.
+A comparacao entre Vergalhao LME e Custo Industrializado esta usando a variavel errada para determinar o resultado.
 
-**Arquivo:** `src/pages/Simulador.tsx`
-- Alterar o Input de `type="number"` para `type="text"` quando desabilitado, exibindo o valor formatado com `toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })`
+**Situacao atual (com bug):**
+- `diferenca = totalComFinanceiro - precoIndustrializado` (correto: positivo = sucata mais barata)
+- `valeAPena = saldoOperacao > 0` (ERRADO: usa o lucro absoluto da operacao de sucata, nao a comparacao)
+- Cores invertidas: diferenca positiva (sucata mais barata) aparece em vermelho
 
----
+**Exemplo do bug:**
+- Vergalhao LME: R$ 78,56/kg
+- Custo Industrializado: R$ 71,47/kg
+- Diferenca: R$ 7,09/kg (sucata e mais barata)
+- Resultado mostrado: "OPERACAO INVIAVEL" / "COMPRAR VERGALHAO" (invertido!)
 
-### 2. Remover coluna "% Total" da tabela de parcelas
-
-A coluna "% Total" sera removida da interface. O percentual sera calculado automaticamente em partes iguais (100 / numero de parcelas). O usuario apenas preenche a coluna "Dias".
-
-**Arquivo:** `src/pages/Simulador.tsx`
-- Remover o `<TableHead>` de "% Total" (linha 1029)
-- Remover o `<TableCell>` com input de percentual (linhas 1043-1050)
-- Alterar o calculo de `parcelasComValor` para usar distribuicao igual automatica: `percentual = 100 / parcelas.length`
-- Remover campo `percentual` dos inputs editaveis de parcela
-
----
-
-### 3. Separar taxa financeira entre Vergalhao e Sucata
-
-Atualmente ambas as abas compartilham o mesmo estado `taxaFinanceiraMensal`. Sera criado um estado separado para a Sucata.
+### Correcao
 
 **Arquivo:** `src/pages/Simulador.tsx`
-- Criar novo estado: `const [taxaFinanceiraSucata, setTaxaFinanceiraSucata] = useState(1.80)`
-- Na aba Sucata (linha 1300-1310): usar `taxaFinanceiraSucata` no lugar de `taxaFinanceiraMensal`
-- Nos calculos de sucata (linhas 299-301): usar `taxaFinanceiraSucata` no lugar de `taxaFinanceiraMensal`
-- Manter `taxaFinanceiraMensal` exclusivo para a aba Vergalhao
 
----
+1. **Linha 315** - Alterar a variavel `valeAPena` para usar a comparacao correta:
+   - De: `const valeAPena = saldoOperacao > 0`
+   - Para: `const valeAPena = diferenca > 0`
+   - Quando `diferenca > 0`, o LME e mais caro, logo comprar sucata vale a pena
 
-### Resumo de alteracoes
+2. **Linha 1461** - Corrigir as cores da "Diferenca":
+   - De: `diferenca > 0 ? "text-destructive" : "text-success"`
+   - Para: `diferenca > 0 ? "text-success" : "text-destructive"`
+   - Diferenca positiva = economia = verde
 
-| Arquivo | Alteracao |
-|---------|-----------|
-| `src/pages/Simulador.tsx` | (1) Formatar Cobre US$/t com 2 decimais; (2) Remover coluna "% Total" e calcular automatico; (3) Criar estado `taxaFinanceiraSucata` separado |
+3. **Linha 1467** - Corrigir as cores da "Economia":
+   - De: `economiaPct > 0 ? "text-destructive" : "text-success"`
+   - Para: `economiaPct > 0 ? "text-success" : "text-destructive"`
+
+4. **Linhas 1431-1434** - Atualizar texto de lucro/prejuizo para usar `diferenca` em vez de `saldoOperacao`:
+   - Lucro: `diferenca * pesoKg` (economia total em kg)
+   - Prejuizo: quando diferenca negativa (LME mais barato)
+
+5. **Linha 478-480 (PDF)** - Corrigir cores e resultado no PDF exportado:
+   - Diferenca positiva = success (verde)
+   - Resultado: `valeAPena ? "COMPRAR SUCATA" : "COMPRAR VERGALHAO"` (ja usa valeAPena, corrigido pelo item 1)
+
+### Resumo
+
+| Local | Bug | Correcao |
+|-------|-----|----------|
+| Linha 315 | `valeAPena = saldoOperacao > 0` | `valeAPena = diferenca > 0` |
+| Linha 1461 | Cor invertida na diferenca | Trocar destructive/success |
+| Linha 1467 | Cor invertida na economia | Trocar destructive/success |
+| Linhas 1431-1434 | Valor lucro/prejuizo usa saldoOperacao | Usar `diferenca * pesoKg` |
+| Linha 478 (PDF) | Cor invertida | Trocar danger/success |
 
