@@ -78,8 +78,10 @@ export default function Simulador() {
     { numero: 3, percentual: 30, dias: 60, dataVencimento: "", valor: 0 },
   ]);
 
-  // Taxa financeira para cálculo prorata (% ao mês)
+  // Taxa financeira para cálculo prorata (% ao mês) - Vergalhão
   const [taxaFinanceiraMensal, setTaxaFinanceiraMensal] = useState(1.80);
+  // Taxa financeira para cálculo prorata (% ao mês) - Sucata (independente)
+  const [taxaFinanceiraSucata, setTaxaFinanceiraSucata] = useState(1.80);
 
   // Sucata inputs
   const [pctLmeSucata, setPctLmeSucata] = useState(97);
@@ -247,7 +249,7 @@ export default function Simulador() {
   // Atualizar valores quando cotação mudar (se não for manual)
   useEffect(() => {
     if (lmeTipoFiltro !== "manual" && lmeCotacao) {
-      if (lmeCotacao.cobre_usd_t) setCobreUsdT(Math.round(lmeCotacao.cobre_usd_t));
+      if (lmeCotacao.cobre_usd_t) setCobreUsdT(Number(lmeCotacao.cobre_usd_t));
       if (lmeCotacao.dolar_brl) setDolarBrl(Number(lmeCotacao.dolar_brl));
     }
   }, [lmeCotacao, lmeTipoFiltro]);
@@ -273,11 +275,13 @@ export default function Simulador() {
   //          Juros (R$) = Valor Base × Juros (%)
   //          Valor Total = Valor Base + Juros (R$)
   const parcelasComValor = parcelas.map(p => {
-    const valorBase = precoAVista * (p.percentual / 100);
+    const percentualAuto = 100 / parcelas.length;
+    const valorBase = precoAVista * (percentualAuto / 100);
     const jurosPct = (taxaFinanceiraMensal / 100) * (p.dias / 30);
     const jurosRs = valorBase * jurosPct;
     return {
       ...p,
+      percentual: percentualAuto,
       valor: valorBase,
       jurosPct,
       jurosRs,
@@ -296,8 +300,8 @@ export default function Simulador() {
   const valorCompra = custoCompraKg * pesoKg;
   const valorMO = custoMO * pesoKg;
   
-  // Cálculo do custo financeiro prorata para sucata
-  const jurosProrataSucata = (taxaFinanceiraMensal / 100) * (prazoSucataDias / 30);
+  // Cálculo do custo financeiro prorata para sucata (usa taxa separada)
+  const jurosProrataSucata = (taxaFinanceiraSucata / 100) * (prazoSucataDias / 30);
   const custoFinanceiroRsKg = custoCompraKg * jurosProrataSucata;
   const valorFinanceiro = custoFinanceiroRsKg * pesoKg;
   
@@ -924,13 +928,20 @@ export default function Simulador() {
                     <div className="grid gap-6 md:grid-cols-2">
                       <div className="space-y-2">
                         <Label>Cobre (US$/t)</Label>
-                        <Input
-                          type="number"
-                          value={cobreUsdT}
-                          onChange={(e) => setCobreUsdT(Number(e.target.value))}
-                          disabled={lmeTipoFiltro !== "manual"}
-                          className={lmeTipoFiltro !== "manual" ? "bg-muted" : ""}
-                        />
+                        {lmeTipoFiltro !== "manual" ? (
+                          <Input
+                            type="text"
+                            value={cobreUsdT.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            disabled
+                            className="bg-muted"
+                          />
+                        ) : (
+                          <Input
+                            type="number"
+                            value={cobreUsdT}
+                            onChange={(e) => setCobreUsdT(Number(e.target.value))}
+                          />
+                        )}
                       </div>
                       <div className="space-y-2">
                         <Label>Dólar (R$/US$)</Label>
@@ -1026,7 +1037,6 @@ export default function Simulador() {
                         <TableHeader>
                           <TableRow className="bg-muted/50">
                             <TableHead>Parcela</TableHead>
-                            <TableHead className="w-20">% Total</TableHead>
                             <TableHead className="w-20">Dias</TableHead>
                             <TableHead>Vencimento</TableHead>
                             <TableHead className="text-right">Valor Base</TableHead>
@@ -1040,14 +1050,6 @@ export default function Simulador() {
                           {parcelasComValor.map((p, idx) => (
                             <TableRow key={idx}>
                               <TableCell className="font-medium">{p.numero}ª</TableCell>
-                              <TableCell>
-                                <Input
-                                  type="number"
-                                  value={p.percentual}
-                                  onChange={(e) => updateParcela(idx, "percentual", Number(e.target.value))}
-                                  className="h-8 w-16"
-                                />
-                              </TableCell>
                               <TableCell>
                                 <Input
                                   type="number"
@@ -1303,8 +1305,8 @@ export default function Simulador() {
                             type="number"
                             step="0.01"
                             min="0"
-                            value={taxaFinanceiraMensal}
-                            onChange={(e) => setTaxaFinanceiraMensal(Number(e.target.value))}
+                            value={taxaFinanceiraSucata}
+                            onChange={(e) => setTaxaFinanceiraSucata(Number(e.target.value))}
                             className="pr-14"
                           />
                           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">% a.m.</span>
