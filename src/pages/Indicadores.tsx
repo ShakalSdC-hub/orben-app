@@ -407,7 +407,7 @@ export default function Indicadores() {
                 <Label className="text-muted-foreground">Cobre (US$/t)</Label>
                 <Input 
                   type="text"
-                  value={lmeCotacao?.cobre_usd_t ? Math.round(lmeCotacao.cobre_usd_t).toLocaleString("pt-BR") : "-"}
+                  value={lmeCotacao?.cobre_usd_t ? Number(lmeCotacao.cobre_usd_t).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "-"}
                   disabled
                   className="bg-muted font-mono text-lg"
                 />
@@ -606,7 +606,7 @@ export default function Indicadores() {
                           {format(new Date(h.data), "dd/MM/yyyy", { locale: ptBR })}
                         </TableCell>
                         <TableCell className="text-right font-mono font-semibold text-primary">
-                          {h.cobre_usd_t ? `$ ${Number(h.cobre_usd_t).toLocaleString("pt-BR")}` : "-"}
+                          {h.cobre_usd_t ? `$ ${Number(h.cobre_usd_t).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "-"}
                         </TableCell>
                         <TableCell className="text-right font-mono">
                           {h.cobre_brl_kg ? formatCurrency(h.cobre_brl_kg) : "-"}

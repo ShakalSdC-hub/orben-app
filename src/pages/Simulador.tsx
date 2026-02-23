@@ -410,7 +410,7 @@ export default function Simulador() {
           <div class="section">
             <h2>Parâmetros de Mercado</h2>
             <table>
-              <tr><th>Cobre (US$/t)</th><td>${cobreUsdT.toLocaleString("pt-BR")}</td></tr>
+              <tr><th>Cobre (US$/t)</th><td>${cobreUsdT.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>
               <tr><th>Dólar (R$/US$)</th><td>R$ ${dolarBrl.toFixed(4)}</td></tr>
               <tr><th>LME Semana (R$/kg)</th><td>${formatCurrency(lmeSemanaBrlKg)}</td></tr>
               <tr><th>Taxa Financeira</th><td>${taxaFinanceiraMensal.toFixed(2)}% a.m.</td></tr>
