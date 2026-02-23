@@ -312,7 +312,7 @@ export default function Simulador() {
   // === COMPARATIVO ===
   const diferenca = totalComFinanceiro - precoIndustrializado;
   const economiaPct = ((diferenca / totalComFinanceiro) * 100);
-  const valeAPena = saldoOperacao > 0;
+  const valeAPena = diferenca > 0;
 
   // Dados do gráfico comparativo
   const dadosComparativo = [
@@ -475,8 +475,8 @@ export default function Simulador() {
             <table>
               <tr><th>Vergalhão LME a Prazo</th><td>${formatCurrency(totalComFinanceiro)}/kg</td></tr>
               <tr><th>Custo Industrializado</th><td>${formatCurrency(precoIndustrializado)}/kg</td></tr>
-              <tr><th>Diferença</th><td class="${diferenca > 0 ? 'danger' : 'success'}">${formatCurrency(diferenca)}/kg</td></tr>
-              <tr><th>Economia</th><td class="${economiaPct > 0 ? 'danger' : 'success'}">${economiaPct.toFixed(1)}%</td></tr>
+              <tr><th>Diferença</th><td class="${diferenca > 0 ? 'success' : 'danger'}">${formatCurrency(diferenca)}/kg</td></tr>
+              <tr><th>Economia</th><td class="${economiaPct > 0 ? 'success' : 'danger'}">${economiaPct.toFixed(1)}%</td></tr>
               <tr class="highlight"><th>Resultado</th><td class="${valeAPena ? 'success' : 'danger'}">${valeAPena ? "COMPRAR SUCATA" : "COMPRAR VERGALHÃO"}</td></tr>
             </table>
           </div>
@@ -1430,8 +1430,8 @@ export default function Simulador() {
                       </p>
                       <p className="text-sm text-muted-foreground mt-1">
                         {valeAPena
-                          ? `Lucro de ${formatCurrency(saldoOperacao)}`
-                          : `Prejuízo de ${formatCurrency(Math.abs(saldoOperacao))}`}
+                          ? `Economia de ${formatCurrency(diferenca * pesoKg)} (${pesoKg.toLocaleString("pt-BR")} kg)`
+                          : `Prejuízo de ${formatCurrency(Math.abs(diferenca * pesoKg))} (${pesoKg.toLocaleString("pt-BR")} kg)`}
                       </p>
                     </div>
 
@@ -1458,13 +1458,13 @@ export default function Simulador() {
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Diferença</span>
-                        <span className={cn("font-bold", diferenca > 0 ? "text-destructive" : "text-success")}>
+                        <span className={cn("font-bold", diferenca > 0 ? "text-success" : "text-destructive")}>
                           {formatCurrency(diferenca)}/kg
                         </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Economia</span>
-                        <span className={cn("font-bold", economiaPct > 0 ? "text-destructive" : "text-success")}>
+                        <span className={cn("font-bold", economiaPct > 0 ? "text-success" : "text-destructive")}>
                           {economiaPct.toFixed(1)}%
                         </span>
                       </div>
