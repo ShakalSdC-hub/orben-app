@@ -1,49 +1,43 @@
 
 
-## Plano: Adicionar Duas Casas Decimais em Todas as Medias LME
+## Plano: Ajustes na Aba Vergalhao LME do Simulador
 
-### O que sera alterado
+### 1. Formatar Cobre (US$/t) com 2 casas decimais
 
-Garantir que todos os valores de media LME exibam exatamente 2 casas decimais apos a virgula, tanto na pagina **Indicadores LME** quanto no **Simulador LME**.
+O campo "Cobre (US$/t)" (linha 927) exibe o valor bruto sem formatacao. Quando desabilitado (modo Semanal/Mensal), sera formatado com 2 casas decimais. Em modo manual, permanece editavel normalmente.
 
----
-
-### Alteracoes por arquivo
-
-#### 1. `src/lib/kpis.ts` - Funcao formatCurrency
-
-A funcao `formatCurrency` ja usa 2 casas decimais por padrao (comportamento do BRL). Nao precisa de alteracao.
-
-#### 2. `src/pages/Indicadores.tsx`
-
-| Local | Atual | Correcao |
-|-------|-------|----------|
-| Linha 410 - Card Cotacao LME, Cobre US$/t | `Math.round(...)` (sem decimais) | Usar `.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })` |
-| Linha 609 - Tabela historico diario, Cobre US$/t | `.toLocaleString("pt-BR")` (sem decimais garantidas) | Adicionar `{ minimumFractionDigits: 2, maximumFractionDigits: 2 }` |
-
-#### 3. `src/pages/Simulador.tsx`
-
-| Local | Atual | Correcao |
-|-------|-------|----------|
-| Linha 356-361 - `formatCurrency` local | Usa padrao BRL (2 casas) | Nenhuma alteracao necessaria |
-| Linha 413 - PDF, Cobre US$/t | `.toLocaleString("pt-BR")` (sem decimais garantidas) | Adicionar `{ minimumFractionDigits: 2, maximumFractionDigits: 2 }` |
-| Linha 928-929 - Input Cobre US$/t | Exibe numero bruto | Campo numerico, OK manter |
-| Linha 1228 - Total Media R$/t | Usa `formatCurrency` | Ja tem 2 casas |
+**Arquivo:** `src/pages/Simulador.tsx`
+- Alterar o Input de `type="number"` para `type="text"` quando desabilitado, exibindo o valor formatado com `toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })`
 
 ---
 
-### Detalhes Tecnicos
+### 2. Remover coluna "% Total" da tabela de parcelas
 
-As alteracoes se concentram em substituir:
-- `Math.round(valor).toLocaleString("pt-BR")` por `Number(valor).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })`
-- `.toLocaleString("pt-BR")` sem opcoes por `.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })`
+A coluna "% Total" sera removida da interface. O percentual sera calculado automaticamente em partes iguais (100 / numero de parcelas). O usuario apenas preenche a coluna "Dias".
 
-Isso garante que valores como `11.739,40` nunca aparecam como `11.739` ou `11739`.
+**Arquivo:** `src/pages/Simulador.tsx`
+- Remover o `<TableHead>` de "% Total" (linha 1029)
+- Remover o `<TableCell>` com input de percentual (linhas 1043-1050)
+- Alterar o calculo de `parcelasComValor` para usar distribuicao igual automatica: `percentual = 100 / parcelas.length`
+- Remover campo `percentual` dos inputs editaveis de parcela
 
-### Arquivos a modificar
+---
+
+### 3. Separar taxa financeira entre Vergalhao e Sucata
+
+Atualmente ambas as abas compartilham o mesmo estado `taxaFinanceiraMensal`. Sera criado um estado separado para a Sucata.
+
+**Arquivo:** `src/pages/Simulador.tsx`
+- Criar novo estado: `const [taxaFinanceiraSucata, setTaxaFinanceiraSucata] = useState(1.80)`
+- Na aba Sucata (linha 1300-1310): usar `taxaFinanceiraSucata` no lugar de `taxaFinanceiraMensal`
+- Nos calculos de sucata (linhas 299-301): usar `taxaFinanceiraSucata` no lugar de `taxaFinanceiraMensal`
+- Manter `taxaFinanceiraMensal` exclusivo para a aba Vergalhao
+
+---
+
+### Resumo de alteracoes
 
 | Arquivo | Alteracao |
 |---------|-----------|
-| `src/pages/Indicadores.tsx` | Linhas 410 e 609 - formatacao USD/t com 2 casas decimais |
-| `src/pages/Simulador.tsx` | Linha 413 - formatacao USD/t no PDF com 2 casas decimais |
+| `src/pages/Simulador.tsx` | (1) Formatar Cobre US$/t com 2 decimais; (2) Remover coluna "% Total" e calcular automatico; (3) Criar estado `taxaFinanceiraSucata` separado |
 
