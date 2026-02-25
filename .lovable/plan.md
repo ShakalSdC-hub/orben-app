@@ -1,63 +1,91 @@
 
 
-## Plano: Exclusao e Campos Adicionais na Venda de Intermediacao
+## Plano: "Compra pela IBRAC" na Compra de Intermediacao
 
-### Parte 1: Botao de Excluir nas 4 abas (Compras, Benef., Vendas, Custos)
+### Contexto do Problema
 
-Adicionar botao de excluir (lixeira) ao lado do botao de editar em cada linha das tabelas. A exclusao sera soft delete (`is_deleted = true`), e os triggers existentes no banco ja restauram os saldos automaticamente:
+Atualmente, o trigger `fn_allocate_venda_from_benef` sempre desconta o custo do material do repasse ao dono:
 
-- **Vendas**: trigger `fn_restore_benef_on_venda_delete_interm` restaura `kg_disponivel_venda` nos beneficiamentos
-- **Beneficiamentos**: trigger `fn_restore_compra_on_benef_delete_interm` restaura `kg_disponivel_compra` nas compras
-- **Compras**: exclusao direta (soft delete), mas apenas se `kg_disponivel_compra == kg_comprado` (nenhuma alocacao em uso)
-- **Custos**: exclusao direta (soft delete), sem dependencias
+```
+saldo_repassar = valor_venda - custo_material - comissao
+```
 
-Um dialog de confirmacao (`DeleteConfirmDialog`) sera exibido antes de cada exclusao. Apenas usuarios com role `admin` poderao excluir.
+Porem, quando o **Renato compra diretamente** a sucata (com dinheiro dele), o custo do material nao deve ser descontado do repasse, pois ele ja pagou. A IBRAC apenas intermedia o beneficiamento (MO). Nesse caso:
 
-**Arquivo:** `src/pages/OperacoesIntermediacao.tsx`
-- Importar `Trash2` do lucide-react e `DeleteConfirmDialog`
-- Adicionar estados para controlar o dialog de exclusao e o ID do registro
-- Criar mutations de soft delete para cada tabela (4 mutations)
-- Adicionar botao de lixeira em cada linha das 4 tabelas, visivel apenas para admin
-- Validar que compras com alocacoes em uso nao podem ser excluidas
+```
+Repasse = Valor Venda - Custos Beneficiamento - Custos Operacao - Comissao
+```
+
+Quando a **IBRAC compra** (usando NF da IBRAC), ai sim o custo do material e descontado:
+
+```
+Repasse = Valor Venda - Custo Material - Custos Beneficiamento - Custos Operacao - Comissao
+```
 
 ---
 
-### Parte 2: Campos adicionais na Venda (Venda pela IBRAC)
+### Alteracoes
 
-#### 2.1 Migracao de banco de dados
+#### 1. Migracao de Banco de Dados
 
-Adicionar novos campos na tabela `vendas_intermediacao`:
+**Adicionar coluna na tabela `compras_intermediacao`:**
 
 | Coluna | Tipo | Default | Descricao |
 |--------|------|---------|-----------|
-| `venda_pela_ibrac` | boolean | false | Se a venda ocorre pela NF da IBRAC |
-| `comissao_ibrac_pct` | numeric | 0 | % comissao IBRAC sobre valor total NF |
-| `pis_cofins_pct` | numeric | 9.25 | PIS/COFINS fixo em 9,25% |
-| `pis_cofins_rs` | numeric | 0 | Valor calculado PIS/COFINS |
-| `icms_pct` | numeric | 0 | % ICMS informado pelo usuario |
-| `icms_rs` | numeric | 0 | Valor calculado ICMS (nao soma no total) |
+| `compra_pela_ibrac` | boolean | true | Se a IBRAC comprou (NF IBRAC) ou se o dono comprou direto |
 
-#### 2.2 Formulario de Venda (`VendaIntermForm.tsx`)
+#### 2. Atualizar Trigger `fn_allocate_venda_from_benef`
 
-- Adicionar switch/checkbox "Venda pela IBRAC"
-- Quando ativado, exibir:
-  1. **Comissao IBRAC (%)** - campo numerico, calcula sobre `valor_venda_rs`
-  2. **PIS/COFINS** - campo fixo 9,25% (editavel), exibe valor calculado automaticamente
-  3. **ICMS (%)** - campo numerico, exibe valor calculado (nao soma no total da operacao)
-- Salvar todos os campos no payload do insert/update
+Modificar o calculo de `v_custo_material` para considerar apenas compras onde `compra_pela_ibrac = true`. Quando o dono comprou direto, o custo do material nao entra no calculo do repasse.
 
-#### 2.3 Tabela de Vendas
+Tambem incluir no calculo:
+- **Custos de beneficiamento** proporcionais (via `beneficiamentos_intermediacao.custos_benef_total_rs`)
+- **Custos da operacao** proporcionais (via `custos_intermediacao`)
 
-- Adicionar badge "IBRAC" na linha quando `venda_pela_ibrac = true`
-- Mostrar PIS/COFINS e ICMS como colunas ou tooltip informativo
+Nova formula:
+
+```text
+v_custo_material = SUM apenas das compras onde compra_pela_ibrac = true
+v_custos_benef = custos proporcionais dos beneficiamentos alocados
+v_custos_operacao = custos_intermediacao da operacao, proporcional ao kg vendido
+v_saldo_repassar = valor_venda - v_custo_material - v_custos_benef - v_custos_operacao - v_comissao_ibrac
+```
+
+Gravar `custos_operacao_alocados_rs = v_custos_benef + v_custos_operacao`.
+
+Incluir UPDATE para recalcular vendas existentes.
+
+#### 3. Formulario de Compra (`CompraIntermForm.tsx`)
+
+- Adicionar switch "Compra pela IBRAC" (default: true)
+- Quando desativado, indica que o dono comprou direto e a IBRAC so intermedia a MO
+- Salvar `compra_pela_ibrac` no payload
+
+#### 4. Tabela de Compras (`OperacoesIntermediacao.tsx`)
+
+- Exibir badge "IBRAC" ou "DONO" na linha da compra conforme o valor de `compra_pela_ibrac`
+
+#### 5. Extrato por Dono (`ExtratoDono.tsx`)
+
+- Incluir `custos_operacao_alocados_rs` na query de vendas
+- Atualizar `custoTotal` da Intermediacao para:
+
+```text
+custoTotal = custo_material_dono_rs + custos_operacao_alocados_rs + comissao_ibrac_rs
+```
+
+- Adicionar coluna "Custos Op." na tabela de Intermediacao
 
 ---
 
 ### Resumo de arquivos a modificar
 
-| Arquivo | Alteracao |
-|---------|-----------|
-| **Migracao SQL** | Adicionar 6 colunas em `vendas_intermediacao` |
-| `src/pages/OperacoesIntermediacao.tsx` | Botoes de excluir nas 4 abas + badge IBRAC nas vendas |
-| `src/components/operacoes/VendaIntermForm.tsx` | Switch "Venda pela IBRAC" + campos comissao, PIS/COFINS, ICMS |
+| Arquivo / Local | Alteracao |
+|-----------------|-----------|
+| Migracao SQL | Adicionar `compra_pela_ibrac` em `compras_intermediacao` |
+| Migracao SQL | Reescrever `fn_allocate_venda_from_benef` para filtrar custo material por `compra_pela_ibrac` e incluir custos benef + operacao |
+| Migracao SQL | UPDATE para recalcular vendas existentes |
+| `src/components/operacoes/CompraIntermForm.tsx` | Switch "Compra pela IBRAC" |
+| `src/pages/OperacoesIntermediacao.tsx` | Badge IBRAC/DONO na aba Compras |
+| `src/pages/ExtratoDono.tsx` | Query + custoTotal + coluna custos operacao |
 
