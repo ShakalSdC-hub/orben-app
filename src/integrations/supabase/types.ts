@@ -566,6 +566,7 @@ export type Database = {
       }
       compras_intermediacao: {
         Row: {
+          compra_pela_ibrac: boolean
           created_at: string
           dt: string
           fornecedor_compra_id: string | null
@@ -581,6 +582,7 @@ export type Database = {
           valor_compra_rs: number | null
         }
         Insert: {
+          compra_pela_ibrac?: boolean
           created_at?: string
           dt: string
           fornecedor_compra_id?: string | null
@@ -596,6 +598,7 @@ export type Database = {
           valor_compra_rs?: number | null
         }
         Update: {
+          compra_pela_ibrac?: boolean
           created_at?: string
           dt?: string
           fornecedor_compra_id?: string | null

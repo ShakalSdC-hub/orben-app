@@ -472,9 +472,14 @@ export default function OperacoesIntermediacao() {
                                   <TableCell>{c.fornecedor?.razao_social || "-"}</TableCell>
                                   <TableCell>{c.nf_compra || "-"}</TableCell>
                                   <TableCell>
-                                    <Badge variant={c.tipo_material === "MEL" ? "default" : "secondary"}>
-                                      {c.tipo_material || "MEL"}
-                                    </Badge>
+                                    <div className="flex gap-1">
+                                      <Badge variant={c.tipo_material === "MEL" ? "default" : "secondary"}>
+                                        {c.tipo_material || "MEL"}
+                                      </Badge>
+                                      <Badge variant={(c as any).compra_pela_ibrac === false ? "outline" : "default"} className={(c as any).compra_pela_ibrac === false ? "border-warning text-warning" : ""}>
+                                        {(c as any).compra_pela_ibrac === false ? "DONO" : "IBRAC"}
+                                      </Badge>
+                                    </div>
                                   </TableCell>
                                   <TableCell className="text-right">{formatWeight(c.kg_comprado)}</TableCell>
                                   <TableCell className="text-right">{formatCurrency(c.preco_compra_rkg)}</TableCell>

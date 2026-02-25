@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -18,6 +19,7 @@ interface CompraInterm {
   kg_comprado: number;
   preco_compra_rkg: number;
   tipo_material: string | null;
+  compra_pela_ibrac?: boolean;
 }
 
 interface CompraIntermFormProps {
@@ -37,6 +39,7 @@ export function CompraIntermForm({ open, onOpenChange, operacaoId, editData }: C
     kg_comprado: 0,
     preco_compra_rkg: 0,
     tipo_material: "MEL",
+    compra_pela_ibrac: true,
   });
 
   useEffect(() => {
@@ -49,9 +52,10 @@ export function CompraIntermForm({ open, onOpenChange, operacaoId, editData }: C
           kg_comprado: editData.kg_comprado,
           preco_compra_rkg: editData.preco_compra_rkg,
           tipo_material: editData.tipo_material || "MEL",
+          compra_pela_ibrac: editData.compra_pela_ibrac ?? true,
         });
       } else {
-        setForm({ dt: format(new Date(), "yyyy-MM-dd"), fornecedor_compra_id: "", nf_compra: "", kg_comprado: 0, preco_compra_rkg: 0, tipo_material: "MEL" });
+        setForm({ dt: format(new Date(), "yyyy-MM-dd"), fornecedor_compra_id: "", nf_compra: "", kg_comprado: 0, preco_compra_rkg: 0, tipo_material: "MEL", compra_pela_ibrac: true });
       }
     }
   }, [open, editData]);
@@ -74,6 +78,7 @@ export function CompraIntermForm({ open, onOpenChange, operacaoId, editData }: C
         kg_comprado: form.kg_comprado,
         preco_compra_rkg: form.preco_compra_rkg,
         tipo_material: form.tipo_material,
+        compra_pela_ibrac: form.compra_pela_ibrac,
       };
 
       if (editData) {
@@ -101,6 +106,22 @@ export function CompraIntermForm({ open, onOpenChange, operacaoId, editData }: C
           <DialogTitle>{editData ? "Editar Compra" : "Nova Compra de Material"}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
+          <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+            <div>
+              <Label htmlFor="compra-ibrac" className="font-medium">Compra pela IBRAC</Label>
+              <p className="text-xs text-muted-foreground">
+                {form.compra_pela_ibrac
+                  ? "IBRAC comprou com NF própria (custo descontado do repasse)"
+                  : "Dono comprou direto (IBRAC só intermedia a MO)"}
+              </p>
+            </div>
+            <Switch
+              id="compra-ibrac"
+              checked={form.compra_pela_ibrac}
+              onCheckedChange={(checked) => setForm({ ...form, compra_pela_ibrac: checked })}
+            />
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Data</Label>
