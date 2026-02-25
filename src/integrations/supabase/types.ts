@@ -1853,54 +1853,72 @@ export type Database = {
       vendas_intermediacao: {
         Row: {
           cliente_id: string | null
+          comissao_ibrac_pct: number | null
           comissao_ibrac_rs: number | null
           created_at: string
           custo_material_dono_rs: number | null
           custos_operacao_alocados_rs: number | null
           dt: string
+          icms_pct: number | null
+          icms_rs: number | null
           id: string
           is_deleted: boolean | null
           kg_vendido: number
           nf_venda: string | null
           operacao_id: string
+          pis_cofins_pct: number | null
+          pis_cofins_rs: number | null
           preco_venda_rkg: number
           saldo_repassar_rs: number | null
           updated_at: string
           valor_venda_rs: number | null
+          venda_pela_ibrac: boolean | null
         }
         Insert: {
           cliente_id?: string | null
+          comissao_ibrac_pct?: number | null
           comissao_ibrac_rs?: number | null
           created_at?: string
           custo_material_dono_rs?: number | null
           custos_operacao_alocados_rs?: number | null
           dt: string
+          icms_pct?: number | null
+          icms_rs?: number | null
           id?: string
           is_deleted?: boolean | null
           kg_vendido: number
           nf_venda?: string | null
           operacao_id: string
+          pis_cofins_pct?: number | null
+          pis_cofins_rs?: number | null
           preco_venda_rkg: number
           saldo_repassar_rs?: number | null
           updated_at?: string
           valor_venda_rs?: number | null
+          venda_pela_ibrac?: boolean | null
         }
         Update: {
           cliente_id?: string | null
+          comissao_ibrac_pct?: number | null
           comissao_ibrac_rs?: number | null
           created_at?: string
           custo_material_dono_rs?: number | null
           custos_operacao_alocados_rs?: number | null
           dt?: string
+          icms_pct?: number | null
+          icms_rs?: number | null
           id?: string
           is_deleted?: boolean | null
           kg_vendido?: number
           nf_venda?: string | null
           operacao_id?: string
+          pis_cofins_pct?: number | null
+          pis_cofins_rs?: number | null
           preco_venda_rkg?: number
           saldo_repassar_rs?: number | null
           updated_at?: string
           valor_venda_rs?: number | null
+          venda_pela_ibrac?: boolean | null
         }
         Relationships: [
           {
