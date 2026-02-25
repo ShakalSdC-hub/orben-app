@@ -96,7 +96,7 @@ export default function ExtratoDono() {
         .from("vendas_intermediacao")
         .select(`
           id, dt, kg_vendido, nf_venda, preco_venda_rkg, valor_venda_rs,
-          custo_material_dono_rs, comissao_ibrac_rs, saldo_repassar_rs,
+          custo_material_dono_rs, custos_operacao_alocados_rs, comissao_ibrac_rs, saldo_repassar_rs,
           operacao:operacoes_intermediacao!vendas_intermediacao_operacao_id_fkey(
             id, nome, dono_economico_id,
             dono:parceiros!operacoes_intermediacao_dono_economico_id_fkey(id, razao_social, nome_fantasia)
@@ -218,7 +218,7 @@ export default function ExtratoDono() {
         label: 'Intermediação',
         kgTotal: vendasFiltradas.reduce((acc: number, v: any) => acc + (v.kg_vendido || 0), 0),
         valorTotal: vendasFiltradas.reduce((acc: number, v: any) => acc + (v.valor_venda_rs || 0), 0),
-        custoTotal: vendasFiltradas.reduce((acc: number, v: any) => acc + (v.custo_material_dono_rs || 0) + (v.comissao_ibrac_rs || 0), 0),
+        custoTotal: vendasFiltradas.reduce((acc: number, v: any) => acc + (v.custo_material_dono_rs || 0) + (v.custos_operacao_alocados_rs || 0) + (v.comissao_ibrac_rs || 0), 0),
         resultadoTotal: vendasFiltradas.reduce((acc: number, v: any) => acc + (v.saldo_repassar_rs || 0), 0),
         operacoes: vendasFiltradas.length,
       });
@@ -329,6 +329,8 @@ export default function ExtratoDono() {
         "NF": v.nf_venda || '-',
         "Kg": v.kg_vendido,
         "Valor Venda (R$)": v.valor_venda_rs || 0,
+        "Custo Material (R$)": v.custo_material_dono_rs || 0,
+        "Custos Op. (R$)": v.custos_operacao_alocados_rs || 0,
         "Comissão (R$)": v.comissao_ibrac_rs || 0,
         "Repasse Dono (R$)": v.saldo_repassar_rs || 0,
       }));
@@ -528,6 +530,8 @@ export default function ExtratoDono() {
                 <th>NF</th>
                 <th class="text-right">Kg</th>
                 <th class="text-right">Valor Venda</th>
+                <th class="text-right">Custo Mat.</th>
+                <th class="text-right">Custos Op.</th>
                 <th class="text-right">Comissão</th>
                 <th class="text-right">Repasse Dono</th>
               </tr>
@@ -541,6 +545,8 @@ export default function ExtratoDono() {
                   <td>${v.nf_venda || '-'}</td>
                   <td class="text-right">${formatWeight(v.kg_vendido)}</td>
                   <td class="text-right">${formatCurrency(v.valor_venda_rs)}</td>
+                  <td class="text-right">${formatCurrency(v.custo_material_dono_rs)}</td>
+                  <td class="text-right">${formatCurrency(v.custos_operacao_alocados_rs)}</td>
                   <td class="text-right">${formatCurrency(v.comissao_ibrac_rs)}</td>
                   <td class="text-right positive">${formatCurrency(v.saldo_repassar_rs)}</td>
                 </tr>
@@ -935,6 +941,8 @@ export default function ExtratoDono() {
                       <TableHead>NF</TableHead>
                       <TableHead className="text-right">Kg</TableHead>
                       <TableHead className="text-right">Valor</TableHead>
+                      <TableHead className="text-right">Custo Mat.</TableHead>
+                      <TableHead className="text-right">Custos Op.</TableHead>
                       <TableHead className="text-right">Comissão</TableHead>
                       <TableHead className="text-right">Repasse</TableHead>
                     </TableRow>
@@ -948,6 +956,8 @@ export default function ExtratoDono() {
                         <TableCell>{v.nf_venda || '-'}</TableCell>
                         <TableCell className="text-right">{formatWeight(v.kg_vendido)}</TableCell>
                         <TableCell className="text-right">{formatCurrency(v.valor_venda_rs)}</TableCell>
+                        <TableCell className="text-right text-destructive">{formatCurrency(v.custo_material_dono_rs)}</TableCell>
+                        <TableCell className="text-right text-destructive">{formatCurrency(v.custos_operacao_alocados_rs)}</TableCell>
                         <TableCell className="text-right text-warning">{formatCurrency(v.comissao_ibrac_rs)}</TableCell>
                         <TableCell className="text-right text-success">{formatCurrency(v.saldo_repassar_rs)}</TableCell>
                       </TableRow>
