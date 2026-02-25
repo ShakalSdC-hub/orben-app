@@ -1,55 +1,63 @@
 
 
-## Plano: Corrigir Logica de Comparacao no Simulador LME
+## Plano: Exclusao e Campos Adicionais na Venda de Intermediacao
 
-### Problema Identificado
+### Parte 1: Botao de Excluir nas 4 abas (Compras, Benef., Vendas, Custos)
 
-A comparacao entre Vergalhao LME e Custo Industrializado esta usando a variavel errada para determinar o resultado.
+Adicionar botao de excluir (lixeira) ao lado do botao de editar em cada linha das tabelas. A exclusao sera soft delete (`is_deleted = true`), e os triggers existentes no banco ja restauram os saldos automaticamente:
 
-**Situacao atual (com bug):**
-- `diferenca = totalComFinanceiro - precoIndustrializado` (correto: positivo = sucata mais barata)
-- `valeAPena = saldoOperacao > 0` (ERRADO: usa o lucro absoluto da operacao de sucata, nao a comparacao)
-- Cores invertidas: diferenca positiva (sucata mais barata) aparece em vermelho
+- **Vendas**: trigger `fn_restore_benef_on_venda_delete_interm` restaura `kg_disponivel_venda` nos beneficiamentos
+- **Beneficiamentos**: trigger `fn_restore_compra_on_benef_delete_interm` restaura `kg_disponivel_compra` nas compras
+- **Compras**: exclusao direta (soft delete), mas apenas se `kg_disponivel_compra == kg_comprado` (nenhuma alocacao em uso)
+- **Custos**: exclusao direta (soft delete), sem dependencias
 
-**Exemplo do bug:**
-- Vergalhao LME: R$ 78,56/kg
-- Custo Industrializado: R$ 71,47/kg
-- Diferenca: R$ 7,09/kg (sucata e mais barata)
-- Resultado mostrado: "OPERACAO INVIAVEL" / "COMPRAR VERGALHAO" (invertido!)
+Um dialog de confirmacao (`DeleteConfirmDialog`) sera exibido antes de cada exclusao. Apenas usuarios com role `admin` poderao excluir.
 
-### Correcao
+**Arquivo:** `src/pages/OperacoesIntermediacao.tsx`
+- Importar `Trash2` do lucide-react e `DeleteConfirmDialog`
+- Adicionar estados para controlar o dialog de exclusao e o ID do registro
+- Criar mutations de soft delete para cada tabela (4 mutations)
+- Adicionar botao de lixeira em cada linha das 4 tabelas, visivel apenas para admin
+- Validar que compras com alocacoes em uso nao podem ser excluidas
 
-**Arquivo:** `src/pages/Simulador.tsx`
+---
 
-1. **Linha 315** - Alterar a variavel `valeAPena` para usar a comparacao correta:
-   - De: `const valeAPena = saldoOperacao > 0`
-   - Para: `const valeAPena = diferenca > 0`
-   - Quando `diferenca > 0`, o LME e mais caro, logo comprar sucata vale a pena
+### Parte 2: Campos adicionais na Venda (Venda pela IBRAC)
 
-2. **Linha 1461** - Corrigir as cores da "Diferenca":
-   - De: `diferenca > 0 ? "text-destructive" : "text-success"`
-   - Para: `diferenca > 0 ? "text-success" : "text-destructive"`
-   - Diferenca positiva = economia = verde
+#### 2.1 Migracao de banco de dados
 
-3. **Linha 1467** - Corrigir as cores da "Economia":
-   - De: `economiaPct > 0 ? "text-destructive" : "text-success"`
-   - Para: `economiaPct > 0 ? "text-success" : "text-destructive"`
+Adicionar novos campos na tabela `vendas_intermediacao`:
 
-4. **Linhas 1431-1434** - Atualizar texto de lucro/prejuizo para usar `diferenca` em vez de `saldoOperacao`:
-   - Lucro: `diferenca * pesoKg` (economia total em kg)
-   - Prejuizo: quando diferenca negativa (LME mais barato)
+| Coluna | Tipo | Default | Descricao |
+|--------|------|---------|-----------|
+| `venda_pela_ibrac` | boolean | false | Se a venda ocorre pela NF da IBRAC |
+| `comissao_ibrac_pct` | numeric | 0 | % comissao IBRAC sobre valor total NF |
+| `pis_cofins_pct` | numeric | 9.25 | PIS/COFINS fixo em 9,25% |
+| `pis_cofins_rs` | numeric | 0 | Valor calculado PIS/COFINS |
+| `icms_pct` | numeric | 0 | % ICMS informado pelo usuario |
+| `icms_rs` | numeric | 0 | Valor calculado ICMS (nao soma no total) |
 
-5. **Linha 478-480 (PDF)** - Corrigir cores e resultado no PDF exportado:
-   - Diferenca positiva = success (verde)
-   - Resultado: `valeAPena ? "COMPRAR SUCATA" : "COMPRAR VERGALHAO"` (ja usa valeAPena, corrigido pelo item 1)
+#### 2.2 Formulario de Venda (`VendaIntermForm.tsx`)
 
-### Resumo
+- Adicionar switch/checkbox "Venda pela IBRAC"
+- Quando ativado, exibir:
+  1. **Comissao IBRAC (%)** - campo numerico, calcula sobre `valor_venda_rs`
+  2. **PIS/COFINS** - campo fixo 9,25% (editavel), exibe valor calculado automaticamente
+  3. **ICMS (%)** - campo numerico, exibe valor calculado (nao soma no total da operacao)
+- Salvar todos os campos no payload do insert/update
 
-| Local | Bug | Correcao |
-|-------|-----|----------|
-| Linha 315 | `valeAPena = saldoOperacao > 0` | `valeAPena = diferenca > 0` |
-| Linha 1461 | Cor invertida na diferenca | Trocar destructive/success |
-| Linha 1467 | Cor invertida na economia | Trocar destructive/success |
-| Linhas 1431-1434 | Valor lucro/prejuizo usa saldoOperacao | Usar `diferenca * pesoKg` |
-| Linha 478 (PDF) | Cor invertida | Trocar danger/success |
+#### 2.3 Tabela de Vendas
+
+- Adicionar badge "IBRAC" na linha quando `venda_pela_ibrac = true`
+- Mostrar PIS/COFINS e ICMS como colunas ou tooltip informativo
+
+---
+
+### Resumo de arquivos a modificar
+
+| Arquivo | Alteracao |
+|---------|-----------|
+| **Migracao SQL** | Adicionar 6 colunas em `vendas_intermediacao` |
+| `src/pages/OperacoesIntermediacao.tsx` | Botoes de excluir nas 4 abas + badge IBRAC nas vendas |
+| `src/components/operacoes/VendaIntermForm.tsx` | Switch "Venda pela IBRAC" + campos comissao, PIS/COFINS, ICMS |
 
