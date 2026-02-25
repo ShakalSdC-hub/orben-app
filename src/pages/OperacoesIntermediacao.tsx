@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Loader2, ShoppingCart, Cog, TrendingUp, DollarSign, Handshake, Pencil } from "lucide-react";
+import { Plus, Loader2, ShoppingCart, Cog, TrendingUp, DollarSign, Handshake, Pencil, Trash2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -20,11 +20,13 @@ import { CompraIntermForm } from "@/components/operacoes/CompraIntermForm";
 import { BeneficiamentoIntermForm } from "@/components/operacoes/BeneficiamentoIntermForm";
 import { VendaIntermForm } from "@/components/operacoes/VendaIntermForm";
 import { CustoIntermForm } from "@/components/operacoes/CustoIntermForm";
+import { DeleteConfirmDialog } from "@/components/ui/DeleteConfirmDialog";
 
 export default function OperacoesIntermediacao() {
   const queryClient = useQueryClient();
   const { role } = useAuth();
   const canEdit = role === "admin" || role === "operacao";
+  const isAdmin = role === "admin";
   
   const [activeTab, setActiveTab] = useState("operacoes");
   const [isNewOperacao, setIsNewOperacao] = useState(false);
@@ -39,6 +41,9 @@ export default function OperacoesIntermediacao() {
   const [editBenef, setEditBenef] = useState<any>(null);
   const [editVenda, setEditVenda] = useState<any>(null);
   const [editCusto, setEditCusto] = useState<any>(null);
+
+  // Delete states
+  const [deleteTarget, setDeleteTarget] = useState<{ type: string; id: string; label?: string } | null>(null);
   
   const [operacaoForm, setOperacaoForm] = useState({
     nome: "",
@@ -171,6 +176,50 @@ export default function OperacoesIntermediacao() {
     onError: (error) => toast({ title: "Erro", description: error.message, variant: "destructive" }),
   });
 
+  // Delete mutations
+  const deleteMutation = useMutation({
+    mutationFn: async ({ type, id }: { type: string; id: string }) => {
+      let table: string;
+      switch (type) {
+        case "compra": table = "compras_intermediacao"; break;
+        case "benef": table = "beneficiamentos_intermediacao"; break;
+        case "venda": table = "vendas_intermediacao"; break;
+        case "custo": table = "custos_intermediacao"; break;
+        default: throw new Error("Tipo inválido");
+      }
+
+      // Validação: compras com alocações em uso não podem ser excluídas
+      if (type === "compra") {
+        const compra = compras.find(c => c.id === id);
+        if (compra && compra.kg_disponivel_compra !== compra.kg_comprado) {
+          throw new Error("Esta compra possui kg alocados em beneficiamentos. Exclua os beneficiamentos primeiro.");
+        }
+      }
+
+      // Validação: beneficiamentos com vendas alocadas não podem ser excluídos
+      if (type === "benef") {
+        const benef = beneficiamentos.find(b => b.id === id);
+        if (benef && benef.kg_disponivel_venda !== benef.kg_retornado) {
+          throw new Error("Este beneficiamento possui kg alocados em vendas. Exclua as vendas primeiro.");
+        }
+      }
+
+      const { error } = await supabase.from(table as any).update({ is_deleted: true }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["compras_intermediacao"] });
+      queryClient.invalidateQueries({ queryKey: ["beneficiamentos_intermediacao"] });
+      queryClient.invalidateQueries({ queryKey: ["vendas_intermediacao"] });
+      queryClient.invalidateQueries({ queryKey: ["custos_intermediacao"] });
+      setDeleteTarget(null);
+      toast({ title: "Registro excluído com sucesso!" });
+    },
+    onError: (error) => {
+      toast({ title: "Erro ao excluir", description: error.message, variant: "destructive" });
+    },
+  });
+
   // Totais
   const totais = {
     kgComprado: compras.reduce((acc, c) => acc + (c.kg_comprado || 0), 0),
@@ -186,25 +235,10 @@ export default function OperacoesIntermediacao() {
     outrosCustos: custos.reduce((acc, c) => acc + (c.val || 0), 0),
   };
 
-  const handleEditCompra = (compra: any) => {
-    setEditCompra(compra);
-    setShowCompraForm(true);
-  };
-
-  const handleEditBenef = (benef: any) => {
-    setEditBenef(benef);
-    setShowBenefForm(true);
-  };
-
-  const handleEditVenda = (venda: any) => {
-    setEditVenda(venda);
-    setShowVendaForm(true);
-  };
-
-  const handleEditCusto = (custo: any) => {
-    setEditCusto(custo);
-    setShowCustoForm(true);
-  };
+  const handleEditCompra = (compra: any) => { setEditCompra(compra); setShowCompraForm(true); };
+  const handleEditBenef = (benef: any) => { setEditBenef(benef); setShowBenefForm(true); };
+  const handleEditVenda = (venda: any) => { setEditVenda(venda); setShowVendaForm(true); };
+  const handleEditCusto = (custo: any) => { setEditCusto(custo); setShowCustoForm(true); };
 
   return (
     <MainLayout>
@@ -406,6 +440,7 @@ export default function OperacoesIntermediacao() {
                     <TabsTrigger value="custos"><DollarSign className="h-4 w-4 mr-1" /> Custos</TabsTrigger>
                   </TabsList>
 
+                  {/* COMPRAS */}
                   <TabsContent value="compras" className="mt-4">
                     <Card>
                       <CardHeader className="flex flex-row items-center justify-between">
@@ -427,7 +462,7 @@ export default function OperacoesIntermediacao() {
                                 <TableHead className="text-right">R$/kg</TableHead>
                                 <TableHead className="text-right">Valor</TableHead>
                                 <TableHead className="text-right">Saldo</TableHead>
-                                <TableHead className="w-10"></TableHead>
+                                <TableHead className="w-20"></TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -450,11 +485,25 @@ export default function OperacoesIntermediacao() {
                                     </Badge>
                                   </TableCell>
                                   <TableCell>
-                                    {canEdit && (
-                                      <Button variant="ghost" size="icon" onClick={() => handleEditCompra(c)}>
-                                        <Pencil className="h-4 w-4" />
-                                      </Button>
-                                    )}
+                                    <div className="flex gap-1">
+                                      {canEdit && (
+                                        <Button variant="ghost" size="icon" onClick={() => handleEditCompra(c)}>
+                                          <Pencil className="h-4 w-4" />
+                                        </Button>
+                                      )}
+                                      {isAdmin && (
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="text-destructive hover:text-destructive"
+                                          disabled={c.kg_disponivel_compra !== c.kg_comprado}
+                                          title={c.kg_disponivel_compra !== c.kg_comprado ? "Exclua os beneficiamentos primeiro" : "Excluir"}
+                                          onClick={() => setDeleteTarget({ type: "compra", id: c.id })}
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      )}
+                                    </div>
                                   </TableCell>
                                 </TableRow>
                               ))}
@@ -465,6 +514,7 @@ export default function OperacoesIntermediacao() {
                     </Card>
                   </TabsContent>
 
+                  {/* BENEFICIAMENTOS */}
                   <TabsContent value="beneficiamentos" className="mt-4">
                     <Card>
                       <CardHeader className="flex flex-row items-center justify-between">
@@ -485,7 +535,7 @@ export default function OperacoesIntermediacao() {
                                 <TableHead className="text-right">Retornado</TableHead>
                                 <TableHead className="text-right">Custos</TableHead>
                                 <TableHead className="text-right">Saldo</TableHead>
-                                <TableHead className="w-10"></TableHead>
+                                <TableHead className="w-20"></TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -519,11 +569,25 @@ export default function OperacoesIntermediacao() {
                                       </Badge>
                                     </TableCell>
                                     <TableCell>
-                                      {canEdit && (
-                                        <Button variant="ghost" size="icon" onClick={() => handleEditBenef(b)}>
-                                          <Pencil className="h-4 w-4" />
-                                        </Button>
-                                      )}
+                                      <div className="flex gap-1">
+                                        {canEdit && (
+                                          <Button variant="ghost" size="icon" onClick={() => handleEditBenef(b)}>
+                                            <Pencil className="h-4 w-4" />
+                                          </Button>
+                                        )}
+                                        {isAdmin && (
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="text-destructive hover:text-destructive"
+                                            disabled={b.kg_disponivel_venda !== b.kg_retornado}
+                                            title={b.kg_disponivel_venda !== b.kg_retornado ? "Exclua as vendas primeiro" : "Excluir"}
+                                            onClick={() => setDeleteTarget({ type: "benef", id: b.id })}
+                                          >
+                                            <Trash2 className="h-4 w-4" />
+                                          </Button>
+                                        )}
+                                      </div>
                                     </TableCell>
                                   </TableRow>
                                 );
@@ -535,6 +599,7 @@ export default function OperacoesIntermediacao() {
                     </Card>
                   </TabsContent>
 
+                  {/* VENDAS */}
                   <TabsContent value="vendas" className="mt-4">
                     <Card>
                       <CardHeader className="flex flex-row items-center justify-between">
@@ -554,24 +619,41 @@ export default function OperacoesIntermediacao() {
                                 <TableHead className="text-right">Receita</TableHead>
                                 <TableHead className="text-right">Comissão</TableHead>
                                 <TableHead className="text-right">Repasse</TableHead>
-                                <TableHead className="w-10"></TableHead>
+                                <TableHead className="w-20"></TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {vendas.map((v) => (
+                              {vendas.map((v: any) => (
                                 <TableRow key={v.id}>
-                                  <TableCell>{format(new Date(v.dt), "dd/MM/yy")}</TableCell>
+                                  <TableCell>
+                                    <div className="flex items-center gap-2">
+                                      {format(new Date(v.dt), "dd/MM/yy")}
+                                      {v.venda_pela_ibrac && <Badge variant="outline" className="text-xs">IBRAC</Badge>}
+                                    </div>
+                                  </TableCell>
                                   <TableCell>{v.cliente?.razao_social || "-"}</TableCell>
                                   <TableCell className="text-right">{formatWeight(v.kg_vendido)}</TableCell>
                                   <TableCell className="text-right">{formatCurrency(v.valor_venda_rs || 0)}</TableCell>
                                   <TableCell className="text-right text-success">{formatCurrency(v.comissao_ibrac_rs || 0)}</TableCell>
                                   <TableCell className="text-right">{formatCurrency(v.saldo_repassar_rs || 0)}</TableCell>
                                   <TableCell>
-                                    {canEdit && (
-                                      <Button variant="ghost" size="icon" onClick={() => handleEditVenda(v)}>
-                                        <Pencil className="h-4 w-4" />
-                                      </Button>
-                                    )}
+                                    <div className="flex gap-1">
+                                      {canEdit && (
+                                        <Button variant="ghost" size="icon" onClick={() => handleEditVenda(v)}>
+                                          <Pencil className="h-4 w-4" />
+                                        </Button>
+                                      )}
+                                      {isAdmin && (
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="text-destructive hover:text-destructive"
+                                          onClick={() => setDeleteTarget({ type: "venda", id: v.id })}
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      )}
+                                    </div>
                                   </TableCell>
                                 </TableRow>
                               ))}
@@ -582,6 +664,7 @@ export default function OperacoesIntermediacao() {
                     </Card>
                   </TabsContent>
 
+                  {/* CUSTOS */}
                   <TabsContent value="custos" className="mt-4">
                     <Card>
                       <CardHeader className="flex flex-row items-center justify-between">
@@ -599,7 +682,7 @@ export default function OperacoesIntermediacao() {
                                 <TableHead>Categoria</TableHead>
                                 <TableHead>Documento</TableHead>
                                 <TableHead className="text-right">Valor</TableHead>
-                                <TableHead className="w-10"></TableHead>
+                                <TableHead className="w-20"></TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -610,11 +693,23 @@ export default function OperacoesIntermediacao() {
                                   <TableCell>{c.documento || "-"}</TableCell>
                                   <TableCell className="text-right">{formatCurrency(c.val)}</TableCell>
                                   <TableCell>
-                                    {canEdit && (
-                                      <Button variant="ghost" size="icon" onClick={() => handleEditCusto(c)}>
-                                        <Pencil className="h-4 w-4" />
-                                      </Button>
-                                    )}
+                                    <div className="flex gap-1">
+                                      {canEdit && (
+                                        <Button variant="ghost" size="icon" onClick={() => handleEditCusto(c)}>
+                                          <Pencil className="h-4 w-4" />
+                                        </Button>
+                                      )}
+                                      {isAdmin && (
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="text-destructive hover:text-destructive"
+                                          onClick={() => setDeleteTarget({ type: "custo", id: c.id })}
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      )}
+                                    </div>
                                   </TableCell>
                                 </TableRow>
                               ))}
@@ -661,6 +756,14 @@ export default function OperacoesIntermediacao() {
             />
           </>
         )}
+
+        {/* Delete Dialog */}
+        <DeleteConfirmDialog
+          open={!!deleteTarget}
+          onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+          onConfirm={() => { if (deleteTarget) deleteMutation.mutate(deleteTarget); }}
+          isLoading={deleteMutation.isPending}
+        />
       </div>
     </MainLayout>
   );

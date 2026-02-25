@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -17,6 +18,10 @@ interface VendaInterm {
   nf_venda: string | null;
   kg_vendido: number;
   preco_venda_rkg: number;
+  venda_pela_ibrac?: boolean;
+  comissao_ibrac_pct?: number;
+  pis_cofins_pct?: number;
+  icms_pct?: number;
 }
 
 interface VendaIntermFormProps {
@@ -36,6 +41,10 @@ export function VendaIntermForm({ open, onOpenChange, operacaoId, kgDisponivel, 
     nf_venda: "",
     kg_vendido: 0,
     preco_venda_rkg: 0,
+    venda_pela_ibrac: false,
+    comissao_ibrac_pct: 0,
+    pis_cofins_pct: 9.25,
+    icms_pct: 0,
   });
 
   useEffect(() => {
@@ -47,9 +56,13 @@ export function VendaIntermForm({ open, onOpenChange, operacaoId, kgDisponivel, 
           nf_venda: editData.nf_venda || "",
           kg_vendido: editData.kg_vendido,
           preco_venda_rkg: editData.preco_venda_rkg,
+          venda_pela_ibrac: editData.venda_pela_ibrac || false,
+          comissao_ibrac_pct: editData.comissao_ibrac_pct || 0,
+          pis_cofins_pct: editData.pis_cofins_pct ?? 9.25,
+          icms_pct: editData.icms_pct || 0,
         });
       } else {
-        setForm({ dt: format(new Date(), "yyyy-MM-dd"), cliente_id: "", nf_venda: "", kg_vendido: 0, preco_venda_rkg: 0 });
+        setForm({ dt: format(new Date(), "yyyy-MM-dd"), cliente_id: "", nf_venda: "", kg_vendido: 0, preco_venda_rkg: 0, venda_pela_ibrac: false, comissao_ibrac_pct: 0, pis_cofins_pct: 9.25, icms_pct: 0 });
       }
     }
   }, [open, editData]);
@@ -65,14 +78,25 @@ export function VendaIntermForm({ open, onOpenChange, operacaoId, kgDisponivel, 
     },
   });
 
+  const valorTotal = form.kg_vendido * form.preco_venda_rkg;
+  const comissaoIbracRs = form.venda_pela_ibrac ? valorTotal * (form.comissao_ibrac_pct / 100) : 0;
+  const pisCofinsRs = form.venda_pela_ibrac ? valorTotal * (form.pis_cofins_pct / 100) : 0;
+  const icmsRs = form.venda_pela_ibrac ? valorTotal * (form.icms_pct / 100) : 0;
+
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const payload = {
+      const payload: any = {
         dt: form.dt,
         cliente_id: form.cliente_id || null,
         nf_venda: form.nf_venda || null,
         kg_vendido: form.kg_vendido,
         preco_venda_rkg: form.preco_venda_rkg,
+        venda_pela_ibrac: form.venda_pela_ibrac,
+        comissao_ibrac_pct: form.venda_pela_ibrac ? form.comissao_ibrac_pct : 0,
+        pis_cofins_pct: form.venda_pela_ibrac ? form.pis_cofins_pct : 0,
+        pis_cofins_rs: pisCofinsRs,
+        icms_pct: form.venda_pela_ibrac ? form.icms_pct : 0,
+        icms_rs: icmsRs,
       };
 
       if (editData) {
@@ -91,8 +115,6 @@ export function VendaIntermForm({ open, onOpenChange, operacaoId, kgDisponivel, 
     },
     onError: (error) => toast({ title: "Erro", description: error.message, variant: "destructive" }),
   });
-
-  const valorTotal = form.kg_vendido * form.preco_venda_rkg;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -150,6 +172,64 @@ export function VendaIntermForm({ open, onOpenChange, operacaoId, kgDisponivel, 
           {valorTotal > 0 && (
             <div className="p-3 bg-muted rounded-lg text-sm">
               Valor total: <strong>R$ {valorTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong>
+            </div>
+          )}
+
+          {/* Venda pela IBRAC */}
+          <div className="flex items-center justify-between border rounded-lg p-3">
+            <Label htmlFor="venda-ibrac" className="cursor-pointer">Venda pela IBRAC</Label>
+            <Switch
+              id="venda-ibrac"
+              checked={form.venda_pela_ibrac}
+              onCheckedChange={(checked) => setForm({ ...form, venda_pela_ibrac: checked })}
+            />
+          </div>
+
+          {form.venda_pela_ibrac && (
+            <div className="space-y-3 border rounded-lg p-3 bg-muted/50">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Comissão IBRAC (%)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={form.comissao_ibrac_pct}
+                    onChange={(e) => setForm({ ...form, comissao_ibrac_pct: Number(e.target.value) })}
+                  />
+                  {comissaoIbracRs > 0 && (
+                    <p className="text-xs text-muted-foreground mt-1">= R$ {comissaoIbracRs.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
+                  )}
+                </div>
+                <div>
+                  <Label>PIS/COFINS (%)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={form.pis_cofins_pct}
+                    onChange={(e) => setForm({ ...form, pis_cofins_pct: Number(e.target.value) })}
+                  />
+                  {pisCofinsRs > 0 && (
+                    <p className="text-xs text-muted-foreground mt-1">= R$ {pisCofinsRs.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
+                  )}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>ICMS (%)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={form.icms_pct}
+                    onChange={(e) => setForm({ ...form, icms_pct: Number(e.target.value) })}
+                  />
+                  {icmsRs > 0 && (
+                    <p className="text-xs text-muted-foreground mt-1">= R$ {icmsRs.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</p>
+                  )}
+                </div>
+                <div className="flex items-end">
+                  <p className="text-xs text-muted-foreground pb-2">ICMS é apenas informativo, não soma no total da operação.</p>
+                </div>
+              </div>
             </div>
           )}
         </div>
