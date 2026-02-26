@@ -20,6 +20,8 @@ interface CompraInterm {
   preco_compra_rkg: number;
   tipo_material: string | null;
   compra_pela_ibrac?: boolean;
+  perda_mel_pct?: number;
+  perda_mista_pct?: number;
 }
 
 interface CompraIntermFormProps {
@@ -40,6 +42,8 @@ export function CompraIntermForm({ open, onOpenChange, operacaoId, editData }: C
     preco_compra_rkg: 0,
     tipo_material: "MEL",
     compra_pela_ibrac: true,
+    perda_mel_pct: 5,
+    perda_mista_pct: 10,
   });
 
   useEffect(() => {
@@ -53,9 +57,11 @@ export function CompraIntermForm({ open, onOpenChange, operacaoId, editData }: C
           preco_compra_rkg: editData.preco_compra_rkg,
           tipo_material: editData.tipo_material || "MEL",
           compra_pela_ibrac: editData.compra_pela_ibrac ?? true,
+          perda_mel_pct: (editData.perda_mel_pct ?? 0.05) * 100,
+          perda_mista_pct: (editData.perda_mista_pct ?? 0.10) * 100,
         });
       } else {
-        setForm({ dt: format(new Date(), "yyyy-MM-dd"), fornecedor_compra_id: "", nf_compra: "", kg_comprado: 0, preco_compra_rkg: 0, tipo_material: "MEL", compra_pela_ibrac: true });
+        setForm({ dt: format(new Date(), "yyyy-MM-dd"), fornecedor_compra_id: "", nf_compra: "", kg_comprado: 0, preco_compra_rkg: 0, tipo_material: "MEL", compra_pela_ibrac: true, perda_mel_pct: 5, perda_mista_pct: 10 });
       }
     }
   }, [open, editData]);
@@ -79,6 +85,8 @@ export function CompraIntermForm({ open, onOpenChange, operacaoId, editData }: C
         preco_compra_rkg: form.preco_compra_rkg,
         tipo_material: form.tipo_material,
         compra_pela_ibrac: form.compra_pela_ibrac,
+        perda_mel_pct: form.perda_mel_pct / 100,
+        perda_mista_pct: form.perda_mista_pct / 100,
       };
 
       if (editData) {
@@ -98,6 +106,8 @@ export function CompraIntermForm({ open, onOpenChange, operacaoId, editData }: C
   });
 
   const valorTotal = form.kg_comprado * form.preco_compra_rkg;
+  const perdaAtiva = form.tipo_material === "MEL" ? form.perda_mel_pct : form.perda_mista_pct;
+  const previsaoRetorno = form.kg_comprado * (1 - perdaAtiva / 100);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -158,6 +168,17 @@ export function CompraIntermForm({ open, onOpenChange, operacaoId, editData }: C
 
           <div className="grid grid-cols-2 gap-4">
             <div>
+              <Label>% Perda Mel</Label>
+              <Input type="number" step="0.1" value={form.perda_mel_pct} onChange={(e) => setForm({ ...form, perda_mel_pct: Number(e.target.value) })} />
+            </div>
+            <div>
+              <Label>% Perda Mista</Label>
+              <Input type="number" step="0.1" value={form.perda_mista_pct} onChange={(e) => setForm({ ...form, perda_mista_pct: Number(e.target.value) })} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
               <Label>Kg Comprado</Label>
               <Input type="number" value={form.kg_comprado} onChange={(e) => setForm({ ...form, kg_comprado: Number(e.target.value) })} />
             </div>
@@ -168,8 +189,11 @@ export function CompraIntermForm({ open, onOpenChange, operacaoId, editData }: C
           </div>
 
           {valorTotal > 0 && (
-            <div className="p-3 bg-muted rounded-lg text-sm">
-              Valor total: <strong>R$ {valorTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong>
+            <div className="p-3 bg-muted rounded-lg text-sm space-y-1">
+              <div>Valor total: <strong>R$ {valorTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</strong></div>
+              {form.kg_comprado > 0 && (
+                <div>Previsão retorno: <strong>{previsaoRetorno.toLocaleString("pt-BR", { minimumFractionDigits: 1 })} kg</strong> <span className="text-muted-foreground">(perda {perdaAtiva}%)</span></div>
+              )}
             </div>
           )}
         </div>

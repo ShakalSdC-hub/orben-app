@@ -576,6 +576,8 @@ export type Database = {
           kg_disponivel_compra: number | null
           nf_compra: string | null
           operacao_id: string
+          perda_mel_pct: number | null
+          perda_mista_pct: number | null
           preco_compra_rkg: number
           tipo_material: string | null
           updated_at: string
@@ -592,6 +594,8 @@ export type Database = {
           kg_disponivel_compra?: number | null
           nf_compra?: string | null
           operacao_id: string
+          perda_mel_pct?: number | null
+          perda_mista_pct?: number | null
           preco_compra_rkg: number
           tipo_material?: string | null
           updated_at?: string
@@ -608,6 +612,8 @@ export type Database = {
           kg_disponivel_compra?: number | null
           nf_compra?: string | null
           operacao_id?: string
+          perda_mel_pct?: number | null
+          perda_mista_pct?: number | null
           preco_compra_rkg?: number
           tipo_material?: string | null
           updated_at?: string
