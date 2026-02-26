@@ -1,60 +1,46 @@
 
 
-## Plano: Previsao de Retorno no Card "Em Beneficiamento"
+## Correcao: Comissao IBRAC calculando incorretamente
 
-### Objetivo
+### Problema Identificado
 
-Adicionar campos de perda prevista (% Perda Mel e % Perda Mista) na compra de material, para que o card "Em Beneficiamento" mostre a previsao do vergalhao que ira retornar, descontando as perdas esperadas.
+O trigger `fn_allocate_venda_from_benef` sempre calcula a comissao usando `comissao_mode` e `comissao_val` da tabela `operacoes_intermediacao`, independentemente de a venda ser pela IBRAC ou nao.
 
-### Alteracoes
+O formulario de venda (`VendaIntermForm`) tem os campos `venda_pela_ibrac` e `comissao_ibrac_pct`, mas o trigger ignora esses valores e usa a comissao fixa da operacao.
 
-#### 1. Banco de Dados - Migracao SQL
+Alem disso, a formula correta da comissao e: **% x Valor Total da NF (valor_venda_rs)**, usando o percentual informado na propria venda (`comissao_ibrac_pct`).
 
-Adicionar duas colunas na tabela `compras_intermediacao`:
+### Solucao
 
-| Coluna | Tipo | Default |
-|--------|------|---------|
-| `perda_mel_pct` | numeric | 0.05 (5%) |
-| `perda_mista_pct` | numeric | 0.10 (10%) |
+#### 1. Migracao SQL - Atualizar o trigger `fn_allocate_venda_from_benef`
 
-Esses valores representam a previsao de perda no beneficiamento para cada tipo de material.
+Alterar o calculo da comissao para:
+- Se `venda_pela_ibrac = false`: comissao = 0
+- Se `venda_pela_ibrac = true`: comissao = `valor_venda_rs * (comissao_ibrac_pct / 100)`
 
-#### 2. Formulario de Compra (`CompraIntermForm.tsx`)
+Usar os campos da propria venda (`NEW.venda_pela_ibrac` e `NEW.comissao_ibrac_pct`) em vez dos campos da operacao (`comissao_mode` / `comissao_val`).
 
-Adicionar dois campos numericos abaixo do tipo de material:
-- **% Perda Mel** (default 5) - visivel/editavel quando tipo = MEL
-- **% Perda Mista** (default 10) - visivel/editavel quando tipo = MISTA
+Remover a consulta a `operacoes_intermediacao` para buscar `comissao_mode` e `comissao_val`, pois nao sera mais necessaria.
 
-Ambos sempre salvos no registro, mas o campo relevante depende do `tipo_material`.
-
-Exibir preview: "Previsao retorno: X kg" calculado como:
-- Se MEL: `kg_comprado * (1 - perda_mel_pct/100)`
-- Se MISTA: `kg_comprado * (1 - perda_mista_pct/100)`
-
-#### 3. Calculo do Card "Em Beneficiamento" (`OperacoesIntermediacao.tsx`)
-
-Alterar o calculo de `kgComprado - kgBeneficiado` para considerar a perda prevista:
+Nova logica:
 
 ```text
-kgEmBenefPrevisto = compras que ainda nao foram beneficiadas (kg_disponivel_compra > 0)
-  SUM de: kg_disponivel_compra * (1 - perda aplicavel conforme tipo_material)
-
-Valor do card = kgEmBenefPrevisto (previsao de retorno do que esta em beneficiamento)
-Subtitulo: "Previsao retorno (com perdas)"
+SE venda_pela_ibrac = true:
+  v_comissao_ibrac = v_valor_venda * (NEW.comissao_ibrac_pct / 100)
+SENAO:
+  v_comissao_ibrac = 0
 ```
 
-Adicionar um novo campo nos totais:
-- `kgEmBenefPrevistoRetorno`: soma do kg disponivel de cada compra multiplicado por (1 - perda%), agrupado pelo tipo de material
+Incluir UPDATE para recalcular vendas existentes com a nova logica.
 
-#### 4. Tabela de Compras (`OperacoesIntermediacao.tsx`)
+#### 2. Nenhuma alteracao no frontend
 
-Adicionar coluna "Perda %" na tabela de compras mostrando a perda aplicavel conforme o tipo do material.
+O formulario `VendaIntermForm` ja possui os campos corretos (`venda_pela_ibrac`, `comissao_ibrac_pct`). Apenas o trigger precisa ser corrigido para usa-los.
 
 ### Resumo de arquivos
 
 | Arquivo / Local | Alteracao |
 |-----------------|-----------|
-| Migracao SQL | Adicionar `perda_mel_pct` e `perda_mista_pct` em `compras_intermediacao` |
-| `CompraIntermForm.tsx` | Campos de % Perda Mel e % Perda Mista + preview de retorno |
-| `OperacoesIntermediacao.tsx` | Card "Em Beneficiamento" com calculo de previsao de retorno descontando perdas; coluna "Perda %" na tabela |
+| Migracao SQL | Reescrever calculo de comissao no trigger `fn_allocate_venda_from_benef` para usar campos da venda |
+| Migracao SQL | UPDATE para recalcular vendas existentes |
 
