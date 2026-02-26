@@ -406,6 +406,15 @@ export default function OperacoesIntermediacao() {
                   </Card>
                   <Card>
                     <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium text-muted-foreground">Em Beneficiamento</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{formatWeight(totais.kgComprado - totais.kgBeneficiado)}</div>
+                      <p className="text-xs text-muted-foreground">Compras − Beneficiado</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="pb-2">
                       <CardTitle className="text-sm font-medium text-muted-foreground">Beneficiado</CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -428,14 +437,6 @@ export default function OperacoesIntermediacao() {
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold text-success">{formatCurrency(totais.comissaoIbrac)}</div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium text-muted-foreground">Repasse Dono</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">{formatCurrency(totais.repasseDono)}</div>
                     </CardContent>
                   </Card>
                 </div>
