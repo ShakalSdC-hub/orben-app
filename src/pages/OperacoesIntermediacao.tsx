@@ -233,6 +233,14 @@ export default function OperacoesIntermediacao() {
     comissaoIbrac: vendas.reduce((acc, v) => acc + (v.comissao_ibrac_rs || 0), 0),
     repasseDono: vendas.reduce((acc, v) => acc + (v.saldo_repassar_rs || 0), 0),
     outrosCustos: custos.reduce((acc, c) => acc + (c.val || 0), 0),
+    kgEmBenefPrevistoRetorno: compras.reduce((acc, c) => {
+      const disp = c.kg_disponivel_compra || 0;
+      if (disp <= 0) return acc;
+      const perda = c.tipo_material === "MISTA" 
+        ? ((c as any).perda_mista_pct ?? 0.10) 
+        : ((c as any).perda_mel_pct ?? 0.05);
+      return acc + disp * (1 - perda);
+    }, 0),
   };
 
   const handleEditCompra = (compra: any) => { setEditCompra(compra); setShowCompraForm(true); };
@@ -409,8 +417,8 @@ export default function OperacoesIntermediacao() {
                       <CardTitle className="text-sm font-medium text-muted-foreground">Em Beneficiamento</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">{formatWeight(totais.kgComprado - totais.kgBeneficiado)}</div>
-                      <p className="text-xs text-muted-foreground">Compras − Beneficiado</p>
+                      <div className="text-2xl font-bold">{formatWeight(totais.kgEmBenefPrevistoRetorno)}</div>
+                      <p className="text-xs text-muted-foreground">Previsão retorno (com perdas)</p>
                     </CardContent>
                   </Card>
                   <Card>
@@ -469,6 +477,7 @@ export default function OperacoesIntermediacao() {
                                 <TableHead>NF</TableHead>
                                 <TableHead>Tipo</TableHead>
                                 <TableHead className="text-right">Kg</TableHead>
+                                <TableHead className="text-right">Perda %</TableHead>
                                 <TableHead className="text-right">R$/kg</TableHead>
                                 <TableHead className="text-right">Valor</TableHead>
                                 <TableHead className="text-right">Saldo</TableHead>
@@ -492,6 +501,9 @@ export default function OperacoesIntermediacao() {
                                     </div>
                                   </TableCell>
                                   <TableCell className="text-right">{formatWeight(c.kg_comprado)}</TableCell>
+                                  <TableCell className="text-right">
+                                    {((c.tipo_material === "MISTA" ? ((c as any).perda_mista_pct ?? 0.10) : ((c as any).perda_mel_pct ?? 0.05)) * 100).toFixed(1)}%
+                                  </TableCell>
                                   <TableCell className="text-right">{formatCurrency(c.preco_compra_rkg)}</TableCell>
                                   <TableCell className="text-right">{formatCurrency(c.valor_compra_rs || 0)}</TableCell>
                                   <TableCell className="text-right">
