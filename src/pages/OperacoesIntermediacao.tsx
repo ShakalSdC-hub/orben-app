@@ -394,7 +394,7 @@ export default function OperacoesIntermediacao() {
             ) : (
               <>
                 {/* KPIs */}
-                <div className="grid gap-4 md:grid-cols-4">
+                <div className="grid gap-4 md:grid-cols-5">
                   <Card>
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm font-medium text-muted-foreground">Compras</CardTitle>
@@ -402,6 +402,15 @@ export default function OperacoesIntermediacao() {
                     <CardContent>
                       <div className="text-2xl font-bold">{formatWeight(totais.kgComprado)}</div>
                       <p className="text-xs text-muted-foreground">{formatCurrency(totais.valorCompras)}</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium text-muted-foreground">Beneficiado</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{formatWeight(totais.kgBeneficiado)}</div>
+                      <p className="text-xs text-muted-foreground">Disp. venda: {formatWeight(totais.kgDisponivelVenda)}</p>
                     </CardContent>
                   </Card>
                   <Card>
