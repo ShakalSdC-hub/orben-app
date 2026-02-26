@@ -1,91 +1,60 @@
 
 
-## Plano: "Compra pela IBRAC" na Compra de Intermediacao
+## Plano: Previsao de Retorno no Card "Em Beneficiamento"
 
-### Contexto do Problema
+### Objetivo
 
-Atualmente, o trigger `fn_allocate_venda_from_benef` sempre desconta o custo do material do repasse ao dono:
-
-```
-saldo_repassar = valor_venda - custo_material - comissao
-```
-
-Porem, quando o **Renato compra diretamente** a sucata (com dinheiro dele), o custo do material nao deve ser descontado do repasse, pois ele ja pagou. A IBRAC apenas intermedia o beneficiamento (MO). Nesse caso:
-
-```
-Repasse = Valor Venda - Custos Beneficiamento - Custos Operacao - Comissao
-```
-
-Quando a **IBRAC compra** (usando NF da IBRAC), ai sim o custo do material e descontado:
-
-```
-Repasse = Valor Venda - Custo Material - Custos Beneficiamento - Custos Operacao - Comissao
-```
-
----
+Adicionar campos de perda prevista (% Perda Mel e % Perda Mista) na compra de material, para que o card "Em Beneficiamento" mostre a previsao do vergalhao que ira retornar, descontando as perdas esperadas.
 
 ### Alteracoes
 
-#### 1. Migracao de Banco de Dados
+#### 1. Banco de Dados - Migracao SQL
 
-**Adicionar coluna na tabela `compras_intermediacao`:**
+Adicionar duas colunas na tabela `compras_intermediacao`:
 
-| Coluna | Tipo | Default | Descricao |
-|--------|------|---------|-----------|
-| `compra_pela_ibrac` | boolean | true | Se a IBRAC comprou (NF IBRAC) ou se o dono comprou direto |
+| Coluna | Tipo | Default |
+|--------|------|---------|
+| `perda_mel_pct` | numeric | 0.05 (5%) |
+| `perda_mista_pct` | numeric | 0.10 (10%) |
 
-#### 2. Atualizar Trigger `fn_allocate_venda_from_benef`
+Esses valores representam a previsao de perda no beneficiamento para cada tipo de material.
 
-Modificar o calculo de `v_custo_material` para considerar apenas compras onde `compra_pela_ibrac = true`. Quando o dono comprou direto, o custo do material nao entra no calculo do repasse.
+#### 2. Formulario de Compra (`CompraIntermForm.tsx`)
 
-Tambem incluir no calculo:
-- **Custos de beneficiamento** proporcionais (via `beneficiamentos_intermediacao.custos_benef_total_rs`)
-- **Custos da operacao** proporcionais (via `custos_intermediacao`)
+Adicionar dois campos numericos abaixo do tipo de material:
+- **% Perda Mel** (default 5) - visivel/editavel quando tipo = MEL
+- **% Perda Mista** (default 10) - visivel/editavel quando tipo = MISTA
 
-Nova formula:
+Ambos sempre salvos no registro, mas o campo relevante depende do `tipo_material`.
+
+Exibir preview: "Previsao retorno: X kg" calculado como:
+- Se MEL: `kg_comprado * (1 - perda_mel_pct/100)`
+- Se MISTA: `kg_comprado * (1 - perda_mista_pct/100)`
+
+#### 3. Calculo do Card "Em Beneficiamento" (`OperacoesIntermediacao.tsx`)
+
+Alterar o calculo de `kgComprado - kgBeneficiado` para considerar a perda prevista:
 
 ```text
-v_custo_material = SUM apenas das compras onde compra_pela_ibrac = true
-v_custos_benef = custos proporcionais dos beneficiamentos alocados
-v_custos_operacao = custos_intermediacao da operacao, proporcional ao kg vendido
-v_saldo_repassar = valor_venda - v_custo_material - v_custos_benef - v_custos_operacao - v_comissao_ibrac
+kgEmBenefPrevisto = compras que ainda nao foram beneficiadas (kg_disponivel_compra > 0)
+  SUM de: kg_disponivel_compra * (1 - perda aplicavel conforme tipo_material)
+
+Valor do card = kgEmBenefPrevisto (previsao de retorno do que esta em beneficiamento)
+Subtitulo: "Previsao retorno (com perdas)"
 ```
 
-Gravar `custos_operacao_alocados_rs = v_custos_benef + v_custos_operacao`.
-
-Incluir UPDATE para recalcular vendas existentes.
-
-#### 3. Formulario de Compra (`CompraIntermForm.tsx`)
-
-- Adicionar switch "Compra pela IBRAC" (default: true)
-- Quando desativado, indica que o dono comprou direto e a IBRAC so intermedia a MO
-- Salvar `compra_pela_ibrac` no payload
+Adicionar um novo campo nos totais:
+- `kgEmBenefPrevistoRetorno`: soma do kg disponivel de cada compra multiplicado por (1 - perda%), agrupado pelo tipo de material
 
 #### 4. Tabela de Compras (`OperacoesIntermediacao.tsx`)
 
-- Exibir badge "IBRAC" ou "DONO" na linha da compra conforme o valor de `compra_pela_ibrac`
+Adicionar coluna "Perda %" na tabela de compras mostrando a perda aplicavel conforme o tipo do material.
 
-#### 5. Extrato por Dono (`ExtratoDono.tsx`)
-
-- Incluir `custos_operacao_alocados_rs` na query de vendas
-- Atualizar `custoTotal` da Intermediacao para:
-
-```text
-custoTotal = custo_material_dono_rs + custos_operacao_alocados_rs + comissao_ibrac_rs
-```
-
-- Adicionar coluna "Custos Op." na tabela de Intermediacao
-
----
-
-### Resumo de arquivos a modificar
+### Resumo de arquivos
 
 | Arquivo / Local | Alteracao |
 |-----------------|-----------|
-| Migracao SQL | Adicionar `compra_pela_ibrac` em `compras_intermediacao` |
-| Migracao SQL | Reescrever `fn_allocate_venda_from_benef` para filtrar custo material por `compra_pela_ibrac` e incluir custos benef + operacao |
-| Migracao SQL | UPDATE para recalcular vendas existentes |
-| `src/components/operacoes/CompraIntermForm.tsx` | Switch "Compra pela IBRAC" |
-| `src/pages/OperacoesIntermediacao.tsx` | Badge IBRAC/DONO na aba Compras |
-| `src/pages/ExtratoDono.tsx` | Query + custoTotal + coluna custos operacao |
+| Migracao SQL | Adicionar `perda_mel_pct` e `perda_mista_pct` em `compras_intermediacao` |
+| `CompraIntermForm.tsx` | Campos de % Perda Mel e % Perda Mista + preview de retorno |
+| `OperacoesIntermediacao.tsx` | Card "Em Beneficiamento" com calculo de previsao de retorno descontando perdas; coluna "Perda %" na tabela |
 
