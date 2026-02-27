@@ -233,15 +233,15 @@ export default function OperacoesIntermediacao() {
     comissaoIbrac: vendas.reduce((acc, v) => acc + (v.comissao_ibrac_rs || 0), 0),
     repasseDono: vendas.reduce((acc, v) => acc + (v.saldo_repassar_rs || 0), 0),
     outrosCustos: custos.reduce((acc, c) => acc + (c.val || 0), 0),
-    kgEmBenefPrevistoRetorno: compras.reduce((acc, c) => {
-      const disp = c.kg_disponivel_compra || 0;
-      if (disp <= 0) return acc;
+    totalPerdas: compras.reduce((acc, c) => {
       const perda = c.tipo_material === "MISTA" 
         ? ((c as any).perda_mista_pct ?? 0.10) 
         : ((c as any).perda_mel_pct ?? 0.05);
-      return acc + disp * (1 - perda);
+      return acc + (c.kg_comprado || 0) * perda;
     }, 0),
   };
+
+  const kgEnvBeneficiamento = totais.kgComprado - totais.totalPerdas;
 
   const handleEditCompra = (compra: any) => { setEditCompra(compra); setShowCompraForm(true); };
   const handleEditBenef = (benef: any) => { setEditBenef(benef); setShowBenefForm(true); };
@@ -402,8 +402,8 @@ export default function OperacoesIntermediacao() {
             ) : (
               <>
                 {/* KPIs */}
-                <div className="grid gap-4 md:grid-cols-5">
-                  <Card>
+                <div className="grid gap-4 md:grid-cols-3">
+                  <Card className="p-1">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm font-medium text-muted-foreground">Compras</CardTitle>
                     </CardHeader>
@@ -412,25 +412,34 @@ export default function OperacoesIntermediacao() {
                       <p className="text-xs text-muted-foreground">{formatCurrency(totais.valorCompras)}</p>
                     </CardContent>
                   </Card>
-                  <Card>
+                  <Card className="p-1">
                     <CardHeader className="pb-2">
-                      <CardTitle className="text-sm font-medium text-muted-foreground">Em Beneficiamento</CardTitle>
+                      <CardTitle className="text-sm font-medium text-muted-foreground">Env. Beneficiamento</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">{formatWeight(totais.kgEmBenefPrevistoRetorno)}</div>
-                      <p className="text-xs text-muted-foreground">Previsão retorno (com perdas)</p>
+                      <div className="text-2xl font-bold">{formatWeight(kgEnvBeneficiamento)}</div>
+                      <p className="text-xs text-muted-foreground">Perdas previstas: {formatWeight(totais.totalPerdas)}</p>
                     </CardContent>
                   </Card>
-                  <Card>
+                  <Card className="p-1">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm font-medium text-muted-foreground">Beneficiado</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">{formatWeight(totais.kgBeneficiado)}</div>
-                      <p className="text-xs text-muted-foreground">Disp. venda: {formatWeight(totais.kgDisponivelVenda)}</p>
+                      <p className="text-xs text-muted-foreground">Retornado do beneficiador</p>
                     </CardContent>
                   </Card>
-                  <Card>
+                  <Card className="p-1">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium text-muted-foreground">Saldo</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{formatWeight(totais.kgDisponivelVenda)}</div>
+                      <p className="text-xs text-muted-foreground">Material no fornecedor p/ venda</p>
+                    </CardContent>
+                  </Card>
+                  <Card className="p-1">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm font-medium text-muted-foreground">Vendas</CardTitle>
                     </CardHeader>
@@ -439,7 +448,7 @@ export default function OperacoesIntermediacao() {
                       <p className="text-xs text-muted-foreground">{formatCurrency(totais.receitaVendas)}</p>
                     </CardContent>
                   </Card>
-                  <Card>
+                  <Card className="p-1">
                     <CardHeader className="pb-2">
                       <CardTitle className="text-sm font-medium text-muted-foreground">Comissão IBRAC</CardTitle>
                     </CardHeader>
