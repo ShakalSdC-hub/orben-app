@@ -435,8 +435,8 @@ export default function OperacoesIntermediacao() {
                       <CardTitle className="text-sm font-medium text-muted-foreground">Saldo</CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">{formatWeight(totais.kgDisponivelVenda)}</div>
-                      <p className="text-xs text-muted-foreground">Material no fornecedor p/ venda</p>
+                      <div className="text-2xl font-bold">{formatWeight(kgEnvBeneficiamento - totais.kgBeneficiado)}</div>
+                      <p className="text-xs text-muted-foreground">Env. Beneficiamento - Beneficiado</p>
                     </CardContent>
                   </Card>
                   <Card className="p-1">
