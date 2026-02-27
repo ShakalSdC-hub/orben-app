@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -865,14 +865,12 @@ export default function Relatorios() {
                             </TableRow>
                           ) : (
                             filterByPeriod(entradasC1).map((e) => (
-                              <Collapsible key={e.id} open={expandedC1 === e.id} onOpenChange={() => setExpandedC1(expandedC1 === e.id ? null : e.id)}>
-                                <TableRow className="cursor-pointer hover:bg-muted/50">
+                              <React.Fragment key={e.id}>
+                                <TableRow className="cursor-pointer hover:bg-muted/50" onClick={() => setExpandedC1(expandedC1 === e.id ? null : e.id)}>
                                   <TableCell>
-                                    <CollapsibleTrigger asChild>
-                                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                                        {expandedC1 === e.id ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                                      </Button>
-                                    </CollapsibleTrigger>
+                                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                      {expandedC1 === e.id ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                    </Button>
                                   </TableCell>
                                   <TableCell className="font-medium">{e.operacao?.nome || "-"}</TableCell>
                                   <TableCell>{format(parseISO(e.dt_recebimento || e.created_at), "dd/MM/yy")}</TableCell>
@@ -887,7 +885,7 @@ export default function Relatorios() {
                                     </Badge>
                                   </TableCell>
                                 </TableRow>
-                                <CollapsibleContent asChild>
+                                {expandedC1 === e.id && (
                                   <TableRow className="bg-muted/30">
                                     <TableCell colSpan={8} className="py-3">
                                       <div className="flex items-center gap-4 text-sm">
@@ -911,8 +909,8 @@ export default function Relatorios() {
                                       </div>
                                     </TableCell>
                                   </TableRow>
-                                </CollapsibleContent>
-                              </Collapsible>
+                                )}
+                              </React.Fragment>
                             ))
                           )}
                         </TableBody>
@@ -1008,14 +1006,12 @@ export default function Relatorios() {
                             </TableRow>
                           ) : (
                             filterByPeriod(comprasInterm).map((c) => (
-                              <Collapsible key={c.id} open={expandedInterm === c.id} onOpenChange={() => setExpandedInterm(expandedInterm === c.id ? null : c.id)}>
-                                <TableRow className="cursor-pointer hover:bg-muted/50">
+                              <React.Fragment key={c.id}>
+                                <TableRow className="cursor-pointer hover:bg-muted/50" onClick={() => setExpandedInterm(expandedInterm === c.id ? null : c.id)}>
                                   <TableCell>
-                                    <CollapsibleTrigger asChild>
-                                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                                        {expandedInterm === c.id ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                                      </Button>
-                                    </CollapsibleTrigger>
+                                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                      {expandedInterm === c.id ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                    </Button>
                                   </TableCell>
                                   <TableCell className="font-medium">{c.operacao?.nome || "-"}</TableCell>
                                   <TableCell>{format(parseISO(c.dt), "dd/MM/yy")}</TableCell>
@@ -1029,7 +1025,7 @@ export default function Relatorios() {
                                   <TableCell className="text-right">{formatWeight(c.kg_comprado || 0)}</TableCell>
                                   <TableCell className="text-right">{formatCurrency(c.valor_compra_rs || 0)}</TableCell>
                                 </TableRow>
-                                <CollapsibleContent asChild>
+                                {expandedInterm === c.id && (
                                   <TableRow className="bg-muted/30">
                                     <TableCell colSpan={7} className="py-3">
                                       <div className="flex items-center gap-4 text-sm">
@@ -1048,8 +1044,8 @@ export default function Relatorios() {
                                       </div>
                                     </TableCell>
                                   </TableRow>
-                                </CollapsibleContent>
-                              </Collapsible>
+                                )}
+                              </React.Fragment>
                             ))
                           )}
                         </TableBody>
@@ -1145,14 +1141,12 @@ export default function Relatorios() {
                             </TableRow>
                           ) : (
                             filterByPeriod(entradasTerceiros).map((e) => (
-                              <Collapsible key={e.id} open={expandedTerc === e.id} onOpenChange={() => setExpandedTerc(expandedTerc === e.id ? null : e.id)}>
-                                <TableRow className="cursor-pointer hover:bg-muted/50">
+                              <React.Fragment key={e.id}>
+                                <TableRow className="cursor-pointer hover:bg-muted/50" onClick={() => setExpandedTerc(expandedTerc === e.id ? null : e.id)}>
                                   <TableCell>
-                                    <CollapsibleTrigger asChild>
-                                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                                        {expandedTerc === e.id ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                                      </Button>
-                                    </CollapsibleTrigger>
+                                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                      {expandedTerc === e.id ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                    </Button>
                                   </TableCell>
                                   <TableCell className="font-medium">{e.operacao?.nome || "-"}</TableCell>
                                   <TableCell>{format(parseISO(e.dt), "dd/MM/yy")}</TableCell>
@@ -1165,7 +1159,7 @@ export default function Relatorios() {
                                   <TableCell className="text-right">{formatWeight(e.kg_recebido || 0)}</TableCell>
                                   <TableCell>{e.documento || "-"}</TableCell>
                                 </TableRow>
-                                <CollapsibleContent asChild>
+                                {expandedTerc === e.id && (
                                   <TableRow className="bg-muted/30">
                                     <TableCell colSpan={6} className="py-3">
                                       <div className="flex items-center gap-4 text-sm">
@@ -1181,8 +1175,8 @@ export default function Relatorios() {
                                       </div>
                                     </TableCell>
                                   </TableRow>
-                                </CollapsibleContent>
-                              </Collapsible>
+                                )}
+                              </React.Fragment>
                             ))
                           )}
                         </TableBody>
