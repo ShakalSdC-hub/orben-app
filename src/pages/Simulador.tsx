@@ -89,6 +89,7 @@ export default function Simulador() {
   const [custoMO, setCustoMO] = useState(3.40);
   const [prazoSucataDias, setPrazoSucataDias] = useState(40);
   const [pesoKg, setPesoKg] = useState(10000);
+  const [perdaSucataPct, setPerdaSucataPct] = useState(4);
 
   // === Estados para Orçamento Serviço Terceiros ===
   const [orcNomeCliente, setOrcNomeCliente] = useState("");
