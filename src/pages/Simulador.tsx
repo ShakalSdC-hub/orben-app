@@ -89,6 +89,7 @@ export default function Simulador() {
   const [custoMO, setCustoMO] = useState(3.40);
   const [prazoSucataDias, setPrazoSucataDias] = useState(40);
   const [pesoKg, setPesoKg] = useState(10000);
+  const [perdaSucataPct, setPerdaSucataPct] = useState(4);
 
   // === Estados para Orçamento Serviço Terceiros ===
   const [orcNomeCliente, setOrcNomeCliente] = useState("");
@@ -296,6 +297,7 @@ export default function Simulador() {
   // === CÁLCULOS SUCATA ===
   const totalMediaBrl = (cobreUsdT * dolarBrl);
   const precoFinalKg = (totalMediaBrl / 1000) * (pctLmeSucata / 100);
+  const pesoLiquido = pesoKg * (1 - perdaSucataPct / 100);
   const valorVendaSucata = precoFinalKg * pesoKg;
   const valorCompra = custoCompraKg * pesoKg;
   const valorMO = custoMO * pesoKg;
@@ -305,9 +307,10 @@ export default function Simulador() {
   const custoFinanceiroRsKg = custoCompraKg * jurosProrataSucata;
   const valorFinanceiro = custoFinanceiroRsKg * pesoKg;
   
+  const custoTotalSucata = valorCompra + valorMO + valorFinanceiro;
   const difOperacoes = valorCompra - valorVendaSucata;
   const saldoOperacao = valorVendaSucata - valorCompra - valorMO - valorFinanceiro;
-  const precoIndustrializado = custoCompraKg + custoMO + custoFinanceiroRsKg + (difOperacoes > 0 ? difOperacoes / pesoKg : 0);
+  const precoIndustrializado = pesoLiquido > 0 ? custoTotalSucata / pesoLiquido : 0;
 
   // === COMPARATIVO ===
   const diferenca = totalComFinanceiro - precoIndustrializado;
@@ -466,6 +469,9 @@ export default function Simulador() {
               <tr><th>Mão de Obra</th><td>${formatCurrency(custoMO)}/kg</td></tr>
               <tr><th>Prazo (dias)</th><td>${prazoSucataDias}</td></tr>
               <tr><th>Custo Financeiro</th><td>${formatCurrency(custoFinanceiroRsKg)}/kg</td></tr>
+              <tr><th>% Perda Beneficiamento</th><td>${perdaSucataPct}%</td></tr>
+              <tr><th>Peso Bruto</th><td>${pesoKg.toLocaleString("pt-BR")} kg</td></tr>
+              <tr><th>Peso Líquido (após perda)</th><td>${pesoLiquido.toLocaleString("pt-BR")} kg</td></tr>
               <tr class="highlight"><th>Preço Industrializado</th><td>${formatCurrency(precoIndustrializado)}/kg</td></tr>
             </table>
           </div>
@@ -1271,7 +1277,7 @@ export default function Simulador() {
                     <CardDescription>Compare venda da sucata vs compra + industrialização</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
+                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                       <div className="space-y-2">
                         <Label>Peso (kg)</Label>
                         <Input
@@ -1319,6 +1325,28 @@ export default function Simulador() {
                           value={prazoSucataDias}
                           onChange={(e) => setPrazoSucataDias(Number(e.target.value))}
                         />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>% Perda Beneficiamento</Label>
+                        <div className="relative">
+                          <Input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            max="100"
+                            value={perdaSucataPct}
+                            onChange={(e) => setPerdaSucataPct(Number(e.target.value))}
+                            className="pr-8"
+                          />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">%</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-muted/50 rounded-lg space-y-1">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Peso Líquido (após perda de {perdaSucataPct}%):</span>
+                        <span className="font-medium">{pesoLiquido.toLocaleString("pt-BR")} kg</span>
                       </div>
                     </div>
 
@@ -1373,6 +1401,14 @@ export default function Simulador() {
                               {formatCurrency(valorFinanceiro)}
                             </TableCell>
                           </TableRow>
+                          <TableRow className="bg-muted/30">
+                            <TableCell className="font-medium">Perda Beneficiamento</TableCell>
+                            <TableCell className="text-right">{perdaSucataPct}%</TableCell>
+                            <TableCell className="text-right">{(pesoKg - pesoLiquido).toLocaleString("pt-BR")} kg</TableCell>
+                            <TableCell className="text-right font-medium">
+                              Líquido: {pesoLiquido.toLocaleString("pt-BR")} kg
+                            </TableCell>
+                          </TableRow>
                           <TableRow className="bg-primary/10">
                             <TableCell colSpan={3} className="font-bold text-lg">SALDO</TableCell>
                             <TableCell className={cn("text-right font-bold text-lg", saldoOperacao > 0 ? "text-success" : "text-destructive")}>
@@ -1382,7 +1418,7 @@ export default function Simulador() {
                           <TableRow className="bg-muted/50">
                             <TableCell colSpan={3} className="font-bold">Preço do KG (Industrialização)</TableCell>
                             <TableCell className="text-right font-bold text-primary text-lg">
-                              {formatCurrency(precoIndustrializado)}
+                              {formatCurrency(precoIndustrializado)}/kg
                             </TableCell>
                           </TableRow>
                         </TableBody>
@@ -1449,6 +1485,9 @@ export default function Simulador() {
                         <p className="text-xs text-muted-foreground mb-1">Custo Industrializado</p>
                         <p className="text-2xl font-bold text-primary">
                           {formatCurrency(precoIndustrializado)}/kg
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Perda: {perdaSucataPct}% → Líquido: {pesoLiquido.toLocaleString("pt-BR")} kg
                         </p>
                       </div>
                     </div>
