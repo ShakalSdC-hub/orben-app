@@ -1486,6 +1486,9 @@ export default function Simulador() {
                         <p className="text-2xl font-bold text-primary">
                           {formatCurrency(precoIndustrializado)}/kg
                         </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Perda: {perdaSucataPct}% → Líquido: {pesoLiquido.toLocaleString("pt-BR")} kg
+                        </p>
                       </div>
                     </div>
 
