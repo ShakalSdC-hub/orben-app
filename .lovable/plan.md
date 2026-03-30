@@ -1,63 +1,49 @@
 
 
-## Plano: Atualizacao de Perdas, Cards e Layout do Cenario 3
+## Plano: Incluir % Perda no Simulador de Sucata
 
-### 1. Atualizar % de perda nas compras existentes (dados)
+### Problema
 
-Usar ferramenta de dados para executar UPDATEs nas compras existentes:
+No modo "Sucata + Industrializacao", o calculo atual usa `pesoKg` diretamente para todos os custos e receitas, ignorando a perda no beneficiamento. Na realidade, ao comprar 10.000 kg com 4% de perda, o resultado final e 9.600 kg de vergalhao — e esse peso menor impacta diretamente no custo por kg.
 
-- **Janeiro** (dt entre 2026-01-01 e 2026-01-31):
-  - MEL: `perda_mel_pct = 0.03` (3%)
-  - MISTA: `perda_mista_pct = 0.08` (8%)
-- **Fevereiro** (dt entre 2026-02-01 e 2026-02-28):
-  - MEL: `perda_mel_pct = 0.04` (4%)
-  - MISTA: `perda_mista_pct = 0.09` (9%)
+### Solucao
 
-Sao 30 registros que precisam ser atualizados.
+Adicionar um campo **% Perda** na aba de Sucata e ajustar os calculos para considerar o peso liquido apos perda.
 
-### 2. Renomear e alterar calculo do card "Em Beneficiamento"
+### Alteracoes em `src/pages/Simulador.tsx`
 
-No arquivo `OperacoesIntermediacao.tsx`:
+**1. Novo estado:**
+- `perdaSucataPct` (default: 4%)
 
-- Renomear de **"Em Beneficiamento"** para **"Env. Beneficiamento"**
-- Novo calculo: **Compras - Perdas**
-  - Para cada compra: `kg_comprado * perda_pct` (conforme tipo_material)
-  - Card mostra: `kgComprado - totalPerdas` (peso liquido previsto de todas as compras)
-- Subtitulo: mostrar total de perdas previstas
-
-### 3. Criar card "Saldo"
-
-Novo card entre "Beneficiado" e "Vendas":
-- **Saldo** = material processado que ainda nao foi vendido
-- Calculo: `kgDisponivelVenda` (soma de kg_disponivel_venda dos beneficiamentos)
-- Esse e o material que esta no fornecedor (Plasinco) pronto mas ainda nao vendido
-
-### 4. Reorganizar layout dos cards (3x2)
-
-Disposicao em duas linhas de 3 cards:
-
+**2. Novo calculo:**
 ```text
-Linha 1: Compras | Env. Beneficiamento | Beneficiado
-Linha 2: Saldo   | Vendas              | Comissao
+pesoLiquido = pesoKg * (1 - perdaSucataPct / 100)
+  Ex: 10.000 * 0.96 = 9.600 kg
+
+Custo total = (custoCompra + custoMO + custoFinanceiro) * pesoKg (compra os 10.000)
+Custo por kg de vergalhao = custoTotal / pesoLiquido (divide pelos 9.600)
+
+precoIndustrializado = (valorCompra + valorMO + valorFinanceiro) / pesoLiquido
 ```
 
-- Grid: `md:grid-cols-3` em vez de `md:grid-cols-5`
-- Aumentar padding/altura dos cards para melhor visualizacao
+**3. Novo campo no formulario:**
+- Input "% Perda" ao lado dos campos existentes (Custo MO, Prazo, etc.)
+- Exibir o peso liquido resultante como informacao complementar
 
-### Detalhes tecnicos
+**4. Atualizar comparativo:**
+- O custo por kg do vergalhao industrializado passa a refletir a perda
+- Atualizar tambem o PDF de exportacao para incluir a perda
 
-| Arquivo / Local | Alteracao |
-|-----------------|-----------|
-| Dados (UPDATE SQL) | Atualizar `perda_mel_pct` e `perda_mista_pct` em compras de Jan e Fev |
-| `OperacoesIntermediacao.tsx` | Renomear card, alterar calculo para Compras-Perdas, criar card Saldo, reorganizar grid 3x2 |
+**5. Atualizar card de resultado:**
+- Mostrar linha com "Perda: X% → Peso liquido: Y kg"
 
-### Calculo detalhado
+### Resumo
 
-```text
-Env. Beneficiamento = SUM(kg_comprado) - SUM(kg_comprado * perda_aplicavel)
-  onde perda_aplicavel = perda_mel_pct se MEL, perda_mista_pct se MISTA
-
-Saldo = SUM(kg_disponivel_venda) dos beneficiamentos
-  (material ja processado, disponivel para venda, ainda no fornecedor)
-```
+| Local | Alteracao |
+|-------|-----------|
+| Estado | Novo `perdaSucataPct` (default 4%) |
+| Calculos (linhas ~296-310) | Usar `pesoLiquido` para calcular custo/kg final |
+| UI Sucata | Novo input "% Perda" |
+| Card resultado | Exibir peso liquido e impacto da perda |
+| PDF export | Incluir % perda e peso liquido |
 
