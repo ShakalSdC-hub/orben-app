@@ -297,6 +297,7 @@ export default function Simulador() {
   // === CÁLCULOS SUCATA ===
   const totalMediaBrl = (cobreUsdT * dolarBrl);
   const precoFinalKg = (totalMediaBrl / 1000) * (pctLmeSucata / 100);
+  const pesoLiquido = pesoKg * (1 - perdaSucataPct / 100);
   const valorVendaSucata = precoFinalKg * pesoKg;
   const valorCompra = custoCompraKg * pesoKg;
   const valorMO = custoMO * pesoKg;
@@ -306,9 +307,10 @@ export default function Simulador() {
   const custoFinanceiroRsKg = custoCompraKg * jurosProrataSucata;
   const valorFinanceiro = custoFinanceiroRsKg * pesoKg;
   
+  const custoTotalSucata = valorCompra + valorMO + valorFinanceiro;
   const difOperacoes = valorCompra - valorVendaSucata;
   const saldoOperacao = valorVendaSucata - valorCompra - valorMO - valorFinanceiro;
-  const precoIndustrializado = custoCompraKg + custoMO + custoFinanceiroRsKg + (difOperacoes > 0 ? difOperacoes / pesoKg : 0);
+  const precoIndustrializado = pesoLiquido > 0 ? custoTotalSucata / pesoLiquido : 0;
 
   // === COMPARATIVO ===
   const diferenca = totalComFinanceiro - precoIndustrializado;
