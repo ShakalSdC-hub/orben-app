@@ -469,6 +469,9 @@ export default function Simulador() {
               <tr><th>Mão de Obra</th><td>${formatCurrency(custoMO)}/kg</td></tr>
               <tr><th>Prazo (dias)</th><td>${prazoSucataDias}</td></tr>
               <tr><th>Custo Financeiro</th><td>${formatCurrency(custoFinanceiroRsKg)}/kg</td></tr>
+              <tr><th>% Perda Beneficiamento</th><td>${perdaSucataPct}%</td></tr>
+              <tr><th>Peso Bruto</th><td>${pesoKg.toLocaleString("pt-BR")} kg</td></tr>
+              <tr><th>Peso Líquido (após perda)</th><td>${pesoLiquido.toLocaleString("pt-BR")} kg</td></tr>
               <tr class="highlight"><th>Preço Industrializado</th><td>${formatCurrency(precoIndustrializado)}/kg</td></tr>
             </table>
           </div>
