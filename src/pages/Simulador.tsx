@@ -1401,6 +1401,14 @@ export default function Simulador() {
                               {formatCurrency(valorFinanceiro)}
                             </TableCell>
                           </TableRow>
+                          <TableRow className="bg-muted/30">
+                            <TableCell className="font-medium">Perda Beneficiamento</TableCell>
+                            <TableCell className="text-right">{perdaSucataPct}%</TableCell>
+                            <TableCell className="text-right">{(pesoKg - pesoLiquido).toLocaleString("pt-BR")} kg</TableCell>
+                            <TableCell className="text-right font-medium">
+                              Líquido: {pesoLiquido.toLocaleString("pt-BR")} kg
+                            </TableCell>
+                          </TableRow>
                           <TableRow className="bg-primary/10">
                             <TableCell colSpan={3} className="font-bold text-lg">SALDO</TableCell>
                             <TableCell className={cn("text-right font-bold text-lg", saldoOperacao > 0 ? "text-success" : "text-destructive")}>
@@ -1410,7 +1418,7 @@ export default function Simulador() {
                           <TableRow className="bg-muted/50">
                             <TableCell colSpan={3} className="font-bold">Preço do KG (Industrialização)</TableCell>
                             <TableCell className="text-right font-bold text-primary text-lg">
-                              {formatCurrency(precoIndustrializado)}
+                              {formatCurrency(precoIndustrializado)}/kg
                             </TableCell>
                           </TableRow>
                         </TableBody>
