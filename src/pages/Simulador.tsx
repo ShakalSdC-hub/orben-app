@@ -1274,7 +1274,7 @@ export default function Simulador() {
                     <CardDescription>Compare venda da sucata vs compra + industrialização</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-5">
+                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
                       <div className="space-y-2">
                         <Label>Peso (kg)</Label>
                         <Input
@@ -1322,6 +1322,28 @@ export default function Simulador() {
                           value={prazoSucataDias}
                           onChange={(e) => setPrazoSucataDias(Number(e.target.value))}
                         />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>% Perda Beneficiamento</Label>
+                        <div className="relative">
+                          <Input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            max="100"
+                            value={perdaSucataPct}
+                            onChange={(e) => setPerdaSucataPct(Number(e.target.value))}
+                            className="pr-8"
+                          />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">%</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-muted/50 rounded-lg space-y-1">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-muted-foreground">Peso Líquido (após perda de {perdaSucataPct}%):</span>
+                        <span className="font-medium">{pesoLiquido.toLocaleString("pt-BR")} kg</span>
                       </div>
                     </div>
 
