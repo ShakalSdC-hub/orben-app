@@ -1,49 +1,26 @@
 
 
-## Plano: Incluir % Perda no Simulador de Sucata
+## Plano: Adicionar campo Frete na aba Sucata + Industrialização
 
-### Problema
+### Alterações em `src/pages/Simulador.tsx`
 
-No modo "Sucata + Industrializacao", o calculo atual usa `pesoKg` diretamente para todos os custos e receitas, ignorando a perda no beneficiamento. Na realidade, ao comprar 10.000 kg com 4% de perda, o resultado final e 9.600 kg de vergalhao — e esse peso menor impacta diretamente no custo por kg.
+**1. Novo estado** (linha ~92):
+- `custoFreteSucataKg` (default: 0) — custo de frete em R$/kg
 
-### Solucao
+**2. Novo campo no formulário** (após "Mão de Obra", linha ~1306):
+- Input "Frete (R$/kg)" com step 0.01
 
-Adicionar um campo **% Perda** na aba de Sucata e ajustar os calculos para considerar o peso liquido apos perda.
+**3. Atualizar cálculos** (linhas ~302-313):
+- `valorFrete = custoFreteSucataKg * pesoKg`
+- `custoTotalSucata = valorCompra + valorMO + valorFrete + valorFinanceiro`
+- `saldoOperacao` e `precoIndustrializado` passam a incluir o frete
 
-### Alteracoes em `src/pages/Simulador.tsx`
+**4. Atualizar cards de resultado**:
+- Adicionar linha "Frete" nos resumos exibidos
 
-**1. Novo estado:**
-- `perdaSucataPct` (default: 4%)
+**5. Atualizar PDF export** (~linha 468):
+- Incluir linha `Frete: R$ X,XX/kg`
 
-**2. Novo calculo:**
-```text
-pesoLiquido = pesoKg * (1 - perdaSucataPct / 100)
-  Ex: 10.000 * 0.96 = 9.600 kg
-
-Custo total = (custoCompra + custoMO + custoFinanceiro) * pesoKg (compra os 10.000)
-Custo por kg de vergalhao = custoTotal / pesoLiquido (divide pelos 9.600)
-
-precoIndustrializado = (valorCompra + valorMO + valorFinanceiro) / pesoLiquido
-```
-
-**3. Novo campo no formulario:**
-- Input "% Perda" ao lado dos campos existentes (Custo MO, Prazo, etc.)
-- Exibir o peso liquido resultante como informacao complementar
-
-**4. Atualizar comparativo:**
-- O custo por kg do vergalhao industrializado passa a refletir a perda
-- Atualizar tambem o PDF de exportacao para incluir a perda
-
-**5. Atualizar card de resultado:**
-- Mostrar linha com "Perda: X% → Peso liquido: Y kg"
-
-### Resumo
-
-| Local | Alteracao |
-|-------|-----------|
-| Estado | Novo `perdaSucataPct` (default 4%) |
-| Calculos (linhas ~296-310) | Usar `pesoLiquido` para calcular custo/kg final |
-| UI Sucata | Novo input "% Perda" |
-| Card resultado | Exibir peso liquido e impacto da perda |
-| PDF export | Incluir % perda e peso liquido |
+**6. Atualizar save/load do histórico** (se aplicável):
+- Salvar e restaurar `custoFreteSucataKg`
 
