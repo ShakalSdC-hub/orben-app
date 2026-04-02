@@ -90,6 +90,7 @@ export default function Simulador() {
   const [prazoSucataDias, setPrazoSucataDias] = useState(40);
   const [pesoKg, setPesoKg] = useState(10000);
   const [perdaSucataPct, setPerdaSucataPct] = useState(4);
+  const [custoFreteSucataKg, setCustoFreteSucataKg] = useState(0);
 
   // === Estados para Orçamento Serviço Terceiros ===
   const [orcNomeCliente, setOrcNomeCliente] = useState("");
@@ -301,15 +302,16 @@ export default function Simulador() {
   const valorVendaSucata = precoFinalKg * pesoKg;
   const valorCompra = custoCompraKg * pesoKg;
   const valorMO = custoMO * pesoKg;
+  const valorFrete = custoFreteSucataKg * pesoKg;
   
   // Cálculo do custo financeiro prorata para sucata (usa taxa separada)
   const jurosProrataSucata = (taxaFinanceiraSucata / 100) * (prazoSucataDias / 30);
   const custoFinanceiroRsKg = custoCompraKg * jurosProrataSucata;
   const valorFinanceiro = custoFinanceiroRsKg * pesoKg;
   
-  const custoTotalSucata = valorCompra + valorMO + valorFinanceiro;
+  const custoTotalSucata = valorCompra + valorMO + valorFrete + valorFinanceiro;
   const difOperacoes = valorCompra - valorVendaSucata;
-  const saldoOperacao = valorVendaSucata - valorCompra - valorMO - valorFinanceiro;
+  const saldoOperacao = valorVendaSucata - valorCompra - valorMO - valorFrete - valorFinanceiro;
   const precoIndustrializado = pesoLiquido > 0 ? custoTotalSucata / pesoLiquido : 0;
 
   // === COMPARATIVO ===
@@ -467,6 +469,7 @@ export default function Simulador() {
               <tr><th>Preço Sucata</th><td>${formatCurrency(precoFinalKg)}/kg</td></tr>
               <tr><th>Custo Compra</th><td>${formatCurrency(custoCompraKg)}/kg</td></tr>
               <tr><th>Mão de Obra</th><td>${formatCurrency(custoMO)}/kg</td></tr>
+              <tr><th>Frete</th><td>${formatCurrency(custoFreteSucataKg)}/kg</td></tr>
               <tr><th>Prazo (dias)</th><td>${prazoSucataDias}</td></tr>
               <tr><th>Custo Financeiro</th><td>${formatCurrency(custoFinanceiroRsKg)}/kg</td></tr>
               <tr><th>% Perda Beneficiamento</th><td>${perdaSucataPct}%</td></tr>
@@ -1305,6 +1308,16 @@ export default function Simulador() {
                         />
                       </div>
                       <div className="space-y-2">
+                        <Label>Frete (R$/kg)</Label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={custoFreteSucataKg}
+                          onChange={(e) => setCustoFreteSucataKg(Number(e.target.value))}
+                        />
+                      </div>
+                      <div className="space-y-2">
                         <Label>Taxa Financeira (% a.m.)</Label>
                         <div className="relative">
                           <Input
@@ -1391,6 +1404,14 @@ export default function Simulador() {
                             <TableCell className="text-right">{formatCurrency(custoMO)}/kg</TableCell>
                             <TableCell className="text-right font-bold text-destructive">
                               {formatCurrency(valorMO)}
+                            </TableCell>
+                          </TableRow>
+                          <TableRow>
+                            <TableCell className="font-medium">(-) Frete</TableCell>
+                            <TableCell className="text-right">{pesoKg.toLocaleString("pt-BR")} kg</TableCell>
+                            <TableCell className="text-right">{formatCurrency(custoFreteSucataKg)}/kg</TableCell>
+                            <TableCell className="text-right font-bold text-destructive">
+                              {formatCurrency(valorFrete)}
                             </TableCell>
                           </TableRow>
                           <TableRow>
