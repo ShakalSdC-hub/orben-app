@@ -1244,7 +1244,7 @@ export default function Simulador() {
                     </div>
                     <div className="grid gap-6 md:grid-cols-2">
                       <div className="space-y-2">
-                        <Label>% LME Sucata (Mista: 97%, Mel: 102%)</Label>
+                        <Label>% LME Sucata</Label>
                         <div className="relative">
                           <Input
                             type="number"
