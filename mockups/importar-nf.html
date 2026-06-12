@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html class="light" lang="pt-br"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            line-height: 1;
+            text-transform: none;
+            letter-spacing: normal;
+            word-wrap: normal;
+            white-space: nowrap;
+            direction: ltr;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #c5c6ce;
+            border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #75777e;
+        }
+        #chevron-card1, #chevron-card2, #chevron-card3 {
+            transition: transform 0.2s ease;
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "outline": "#75777e",
+                        "on-tertiary": "#ffffff",
+                        "on-background": "#0b1c30",
+                        "primary": "#041632",
+                        "surface-bright": "#f8f9ff",
+                        "secondary-container": "#ff946c",
+                        "secondary-fixed": "#ffdbcf",
+                        "tertiary-container": "#003131",
+                        "outline-variant": "#c5c6ce",
+                        "on-primary-fixed-variant": "#374765",
+                        "background": "#f8f9ff",
+                        "surface-container-high": "#dce9ff",
+                        "on-tertiary-fixed": "#002020",
+                        "on-secondary-fixed-variant": "#7b2f0e",
+                        "inverse-surface": "#213145",
+                        "surface-dim": "#cbdbf5",
+                        "secondary-fixed-dim": "#ffb59a",
+                        "tertiary-fixed": "#8cf3f3",
+                        "secondary": "#9a4523",
+                        "primary-container": "#1b2b48",
+                        "on-primary-container": "#8393b5",
+                        "surface-variant": "#d3e4fe",
+                        "primary-fixed-dim": "#b7c7eb",
+                        "on-surface-variant": "#44474d",
+                        "on-tertiary-fixed-variant": "#004f4f",
+                        "on-secondary-container": "#772b0a",
+                        "surface-container-lowest": "#ffffff",
+                        "primary-fixed": "#d7e2ff",
+                        "on-primary-fixed": "#091b37",
+                        "on-surface": "#0b1c30",
+                        "surface-container-low": "#eff4ff",
+                        "on-secondary-fixed": "#380d00",
+                        "surface": "#f8f9ff",
+                        "error": "#ba1a1a",
+                        "error-container": "#ffdad6",
+                        "on-tertiary-container": "#31a1a1",
+                        "inverse-primary": "#b7c7eb",
+                        "tertiary": "#001a1a",
+                        "surface-container-highest": "#d3e4fe",
+                        "on-error-container": "#93000a",
+                        "tertiary-fixed-dim": "#6fd7d6",
+                        "surface-tint": "#4f5e7e",
+                        "on-secondary": "#ffffff",
+                        "on-error": "#ffffff",
+                        "on-primary": "#ffffff",
+                        "surface-container": "#e5eeff",
+                        "inverse-on-surface": "#eaf1ff"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "margin": "24px",
+                        "base": "4px",
+                        "xl": "32px",
+                        "sidebar-width": "260px",
+                        "gutter": "16px",
+                        "2xl": "48px",
+                        "sm": "8px",
+                        "xs": "4px",
+                        "lg": "24px",
+                        "md": "16px"
+                    },
+                    "fontFamily": {
+                        "display-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "body-sm": ["Inter"],
+                        "headline-lg-mobile": ["Inter"],
+                        "label-md": ["JetBrains Mono"],
+                        "headline-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "label-sm": ["JetBrains Mono"],
+                        "title-lg": ["Inter"]
+                    },
+                    "fontSize": {
+                        "display-lg": ["48px", {"lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                        "headline-lg": ["32px", {"lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                        "body-sm": ["12px", {"lineHeight": "18px", "fontWeight": "400"}],
+                        "headline-lg-mobile": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                        "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                        "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                        "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "label-sm": ["10px", {"lineHeight": "14px", "letterSpacing": "0.05em", "fontWeight": "500"}],
+                        "title-lg": ["18px", {"lineHeight": "28px", "fontWeight": "600"}]
+                    }
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background text-on-background font-body-md selection:bg-secondary-container selection:text-on-secondary-container overflow-hidden">
+<!-- Global Sidebar -->
+<aside class="w-sidebar-width h-full fixed left-0 top-0 bg-primary dark:bg-primary-container border-r border-outline-variant dark:border-outline flex flex-col h-full py-lg z-50">
+<div class="px-lg mb-xl">
+<h1 class="font-display-lg text-display-lg font-bold text-on-primary">ORBEN v2</h1>
+<p class="text-on-primary-container text-body-sm opacity-80 uppercase tracking-widest">Industrial Logistics</p>
+</div>
+<nav class="flex-1 space-y-base px-sm">
+<a class="flex items-center gap-md p-md rounded transition-colors text-on-primary-fixed-variant hover:bg-primary-container hover:text-on-primary-container transition-colors" href="dashboard.html">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-body-md text-body-md">Início</span>
+</a>
+<a class="flex items-center gap-md p-md rounded text-on-primary border-l-4 border-secondary-container bg-primary-container/20 font-bold" href="operacoes.html">
+<span class="material-symbols-outlined" data-icon="conveyor_belt">conveyor_belt</span>
+<span class="font-body-md text-body-md">Operações</span>
+</a>
+<a class="flex items-center gap-md p-md rounded transition-colors text-on-primary-fixed-variant hover:bg-primary-container hover:text-on-primary-container transition-colors" href="financeiro.html">
+<span class="material-symbols-outlined" data-icon="payments">payments</span>
+<span class="font-body-md text-body-md">Financeiro</span>
+</a>
+<a class="flex items-center gap-md p-md rounded transition-colors text-on-primary-fixed-variant hover:bg-primary-container hover:text-on-primary-container transition-colors" href="cadastros.html">
+<span class="material-symbols-outlined" data-icon="more_horiz">more_horiz</span>
+<span class="font-body-md text-body-md">Mais</span>
+</a>
+</nav>
+<div class="mt-auto px-sm space-y-base">
+<button class="w-full bg-secondary text-on-secondary px-lg py-md rounded font-bold uppercase tracking-wider mb-lg active:scale-[0.98] duration-150 transition-all shadow-lg shadow-secondary/20">
+                Lançar
+            </button>
+<a class="flex items-center gap-md p-md rounded transition-colors text-on-primary-fixed-variant hover:bg-primary-container hover:text-on-primary-container transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-body-md text-body-md">Configurações</span>
+</a>
+<a class="flex items-center gap-md p-md rounded transition-colors text-on-primary-fixed-variant hover:bg-primary-container hover:text-on-primary-container transition-colors" href="#">
+<span class="material-symbols-outlined" data-icon="logout">logout</span>
+<span class="font-body-md text-body-md">Sair</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Shell -->
+<main class="ml-sidebar-width min-h-screen flex flex-col">
+<!-- Top Nav Bar -->
+<header class="fixed top-0 right-0 left-[260px] h-16 bg-surface-bright dark:bg-surface-container-low border-b border-outline-variant flex justify-between items-center px-lg z-40">
+<div class="flex items-center gap-lg flex-1">
+<div class="relative w-full max-w-md">
+<span class="material-symbols-outlined absolute left-md top-1/2 -translate-y-1/2 text-outline" data-icon="search">search</span>
+<input class="w-full pl-xl pr-md py-sm bg-surface-container-low border border-outline-variant rounded-lg focus:outline-none focus:border-secondary transition-colors font-body-md" placeholder="Buscar operações ou parceiros..." type="text"/>
+</div>
+</div>
+<div class="flex items-center gap-lg">
+<button class="material-symbols-outlined text-on-surface-variant hover:bg-surface-container-high p-sm rounded transition-all" data-icon="notifications">notifications</button>
+<button class="material-symbols-outlined text-on-surface-variant hover:bg-surface-container-high p-sm rounded transition-all" data-icon="help">help</button>
+<div class="h-8 w-8 rounded-full bg-primary-container overflow-hidden border border-outline-variant"></div>
+</div>
+</header>
+<!-- Page Content Area -->
+<div class="pt-16 p-lg flex-1 overflow-y-auto custom-scrollbar">
+<!-- Breadcrumb -->
+<div class="flex items-center gap-xs text-body-sm text-on-surface-variant mb-sm">
+<a class="hover:text-secondary transition-colors" href="operacoes.html">Operações</a>
+<span class="material-symbols-outlined text-[16px]" data-icon="chevron_right">chevron_right</span>
+<span class="text-on-surface font-bold">Importar NF-e (XML)</span>
+</div>
+<!-- Page Header -->
+<section class="mb-xl flex flex-col md:flex-row md:items-end justify-between gap-lg">
+<div>
+<h2 class="font-headline-lg text-headline-lg text-primary mb-base">Importar NF-e (XML)</h2>
+<p class="text-on-surface-variant font-body-md max-w-2xl">Envie os arquivos XML das notas fiscais. O ORBEN extrai os dados automaticamente e sugere o lançamento de operação e, quando aplicável, o título financeiro vinculado.</p>
+</div>
+<a class="flex items-center gap-xs text-primary hover:text-secondary font-label-md text-label-md transition-colors shrink-0" href="operacoes.html">
+<span class="material-symbols-outlined text-[18px]" data-icon="arrow_back">arrow_back</span> Voltar para Operações
+            </a>
+</section>
+<!-- Upload Zone -->
+<div class="border-2 border-dashed border-outline-variant rounded-xl px-lg py-2xl flex flex-col items-center justify-center text-center bg-surface-container-lowest mb-xl hover:border-secondary transition-colors cursor-pointer">
+<div class="w-16 h-16 rounded-full bg-secondary-fixed flex items-center justify-center text-secondary mb-md">
+<span class="material-symbols-outlined text-[32px]" data-icon="upload_file">upload_file</span>
+</div>
+<h3 class="font-title-lg text-title-lg text-on-surface mb-xs">Arraste os arquivos XML aqui</h3>
+<p class="text-on-surface-variant text-body-sm mb-md">ou clique para selecionar — aceita múltiplos arquivos .xml de NF-e</p>
+<button class="bg-primary text-on-primary px-lg py-sm rounded font-label-md text-label-md uppercase tracking-wider">Selecionar Arquivos</button>
+</div>
+<!-- Section Title -->
+<div class="flex items-center justify-between mb-md flex-wrap gap-sm">
+<h3 class="font-title-lg text-title-lg text-on-surface">3 notas processadas</h3>
+<div class="flex items-center gap-lg text-body-sm">
+<span class="flex items-center gap-xs text-on-tertiary-container"><span class="w-2 h-2 rounded-full bg-on-tertiary-container"></span> 2 prontas para lançar</span>
+<span class="flex items-center gap-xs text-on-error-container"><span class="w-2 h-2 rounded-full bg-error"></span> 1 para revisão</span>
+</div>
+</div>
+<!-- Cards Container -->
+<div class="space-y-md mb-2xl">
+<!-- Card 1: Pronto / Próprio -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden shadow-sm">
+<button class="w-full flex items-center justify-between gap-lg p-lg text-left hover:bg-surface-bright transition-colors" onclick="toggleCard('card1')">
+<div class="flex items-center gap-lg flex-1 min-w-0">
+<div class="w-10 h-10 rounded-lg bg-surface-container-high flex items-center justify-center text-on-surface-variant shrink-0">
+<span class="material-symbols-outlined" data-icon="description">description</span>
+</div>
+<div class="min-w-0">
+<p class="font-title-lg text-body-md font-bold text-on-surface truncate">NF 1190 / Série 1 — Saída</p>
+<p class="text-body-sm text-on-surface-variant truncate">IBRAC → Metalúrgica Sul S.A. · 12/06/2026 09:12</p>
+</div>
+</div>
+<div class="flex items-center gap-md shrink-0">
+<div class="text-right hidden md:block">
+<p class="font-label-md text-label-md text-primary font-bold">R$ 412.500,00</p>
+<p class="text-body-sm text-on-surface-variant">12.500 kg</p>
+</div>
+<span class="bg-secondary-fixed text-on-secondary-fixed-variant px-sm py-xs rounded font-label-sm text-label-sm uppercase">Próprio</span>
+<span class="bg-tertiary-fixed text-on-tertiary-fixed-variant px-sm py-xs rounded font-label-sm text-label-sm uppercase flex items-center gap-xs">
+<span class="material-symbols-outlined text-[14px]" data-icon="check_circle">check_circle</span> Pronto
+                            </span>
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="expand_more" id="chevron-card1">expand_more</span>
+</div>
+</button>
+<div class="hidden border-t border-outline-variant bg-surface-container-low/40" id="card1-body">
+<div class="p-lg grid grid-cols-1 md:grid-cols-2 gap-lg">
+<div>
+<h4 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider mb-md flex items-center gap-xs">
+<span class="material-symbols-outlined text-[16px]" data-icon="code">code</span> Dados extraídos do XML
+                                </h4>
+<dl class="space-y-sm text-body-sm">
+<div class="flex justify-between gap-md"><dt class="text-on-surface-variant">Data de Emissão</dt><dd class="font-bold text-on-surface">12/06/2026 09:12</dd></div>
+<div class="flex justify-between gap-md"><dt class="text-on-surface-variant">Destinatário</dt><dd class="font-bold text-on-surface text-right">Metalúrgica Sul S.A.<br/><span class="text-on-surface-variant font-normal">CNPJ 22.333.444/0001-55</span></dd></div>
+<div class="flex justify-between gap-md"><dt class="text-on-surface-variant">Produto (NCM)</dt><dd class="font-bold text-on-surface text-right">7213.10.00<br/><span class="text-on-surface-variant font-normal">Vergalhão CA-50</span></dd></div>
+<div class="flex justify-between gap-md"><dt class="text-on-surface-variant">Peso Líquido (NF)</dt><dd class="font-bold text-on-surface">12.500 kg</dd></div>
+<div class="flex justify-between gap-md"><dt class="text-on-surface-variant">Valor Total (NF)</dt><dd class="font-bold text-on-surface">R$ 412.500,00</dd></div>
+</dl>
+</div>
+<div>
+<h4 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider mb-md flex items-center gap-xs">
+<span class="material-symbols-outlined text-[16px]" data-icon="auto_awesome">auto_awesome</span> Lançamento Sugerido
+                                </h4>
+<div class="bg-tertiary-fixed/30 border border-tertiary-fixed text-on-tertiary-fixed-variant rounded-lg p-md mb-md flex items-start gap-sm text-body-sm">
+<span class="material-symbols-outlined text-[18px] mt-[-2px]" data-icon="check_circle">check_circle</span>
+<p>Cenário identificado com 98% de confiança. Será lançado como <strong>Saída — Próprio</strong> e gerará um título <strong>A Receber</strong> automaticamente.</p>
+</div>
+<div class="space-y-md">
+<div class="grid grid-cols-2 gap-md">
+<label class="block">
+<span class="text-body-sm text-on-surface-variant">Tipo de Operação</span>
+<select class="mt-xs w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-md py-sm font-body-md focus:outline-none focus:border-secondary">
+<option selected="">Próprio</option>
+<option>Terceiros</option>
+<option>Intermediação</option>
+</select>
+</label>
+<label class="block">
+<span class="text-body-sm text-on-surface-variant">Direção</span>
+<select class="mt-xs w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-md py-sm font-body-md focus:outline-none focus:border-secondary">
+<option>Entrada</option>
+<option selected="">Saída</option>
+</select>
+</label>
+</div>
+<label class="block">
+<span class="text-body-sm text-on-surface-variant">Vincular a</span>
+<select class="mt-xs w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-md py-sm font-body-md focus:outline-none focus:border-secondary">
+<option selected="">Op #0042 — Próprio (IBRAC) — em beneficiamento</option>
+<option>Criar nova operação</option>
+</select>
+</label>
+<label class="block">
+<span class="text-body-sm text-on-surface-variant">Título gerado (A Receber)</span>
+<input class="mt-xs w-full bg-surface-container-high border border-outline-variant rounded-lg px-md py-sm font-body-md text-on-surface-variant" disabled="" type="text" value="R$ 412.500,00 · Vencimento 12/07/2026"/>
+</label>
+</div>
+</div>
+</div>
+</div>
+<!-- Card 2 Issue: Renato cenário import -->
+</div>
+<!-- Card 2: Revisar / Intermediação -->
+<div class="bg-surface-container-lowest border border-error rounded-xl overflow-hidden shadow-sm">
+<button class="w-full flex items-center justify-between gap-lg p-lg text-left hover:bg-surface-bright transition-colors" onclick="toggleCard('card2')">
+<div class="flex items-center gap-lg flex-1 min-w-0">
+<div class="w-10 h-10 rounded-lg bg-error-container flex items-center justify-center text-on-error-container shrink-0">
+<span class="material-symbols-outlined" data-icon="description">description</span>
+</div>
+<div class="min-w-0">
+<p class="font-title-lg text-body-md font-bold text-on-surface truncate">NF 4521 / Série 1 — Entrada</p>
+<p class="text-body-sm text-on-surface-variant truncate">Sucatas Recicla Norte Ltda → IBRAC · 11/06/2026 16:42</p>
+</div>
+</div>
+<div class="flex items-center gap-md shrink-0">
+<div class="text-right hidden md:block">
+<p class="font-label-md text-label-md text-primary font-bold">R$ 280.500,00</p>
+<p class="text-body-sm text-on-surface-variant">8.500 kg</p>
+</div>
+<span class="bg-tertiary-fixed text-on-tertiary-fixed-variant px-sm py-xs rounded font-label-sm text-label-sm uppercase">Intermediação</span>
+<span class="bg-error-container text-on-error-container px-sm py-xs rounded font-label-sm text-label-sm uppercase flex items-center gap-xs">
+<span class="material-symbols-outlined text-[14px]" data-icon="error">error</span> Revisar
+                            </span>
+<span class="material-symbols-outlined text-on-surface-variant rotate-180" data-icon="expand_more" id="chevron-card2">expand_more</span>
+</div>
+</button>
+<div class="border-t border-outline-variant bg-surface-container-low/40" id="card2-body">
+<div class="p-lg grid grid-cols-1 lg:grid-cols-2 gap-lg">
+<!-- Dados extraídos -->
+<div>
+<h4 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider mb-md flex items-center gap-xs">
+<span class="material-symbols-outlined text-[16px]" data-icon="code">code</span> Dados extraídos do XML
+                                </h4>
+<dl class="space-y-sm text-body-sm">
+<div class="flex justify-between gap-md"><dt class="text-on-surface-variant">Número / Série</dt><dd class="font-bold text-on-surface">4521 / 1</dd></div>
+<div class="flex justify-between gap-md"><dt class="text-on-surface-variant">Data de Emissão</dt><dd class="font-bold text-on-surface">11/06/2026 16:42</dd></div>
+<div class="flex justify-between gap-md"><dt class="text-on-surface-variant">Emitente</dt><dd class="font-bold text-on-surface text-right">Sucatas Recicla Norte Ltda<br/><span class="text-on-surface-variant font-normal">CNPJ 12.345.678/0001-99</span></dd></div>
+<div class="flex justify-between gap-md"><dt class="text-on-surface-variant">Destinatário</dt><dd class="font-bold text-on-surface text-right">IBRAC Ind. e Com. Ltda<br/><span class="text-on-surface-variant font-normal">CNPJ 98.765.432/0001-11</span></dd></div>
+<div class="flex justify-between gap-md"><dt class="text-on-surface-variant">Peso Bruto (NF)</dt><dd class="font-bold text-on-surface">8.500 kg</dd></div>
+<div class="flex justify-between gap-md"><dt class="text-on-surface-variant">Valor Total (NF)</dt><dd class="font-bold text-on-surface">R$ 280.500,00</dd></div>
+<div class="flex justify-between gap-md"><dt class="text-on-surface-variant">Chave de Acesso</dt><dd class="font-label-sm text-label-sm text-on-surface-variant break-all text-right">3526 0612 3456 7800 0199 5500 1000 0045 2111 2345 6789</dd></div>
+</dl>
+<h4 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider mt-lg mb-sm">Itens da NF</h4>
+<div class="border border-outline-variant rounded-lg overflow-hidden">
+<table class="w-full text-left text-body-sm">
+<thead class="bg-surface-container-low"><tr>
+<th class="px-sm py-xs font-label-sm text-label-sm text-on-surface-variant uppercase">NCM</th>
+<th class="px-sm py-xs font-label-sm text-label-sm text-on-surface-variant uppercase">Descrição</th>
+<th class="px-sm py-xs font-label-sm text-label-sm text-on-surface-variant uppercase text-right">Qtd.</th>
+<th class="px-sm py-xs font-label-sm text-label-sm text-on-surface-variant uppercase text-right">Vlr. Total</th>
+</tr></thead>
+<tbody class="divide-y divide-outline-variant">
+<tr><td class="px-sm py-sm font-label-sm text-label-sm">7404.00.00</td><td class="px-sm py-sm">Sucata de Cobre Mélé</td><td class="px-sm py-sm text-right">8.500 kg</td><td class="px-sm py-sm text-right font-bold">R$ 280.500,00</td></tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- Lançamento sugerido -->
+<div>
+<h4 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider mb-md flex items-center gap-xs">
+<span class="material-symbols-outlined text-[16px]" data-icon="auto_awesome">auto_awesome</span> Lançamento Sugerido
+                                </h4>
+<div class="bg-error-container/40 border border-error-container text-on-error-container rounded-lg p-md mb-md flex items-start gap-sm text-body-sm">
+<span class="material-symbols-outlined text-[18px] mt-[-2px]" data-icon="warning">warning</span>
+<p>Cenário sugerido com 92% de confiança, com base no histórico deste fornecedor. Confirme o <strong>dono econômico</strong> antes de lançar.</p>
+</div>
+<div class="space-y-md">
+<div class="grid grid-cols-2 gap-md">
+<label class="block">
+<span class="text-body-sm text-on-surface-variant">Tipo de Operação</span>
+<select class="mt-xs w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-md py-sm font-body-md focus:outline-none focus:border-secondary">
+<option>Próprio</option>
+<option>Terceiros</option>
+<option selected="">Intermediação</option>
+</select>
+</label>
+<label class="block">
+<span class="text-body-sm text-on-surface-variant">Direção</span>
+<select class="mt-xs w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-md py-sm font-body-md focus:outline-none focus:border-secondary">
+<option selected="">Entrada</option>
+<option>Saída</option>
+</select>
+</label>
+</div>
+<label class="block">
+<span class="text-body-sm text-on-surface-variant">Dono Econômico</span>
+<select class="mt-xs w-full bg-surface-container-lowest border border-secondary rounded-lg px-md py-sm font-body-md focus:outline-none focus:border-secondary">
+<option>IBRAC</option>
+<option selected="">Renato</option>
+<option>Recicla Norte Ltda.</option>
+</select>
+<span class="text-body-sm text-on-surface-variant">Sugerido com base no histórico de compras deste fornecedor (92%).</span>
+</label>
+<label class="block">
+<span class="text-body-sm text-on-surface-variant">Quantidade (kg)</span>
+<input class="mt-xs w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-md py-sm font-body-md focus:outline-none focus:border-secondary" type="number" value="8500"/>
+</label>
+<label class="block">
+<span class="text-body-sm text-on-surface-variant">Vincular a</span>
+<select class="mt-xs w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-md py-sm font-body-md focus:outline-none focus:border-secondary">
+<option selected="">Criar nova operação</option>
+<option>Op #0044 — Intermediação (Renato) — em andamento</option>
+</select>
+</label>
+<div class="border-t border-outline-variant pt-md">
+<label class="flex items-center gap-sm cursor-pointer mb-sm">
+<input checked="" class="w-4 h-4 accent-secondary" onclick="toggleTitulo('titulo-card2')" type="checkbox"/>
+<span class="font-bold text-body-md">Gerar título financeiro vinculado</span>
+</label>
+<div class="space-y-md pl-lg" id="titulo-card2">
+<div class="grid grid-cols-2 gap-md">
+<label class="block">
+<span class="text-body-sm text-on-surface-variant">Tipo</span>
+<select class="mt-xs w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-md py-sm font-body-md focus:outline-none focus:border-secondary">
+<option selected="">A Pagar</option>
+<option>A Receber</option>
+</select>
+</label>
+<label class="block">
+<span class="text-body-sm text-on-surface-variant">Vencimento</span>
+<input class="mt-xs w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-md py-sm font-body-md focus:outline-none focus:border-secondary" type="date" value="2026-07-11"/>
+</label>
+</div>
+<div class="grid grid-cols-2 gap-md">
+<label class="block">
+<span class="text-body-sm text-on-surface-variant">Responsável Fiscal</span>
+<input class="mt-xs w-full bg-surface-container-high border border-outline-variant rounded-lg px-md py-sm font-body-md text-on-surface-variant" disabled="" type="text" value="IBRAC (destinatário da NF)"/>
+</label>
+<label class="block">
+<span class="text-body-sm text-on-surface-variant">Responsável Financeiro</span>
+<select class="mt-xs w-full bg-surface-container-lowest border border-secondary rounded-lg px-md py-sm font-body-md focus:outline-none focus:border-secondary">
+<option>IBRAC</option>
+<option selected="">Renato</option>
+</select>
+</label>
+</div>
+<div class="bg-secondary-fixed/40 border border-secondary-fixed text-on-secondary-fixed-variant rounded-lg p-sm text-body-sm flex items-start gap-sm">
+<span class="material-symbols-outlined text-[16px] mt-[-1px]" data-icon="info">info</span>
+<span>Responsável financeiro diferente do fiscal — será registrado como excepcionalidade no extrato do Renato.</span>
+</div>
+<label class="block">
+<span class="text-body-sm text-on-surface-variant">Valor</span>
+<input class="mt-xs w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-md py-sm font-body-md focus:outline-none focus:border-secondary" type="text" value="R$ 280.500,00"/>
+</label>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Card 3: Pronto / Terceiros -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden shadow-sm">
+<button class="w-full flex items-center justify-between gap-lg p-lg text-left hover:bg-surface-bright transition-colors" onclick="toggleCard('card3')">
+<div class="flex items-center gap-lg flex-1 min-w-0">
+<div class="w-10 h-10 rounded-lg bg-surface-container-high flex items-center justify-center text-on-surface-variant shrink-0">
+<span class="material-symbols-outlined" data-icon="description">description</span>
+</div>
+<div class="min-w-0">
+<p class="font-title-lg text-body-md font-bold text-on-surface truncate">NF 887 / Série 1 — Entrada</p>
+<p class="text-body-sm text-on-surface-variant truncate">Recicla Norte Ltda. → IBRAC · 11/06/2026 10:05</p>
+</div>
+</div>
+<div class="flex items-center gap-md shrink-0">
+<div class="text-right hidden md:block">
+<p class="font-label-md text-label-md text-on-surface-variant">sem valor de NF</p>
+<p class="text-body-sm text-on-surface-variant">5.200 kg</p>
+</div>
+<span class="bg-surface-container-high text-on-surface-variant px-sm py-xs rounded font-label-sm text-label-sm uppercase">Terceiros</span>
+<span class="bg-tertiary-fixed text-on-tertiary-fixed-variant px-sm py-xs rounded font-label-sm text-label-sm uppercase flex items-center gap-xs">
+<span class="material-symbols-outlined text-[14px]" data-icon="check_circle">check_circle</span> Pronto
+                            </span>
+<span class="material-symbols-outlined text-on-surface-variant" data-icon="expand_more" id="chevron-card3">expand_more</span>
+</div>
+</button>
+<div class="hidden border-t border-outline-variant bg-surface-container-low/40" id="card3-body">
+<div class="p-lg grid grid-cols-1 md:grid-cols-2 gap-lg">
+<div>
+<h4 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider mb-md flex items-center gap-xs">
+<span class="material-symbols-outlined text-[16px]" data-icon="code">code</span> Dados extraídos do XML
+                                </h4>
+<dl class="space-y-sm text-body-sm">
+<div class="flex justify-between gap-md"><dt class="text-on-surface-variant">Data de Emissão</dt><dd class="font-bold text-on-surface">11/06/2026 10:05</dd></div>
+<div class="flex justify-between gap-md"><dt class="text-on-surface-variant">Emitente</dt><dd class="font-bold text-on-surface text-right">Recicla Norte Ltda.<br/><span class="text-on-surface-variant font-normal">CNPJ 33.444.555/0001-66</span></dd></div>
+<div class="flex justify-between gap-md"><dt class="text-on-surface-variant">Natureza</dt><dd class="font-bold text-on-surface text-right">Remessa para Industrialização</dd></div>
+<div class="flex justify-between gap-md"><dt class="text-on-surface-variant">Peso Líquido (NF)</dt><dd class="font-bold text-on-surface">5.200 kg</dd></div>
+<div class="flex justify-between gap-md"><dt class="text-on-surface-variant">Valor Total (NF)</dt><dd class="font-bold text-on-surface">R$ 0,00 (sem ICMS — remessa)</dd></div>
+</dl>
+</div>
+<div>
+<h4 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider mb-md flex items-center gap-xs">
+<span class="material-symbols-outlined text-[16px]" data-icon="auto_awesome">auto_awesome</span> Lançamento Sugerido
+                                </h4>
+<div class="bg-tertiary-fixed/30 border border-tertiary-fixed text-on-tertiary-fixed-variant rounded-lg p-md mb-md flex items-start gap-sm text-body-sm">
+<span class="material-symbols-outlined text-[18px] mt-[-2px]" data-icon="check_circle">check_circle</span>
+<p>Cenário identificado com 99% de confiança. Material permanece de propriedade do cliente — não gera título financeiro.</p>
+</div>
+<div class="space-y-md">
+<div class="grid grid-cols-2 gap-md">
+<label class="block">
+<span class="text-body-sm text-on-surface-variant">Tipo de Operação</span>
+<select class="mt-xs w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-md py-sm font-body-md focus:outline-none focus:border-secondary">
+<option>Próprio</option>
+<option selected="">Terceiros</option>
+<option>Intermediação</option>
+</select>
+</label>
+<label class="block">
+<span class="text-body-sm text-on-surface-variant">Direção</span>
+<select class="mt-xs w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-md py-sm font-body-md focus:outline-none focus:border-secondary">
+<option selected="">Entrada</option>
+<option>Saída</option>
+</select>
+</label>
+</div>
+<label class="block">
+<span class="text-body-sm text-on-surface-variant">Vincular a</span>
+<select class="mt-xs w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-md py-sm font-body-md focus:outline-none focus:border-secondary">
+<option selected="">Op #0039 — Terceiros (Recicla Norte Ltda.) — em andamento</option>
+<option>Criar nova operação</option>
+</select>
+</label>
+<label class="block">
+<span class="text-body-sm text-on-surface-variant">Quantidade (kg)</span>
+<input class="mt-xs w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-md py-sm font-body-md focus:outline-none focus:border-secondary" type="number" value="5200"/>
+</label>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Sticky Footer Bar -->
+<div class="sticky bottom-0 -mx-lg px-lg py-md bg-surface-container-lowest border-t border-outline-variant flex flex-col md:flex-row items-center justify-between gap-md mt-xl rounded-t-xl shadow-[0_-4px_12px_rgba(0,0,0,0.05)]">
+<p class="text-body-sm text-on-surface-variant text-center md:text-left">Revise os lançamentos sugeridos antes de confirmar. Operações marcadas como <span class="font-bold text-on-error-container">Revisar</span> precisam de atenção.</p>
+<div class="flex gap-sm shrink-0">
+<button class="px-lg py-sm rounded font-label-md text-label-md uppercase tracking-wider border border-outline-variant text-on-surface-variant hover:bg-surface-container-high transition-all">Descartar Tudo</button>
+<button class="px-lg py-sm rounded font-label-md text-label-md uppercase tracking-wider bg-secondary text-on-secondary shadow-lg shadow-secondary/20 hover:opacity-90 transition-all">Confirmar e Lançar (3)</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+<script>
+        function toggleCard(id) {
+            const body = document.getElementById(id + '-body');
+            const chevron = document.getElementById('chevron-' + id);
+            body.classList.toggle('hidden');
+            chevron.classList.toggle('rotate-180');
+        }
+        function toggleTitulo(id) {
+            document.getElementById(id).classList.toggle('hidden');
+        }
+    </script>
+</body></html>
