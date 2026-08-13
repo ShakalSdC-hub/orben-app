@@ -8,10 +8,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Settings, Percent, Plus, Edit, Trash2, CheckCircle } from "lucide-react";
+import { Settings, Percent, Plus, Edit, Trash2, CheckCircle, Download, Database } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { DownloadSourceCodeButton } from "@/components/configuracoes/DownloadSourceCode";
 
 // Configurações Fiscais Tab
 function ConfigFiscalTab() {
@@ -154,10 +155,14 @@ export default function Configuracoes() {
         </div>
 
         <Tabs defaultValue="fiscal" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-1 max-w-md">
+          <TabsList className="grid w-full grid-cols-2 max-w-md">
             <TabsTrigger value="fiscal" className="flex items-center gap-2">
               <Percent className="h-4 w-4" />
               Fiscal
+            </TabsTrigger>
+            <TabsTrigger value="sistema" className="flex items-center gap-2">
+              <Database className="h-4 w-4" />
+              Sistema
             </TabsTrigger>
           </TabsList>
 
@@ -165,6 +170,26 @@ export default function Configuracoes() {
             <Card>
               <CardContent className="pt-6">
                 <ConfigFiscalTab />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="sistema">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Download className="h-5 w-5" />
+                  Código Fonte
+                </CardTitle>
+                <CardDescription>
+                  Baixe o código fonte completo do sistema em um único arquivo ZIP.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  O arquivo inclui a pasta <strong>src/</strong>, <strong>public/</strong> e os arquivos de configuração do projeto.
+                </p>
+                <DownloadSourceCodeButton />
               </CardContent>
             </Card>
           </TabsContent>
