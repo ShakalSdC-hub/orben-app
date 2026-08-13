@@ -29,9 +29,10 @@ export function DownloadSourceCodeButton() {
       const JSZip = (await import("jszip")).default;
       const zip = new JSZip();
 
-      // Coletar src/ e public/ via Vite glob (raw import)
+      // Coletar src/, public/ e arquivos da raiz via Vite glob (raw import)
       const srcFiles = import.meta.glob("/src/**/*", { query: "?raw", import: "default", eager: true });
       const publicFiles = import.meta.glob("/public/**/*", { query: "?raw", import: "default", eager: true });
+      const rootFiles = import.meta.glob("/*", { query: "?raw", import: "default", eager: true });
 
       for (const [path, content] of Object.entries(srcFiles)) {
         zip.file(path.replace(/^\/+/, ""), content as string);
@@ -41,20 +42,12 @@ export function DownloadSourceCodeButton() {
         zip.file(path.replace(/^\/+/, ""), content as string);
       }
 
-      // Adicionar arquivos de configuração da raiz
-      await Promise.all(
-        rootTextFiles.map(async (file) => {
-          try {
-            const response = await fetch(`/${file}`);
-            if (response.ok) {
-              const content = await response.text();
-              zip.file(file, content);
-            }
-          } catch (e) {
-            console.warn(`Não foi possível incluir ${file}`, e);
-          }
-        })
-      );
+      for (const [path, content] of Object.entries(rootFiles)) {
+        const fileName = path.replace(/^\/+/, "");
+        if (rootFileAllowlist.has(fileName)) {
+          zip.file(fileName, content as string);
+        }
+      }
 
       // Adicionar assets binários
       await Promise.all(
