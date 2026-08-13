@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Download, Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
-const rootTextFiles = [
+const rootFileAllowlist = new Set([
   "package.json",
   "tsconfig.json",
   "tsconfig.app.json",
@@ -16,8 +16,7 @@ const rootTextFiles = [
   "components.json",
   "README.md",
   "robots.txt",
-  ".gitignore",
-];
+]);
 
 const binaryAssets = ["/src/assets/orben-logo.jpeg"];
 
