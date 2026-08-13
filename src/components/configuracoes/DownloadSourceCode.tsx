@@ -31,8 +31,8 @@ export function DownloadSourceCodeButton() {
       const zip = new JSZip();
 
       // Coletar src/ e public/ via Vite glob (raw import)
-      const srcFiles = import.meta.glob("/src/**/*", { as: "raw", eager: true });
-      const publicFiles = import.meta.glob("/public/**/*", { as: "raw", eager: true });
+      const srcFiles = import.meta.glob("/src/**/*", { query: "?raw", import: "default", eager: true });
+      const publicFiles = import.meta.glob("/public/**/*", { query: "?raw", import: "default", eager: true });
 
       for (const [path, content] of Object.entries(srcFiles)) {
         zip.file(path.replace(/^\/+/, ""), content as string);
