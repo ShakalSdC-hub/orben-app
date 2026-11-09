@@ -67,8 +67,8 @@ export function DownloadSourceCodeButton() {
       const JSZip = (await import("jszip")).default;
       const zip = new JSZip();
 
-      const srcFiles = import.meta.glob(textPatterns("/src"), { query: "?raw", import: "default", eager: true });
-      const publicFiles = import.meta.glob(textPatterns("/public"), { query: "?raw", import: "default", eager: true });
+      const srcFiles = import.meta.glob(srcPatterns, { query: "?raw", import: "default", eager: true });
+      const publicFiles = import.meta.glob(publicPatterns, { query: "?raw", import: "default", eager: true });
       const rootFiles = import.meta.glob(rootPatterns, { query: "?raw", import: "default", eager: true });
 
       for (const [path, content] of Object.entries(srcFiles)) {
