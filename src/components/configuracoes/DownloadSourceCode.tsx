@@ -18,7 +18,45 @@ const rootFileAllowlist = new Set([
   "robots.txt",
 ]);
 
-const binaryAssets = ["/src/assets/orben-logo.jpeg"];
+// Apenas arquivos de texto podem ser importados com ?raw: arquivos binários
+// (imagens, ícones) quebram o carregamento da página.
+const srcPatterns = [
+  "/src/**/*.ts",
+  "/src/**/*.tsx",
+  "/src/**/*.js",
+  "/src/**/*.jsx",
+  "/src/**/*.css",
+  "/src/**/*.json",
+  "/src/**/*.md",
+  "/src/**/*.html",
+  "/src/**/*.svg",
+];
+
+const publicPatterns = [
+  "/public/**/*.svg",
+  "/public/**/*.txt",
+  "/public/**/*.html",
+  "/public/**/*.json",
+  "/public/**/*.xml",
+  "/public/**/*.webmanifest",
+];
+
+const rootPatterns = [
+  "/package.json",
+  "/tsconfig.json",
+  "/tsconfig.app.json",
+  "/tsconfig.node.json",
+  "/vite.config.ts",
+  "/tailwind.config.ts",
+  "/postcss.config.js",
+  "/eslint.config.js",
+  "/index.html",
+  "/components.json",
+  "/README.md",
+];
+
+// Arquivos binários são baixados via fetch, não via import ?raw.
+const binaryAssets = ["/src/assets/orben-logo.jpeg", "/public/favicon.ico"];
 
 export function DownloadSourceCodeButton() {
   const [isLoading, setIsLoading] = useState(false);
@@ -29,10 +67,9 @@ export function DownloadSourceCodeButton() {
       const JSZip = (await import("jszip")).default;
       const zip = new JSZip();
 
-      // Coletar src/, public/ e arquivos da raiz via Vite glob (raw import)
-      const srcFiles = import.meta.glob("/src/**/*", { query: "?raw", import: "default", eager: true });
-      const publicFiles = import.meta.glob("/public/**/*", { query: "?raw", import: "default", eager: true });
-      const rootFiles = import.meta.glob(["/package.json", "/tsconfig*.json", "/vite.config.ts", "/tailwind.config.ts", "/postcss.config.js", "/eslint.config.js", "/index.html", "/components.json", "/README.md"], { query: "?raw", import: "default", eager: true });
+      const srcFiles = import.meta.glob(srcPatterns, { query: "?raw", import: "default", eager: true });
+      const publicFiles = import.meta.glob(publicPatterns, { query: "?raw", import: "default", eager: true });
+      const rootFiles = import.meta.glob(rootPatterns, { query: "?raw", import: "default", eager: true });
 
       for (const [path, content] of Object.entries(srcFiles)) {
         zip.file(path.replace(/^\/+/, ""), content as string);
@@ -49,7 +86,6 @@ export function DownloadSourceCodeButton() {
         }
       }
 
-      // Adicionar assets binários
       await Promise.all(
         binaryAssets.map(async (asset) => {
           try {
