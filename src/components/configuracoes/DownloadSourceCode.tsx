@@ -20,10 +20,26 @@ const rootFileAllowlist = new Set([
 
 // Apenas arquivos de texto podem ser importados com ?raw: arquivos binários
 // (imagens, ícones) quebram o carregamento da página.
-const textPatterns = (base: string) =>
-  ["ts", "tsx", "js", "jsx", "mjs", "cjs", "css", "scss", "json", "md", "html", "svg", "txt", "xml", "yml", "yaml", "csv"].map(
-    (ext) => `${base}/**/*.${ext}`,
-  );
+const srcPatterns = [
+  "/src/**/*.ts",
+  "/src/**/*.tsx",
+  "/src/**/*.js",
+  "/src/**/*.jsx",
+  "/src/**/*.css",
+  "/src/**/*.json",
+  "/src/**/*.md",
+  "/src/**/*.html",
+  "/src/**/*.svg",
+];
+
+const publicPatterns = [
+  "/public/**/*.svg",
+  "/public/**/*.txt",
+  "/public/**/*.html",
+  "/public/**/*.json",
+  "/public/**/*.xml",
+  "/public/**/*.webmanifest",
+];
 
 const rootPatterns = [
   "/package.json",
