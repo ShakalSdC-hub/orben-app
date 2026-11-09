@@ -32,7 +32,7 @@ export function DownloadSourceCodeButton() {
       // Coletar src/, public/ e arquivos da raiz via Vite glob (raw import)
       const srcFiles = import.meta.glob("/src/**/*", { query: "?raw", import: "default", eager: true });
       const publicFiles = import.meta.glob("/public/**/*", { query: "?raw", import: "default", eager: true });
-      const rootFiles = import.meta.glob("/*", { query: "?raw", import: "default", eager: true });
+      const rootFiles = import.meta.glob(["/package.json", "/tsconfig*.json", "/vite.config.ts", "/tailwind.config.ts", "/postcss.config.js", "/eslint.config.js", "/index.html", "/components.json", "/README.md"], { query: "?raw", import: "default", eager: true });
 
       for (const [path, content] of Object.entries(srcFiles)) {
         zip.file(path.replace(/^\/+/, ""), content as string);
