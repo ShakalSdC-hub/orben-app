@@ -1,0 +1,2 @@
+DROP POLICY IF EXISTS "Produtos terceiros visíveis para todos autenticados" ON public.produtos_terceiros;
+CREATE POLICY "Produtos terceiros visíveis para usuários com papel" ON public.produtos_terceiros FOR SELECT TO authenticated USING (public.has_any_role(auth.uid()));
