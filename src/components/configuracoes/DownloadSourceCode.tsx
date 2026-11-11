@@ -67,9 +67,38 @@ export function DownloadSourceCodeButton() {
       const JSZip = (await import("jszip")).default;
       const zip = new JSZip();
 
-      const srcFiles = import.meta.glob(srcPatterns, { query: "?raw", import: "default", eager: true });
-      const publicFiles = import.meta.glob(publicPatterns, { query: "?raw", import: "default", eager: true });
-      const rootFiles = import.meta.glob(rootPatterns, { query: "?raw", import: "default", eager: true });
+      const srcFiles = import.meta.glob([
+  "/src/**/*.ts",
+  "/src/**/*.tsx",
+  "/src/**/*.js",
+  "/src/**/*.jsx",
+  "/src/**/*.css",
+  "/src/**/*.json",
+  "/src/**/*.md",
+  "/src/**/*.html",
+  "/src/**/*.svg",
+], { query: "?raw", import: "default", eager: true });
+      const publicFiles = import.meta.glob([
+  "/public/**/*.svg",
+  "/public/**/*.txt",
+  "/public/**/*.html",
+  "/public/**/*.json",
+  "/public/**/*.xml",
+  "/public/**/*.webmanifest",
+], { query: "?raw", import: "default", eager: true });
+      const rootFiles = import.meta.glob([
+  "/package.json",
+  "/tsconfig.json",
+  "/tsconfig.app.json",
+  "/tsconfig.node.json",
+  "/vite.config.ts",
+  "/tailwind.config.ts",
+  "/postcss.config.js",
+  "/eslint.config.js",
+  "/index.html",
+  "/components.json",
+  "/README.md",
+], { query: "?raw", import: "default", eager: true });
 
       for (const [path, content] of Object.entries(srcFiles)) {
         zip.file(path.replace(/^\/+/, ""), content as string);
